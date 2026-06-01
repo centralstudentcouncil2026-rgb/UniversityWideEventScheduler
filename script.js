@@ -12,7 +12,6 @@ const $ = (id) => document.getElementById(id);
 const state = {
   store: null,
   calendar: null,
-  miniCalendarDate: new Date(),
   pendingEvent: null,
   pendingConflictContinuation: null,
   selectedDetails: null,
@@ -51,8 +50,6 @@ function bindEvents() {
   $('registerRole').addEventListener('change', updateRegistrationFields);
   $('mobileMenuButton').addEventListener('click', openSidebar);
   $('mobileScrim').addEventListener('click', closeSidebar);
-  $('miniPrevButton').addEventListener('click', () => shiftMiniCalendar(-1));
-  $('miniNextButton').addEventListener('click', () => shiftMiniCalendar(1));
   $('createEventButton').addEventListener('click', () => openEventModal(defaultRange()));
   $('eventForm').addEventListener('submit', submitEventForm);
   $('eventScheduleType').addEventListener('change', updateScheduleType);
@@ -165,7 +162,7 @@ function initializeCalendar() {
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (_info, success) => success(calendarEvents()),
-    datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; state.miniCalendarDate = new Date(info.start); renderMiniCalendar(); updateAvailability(); },
+    datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
     selectAllow: () => !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
     dateClick: (info) => {
@@ -178,7 +175,6 @@ function initializeCalendar() {
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
   state.calendar.render();
-  renderMiniCalendar();
 }
 
 function refreshCalendar() {
@@ -518,8 +514,6 @@ function updateFilters() { state.filters = { organization: $('filterOrganization
 function resetFilters() { state.filters = { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' }; ['filterVenue', 'filterEventType', 'filterDate', 'filterMonth'].forEach((id) => $(id).value = ''); renderFilterOptions(); $('filterApproval').value = ''; $('filterEventStatus').value = ''; refreshCalendar(); }
 
 function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : 'Select a calendar date to see its public events.'; }
-function renderMiniCalendar() { const date = state.miniCalendarDate; const first = new Date(date.getFullYear(), date.getMonth(), 1); const offset = (first.getDay() + 6) % 7; const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset); $('miniCalendarTitle').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); $('miniCalendar').innerHTML = ['M','T','W','T','F','S','S'].map((d) => `<div class="mini-weekday">${d}</div>`).join(''); for (let i = 0; i < 42; i += 1) { const day = addMinutes(start, i * 1440); const button = document.createElement('button'); button.className = 'mini-day'; button.type = 'button'; button.textContent = day.getDate(); button.style.opacity = day.getMonth() === first.getMonth() ? '1' : '.35'; button.addEventListener('click', () => { state.calendar.gotoDate(day); closeSidebar(); }); $('miniCalendar').appendChild(button); } }
-function shiftMiniCalendar(amount) { state.miniCalendarDate = new Date(state.miniCalendarDate.getFullYear(), state.miniCalendarDate.getMonth() + amount, 1); renderMiniCalendar(); }
 function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
 function handleResize() { if (!state.calendar) return; if (!MOBILE_VIEWS.has(state.calendar.view.type)) state.calendar.changeView('timeGridWeek'); state.calendar.updateSize(); }
 function openSidebar() { $('sidebar').classList.add('open'); $('mobileScrim').classList.add('open'); }

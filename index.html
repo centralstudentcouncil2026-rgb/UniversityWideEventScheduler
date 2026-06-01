@@ -7,7 +7,7 @@
   <title>CORE | University Coordination Calendar</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260601-public-month-v1">
+  <link rel="stylesheet" href="style.css?v=20260602-month-band-v1">
 </head>
 <body>
   <div class="app-shell">
@@ -43,7 +43,6 @@
       <button class="create-button restricted-only" id="createEventButton">+ Post University Event</button>
       <section class="sidebar-section availability-card"><span class="section-label">Shared Calendar</span><strong id="availabilityStatus">Public Events Overview</strong><p id="availabilityDetail">Select a calendar date to see its public events.</p></section>
       <section class="sidebar-section announcement-preview"><span class="section-label">Announcements</span><div id="announcementPreview"></div><button class="secondary-button" id="announcementsButton">View Announcements</button></section>
-      <section class="sidebar-section"><div class="mini-calendar-header"><button class="icon-button" id="miniPrevButton" aria-label="Previous month">&#8249;</button><strong id="miniCalendarTitle">Month</strong><button class="icon-button" id="miniNextButton" aria-label="Next month">&#8250;</button></div><div id="miniCalendar" class="mini-calendar"></div></section>
       <section class="sidebar-section">
         <span class="section-label">Calendar</span>
         <button class="secondary-button" id="filtersButton">Filters</button>
@@ -126,6 +125,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="supabaseClient.js?v=20260601-supabase-v1"></script>
-  <script type="module" src="script.js?v=20260601-public-month-v2"></script>
+  <script type="module" src="script.js?v=20260602-month-band-v1"></script>
 </body>
 </html>

@@ -477,57 +477,6 @@ button {
   margin: 0;
 }
 
-.mini-calendar-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.mini-calendar-header strong {
-  color: var(--aup-navy);
-}
-
-.mini-calendar {
-  display: grid;
-  gap: 3px;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.mini-day,
-.mini-weekday {
-  align-items: center;
-  border-radius: 50%;
-  color: var(--aup-muted);
-  display: flex;
-  font-size: 12px;
-  height: 31px;
-  justify-content: center;
-  width: 31px;
-}
-
-.mini-weekday {
-  color: var(--aup-navy);
-  font-weight: 700;
-}
-
-.mini-day {
-  border: 0;
-  background: transparent;
-}
-
-.mini-day:hover,
-.mini-day.selected {
-  background: var(--aup-gold);
-  color: var(--aup-navy);
-  font-weight: 800;
-}
-
-.mini-day.today {
-  outline: 2px solid var(--aup-blue);
-  outline-offset: -2px;
-}
-
 .check-row {
   align-items: center;
   color: var(--aup-text);
@@ -687,6 +636,26 @@ body.is-public .view-selector {
 
 .fc .fc-highlight {
   background: rgba(244, 180, 0, 0.22);
+}
+
+.fc .fc-daygrid-day-bg {
+  align-items: center;
+  display: flex;
+}
+
+.fc .fc-daygrid-day-bg .fc-highlight {
+  background: var(--aup-gold);
+  border-radius: 999px;
+  bottom: auto;
+  flex: 0 0 auto;
+  height: 8px;
+  left: -1px;
+  margin: 0;
+  opacity: 0.85;
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(100% + 2px);
 }
 
 .fc .fc-event {
