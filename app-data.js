@@ -9,6 +9,7 @@ const EMPTY_COLLECTIONS = [
   'activityLogs',
   'accountRequests'
 ];
+const INTERNAL_PRIVACY_MARKER = '[[privacy:internal]]';
 
 export function createId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -32,6 +33,18 @@ export function normalizeStore(store = {}) {
   return normalized;
 }
 
+export function storeForPersistence(store) {
+  return {
+    ...store,
+    events: store.events.map((event) => ({
+      ...event,
+      private_notes: event.privacy_level === 'internal'
+        ? [INTERNAL_PRIVACY_MARKER, event.private_notes].filter(Boolean).join('\n')
+        : event.private_notes
+    }))
+  };
+}
+
 function normalizeEvent(event) {
   const occurrences = event.occurrences?.length
     ? event.occurrences.map((item) => occurrenceFromRange(item.start_time, item.end_time, item.id))
@@ -39,6 +52,8 @@ function normalizeEvent(event) {
   occurrences.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   return {
     ...event,
+    privacy_level: String(event.private_notes || '').includes(INTERNAL_PRIVACY_MARKER) ? 'internal' : event.privacy_level || 'basic',
+    private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
     occurrences,
     start_time: occurrences[0]?.start_time || event.start_time,

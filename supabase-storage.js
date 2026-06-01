@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260601-cleanup-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260601-public-month-v2';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -34,7 +34,7 @@ export async function loadStore() {
 }
 
 export async function saveStore(store) {
-  await rpc('save_scheduler_store', { p_store: store }, true);
+  await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
 }
 
 export async function authenticate(username, password) {

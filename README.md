@@ -20,9 +20,14 @@ The backend uses Supabase Auth, relational scheduler tables, role-aware RPCs,
 and Row Level Security. Public viewers can read the approved calendar without
 an account. Organization and admin accounts require admin approval.
 
-Public viewers do not need an account. New organization and admin accounts are
-submitted from the public registration form and remain unavailable until an
-admin approves them from the Accounts panel.
+Public viewers do not need an account. They receive a month-only overview and
+can select a date to inspect its public events. New organization and admin
+accounts are submitted from the public registration form and remain unavailable
+until an admin approves them from the Accounts panel.
+
+Active organization accounts can post events directly. Admin-blocked periods
+prevent posting, while schedule overlaps remain visible warnings. Events marked
+internal or draft remain visible only to the posting organization and admins.
 
 ## Run Locally
 

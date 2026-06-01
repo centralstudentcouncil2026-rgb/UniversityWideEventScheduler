@@ -1,10 +1,10 @@
-import { createId } from './app-data.js?v=20260601-cleanup-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260601-cleanup-v1';
+import { createId } from './app-data.js?v=20260601-public-month-v2';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260601-public-month-v2';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
   canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
-  eventOccurrences, findBlockingTime, findVenueConflicts, isManager, isPublic, isSuperAdmin, overlaps
-} from './app-rules.js';
+  eventOccurrences, findBlockingTime, findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
+} from './app-rules.js?v=20260601-public-month-v2';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -17,7 +17,8 @@ const state = {
   pendingConflictContinuation: null,
   selectedDetails: null,
   confirmAction: null,
-  filters: { organization: '', venue: '', category: '', eventType: '', month: '', approval: '', eventStatus: '' },
+  filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
+  selectedPublicDate: '',
   search: ''
 };
 
@@ -68,8 +69,9 @@ function bindEvents() {
   $('agreementSubmitButton').addEventListener('click', finishAgreement);
   $('conflictContinueButton').addEventListener('click', continueAfterConflict);
   $('filtersButton').addEventListener('click', () => openDialog('filtersModal'));
-  ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterMonth', 'filterApproval', 'filterEventStatus'].forEach((id) => $(id).addEventListener('input', updateFilters));
+  ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'].forEach((id) => $(id).addEventListener('input', updateFilters));
   $('resetFiltersButton').addEventListener('click', resetFilters);
+  $('notificationsButton').addEventListener('click', openNotifications);
   $('dashboardButton').addEventListener('click', openDashboard);
   $('announcementsButton').addEventListener('click', openAnnouncements);
   $('announcementForm').addEventListener('submit', addAnnouncement);
@@ -93,6 +95,7 @@ function bindEvents() {
   $('accountRequestsList').addEventListener('click', handleListAction);
   $('activityLogButton').addEventListener('click', openActivityLog);
   $('confirmYesButton').addEventListener('click', confirmPendingAction);
+  $('closePublicDayPanel').addEventListener('click', closePublicDayPanel);
   document.addEventListener('click', (event) => {
     const closer = event.target.closest('[data-close]');
     if (closer) closeDialog(closer.dataset.close);
@@ -138,6 +141,8 @@ function renderRole() {
   document.body.classList.toggle('is-public', isPublic(state.store));
   $('profileName').textContent = user.full_name;
   $('profileInitials').textContent = initials(user.full_name);
+  if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
+  if (!isPublic(state.store)) closePublicDayPanel();
 }
 
 function renderFormOptions() {
@@ -154,17 +159,21 @@ function renderFilterOptions() {
 
 function initializeCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
-    initialView: 'timeGridWeek', firstDay: 1, height: '100%', expandRows: true, nowIndicator: true,
+    initialView: isPublic(state.store) ? 'dayGridMonth' : 'timeGridWeek', firstDay: 1, height: '100%', expandRows: true, nowIndicator: true,
     selectable: true, selectMirror: true, selectMinDistance: 3, longPressDelay: 220, selectLongPressDelay: 220,
     eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotMinTime: '07:00:00',
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (_info, success) => success(calendarEvents()),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; state.miniCalendarDate = new Date(info.start); renderMiniCalendar(); updateAvailability(); },
-    selectAllow: () => window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
+    selectAllow: () => !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
-    dateClick: (info) => { if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return; openEventModal(mobileTapRange(info)); },
-    eventClick: (info) => openDetails(info.event.extendedProps),
+    dateClick: (info) => {
+      if (isPublic(state.store)) return openPublicDayPanel(dateInput(info.date));
+      if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return;
+      openEventModal(mobileTapRange(info));
+    },
+    eventClick: (info) => isPublic(state.store) ? openPublicDayPanel(dateInput(info.event.start)) : openDetails(info.event.extendedProps),
     eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
@@ -175,14 +184,15 @@ function initializeCalendar() {
 function refreshCalendar() {
   state.calendar?.refetchEvents();
   updateAvailability();
+  if (state.selectedPublicDate) renderPublicDayPanel();
 }
 
 function calendarEvents() {
   const user = currentUser(state.store);
   const events = state.store.events.filter((event) => {
-    if (isPublic(state.store)) return event.approval_status === 'approved';
+    if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
-    return event.approval_status === 'approved' || event.organization_id === user.organization_id;
+    return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters).flatMap((event) => {
     const category = categoryById(state.store, event.category_id);
     const occurrences = eventOccurrences(event);
@@ -199,6 +209,7 @@ function matchesFilters(event) {
   if (state.filters.venue && !event.venue.toLowerCase().includes(state.filters.venue.toLowerCase())) return false;
   if (state.filters.category && event.category_id !== state.filters.category) return false;
   if (state.filters.eventType && !event.event_type.toLowerCase().includes(state.filters.eventType.toLowerCase())) return false;
+  if (state.filters.date && !eventOccurrences(event).some((item) => item.date === state.filters.date)) return false;
   if (state.filters.month && !eventOccurrences(event).some((item) => item.start_time.slice(0, 7) === state.filters.month)) return false;
   if (state.filters.approval && event.approval_status !== state.filters.approval) return false;
   if (state.filters.eventStatus && event.event_status !== state.filters.eventStatus) return false;
@@ -208,7 +219,7 @@ function matchesFilters(event) {
 function openEventModal(range, record = null) {
   if (!requirePermission(canEditEvent(state.store, record), 'You cannot edit this event.')) return;
   renderFormOptions();
-  $('eventForm').reset(); $('eventId').value = record?.id || ''; $('eventModalTitle').textContent = record ? 'Edit Event Request' : 'Event Reservation Request';
+  $('eventForm').reset(); $('eventId').value = record?.id || ''; $('eventModalTitle').textContent = record ? 'Edit University Event' : 'Post University Event';
   $('eventOrganization').value = record?.organization_id || currentUser(state.store).organization_id || state.store.organizations[0]?.id || '';
   $('eventCategory').value = record?.category_id || state.store.categories.find((item) => item.active)?.id || '';
   $('eventTitle').value = record?.title || ''; $('eventType').value = record?.event_type || ''; $('eventVenue').value = record?.venue || '';
@@ -219,6 +230,7 @@ function openEventModal(range, record = null) {
   renderOccurrenceRows(occurrences);
   updateScheduleType();
   $('eventAttendees').value = record?.expected_attendees || ''; $('eventStatus').value = record?.event_status || 'planned';
+  $('eventPrivacy').value = record?.privacy_level || 'basic';
   $('eventContactPerson').value = record?.contact_person || currentUser(state.store).full_name; $('eventContactInfo').value = record?.contact_info || '';
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
   $('eventPrivateNotes').value = record?.private_notes || ''; $('eventAdminNotes').value = record?.admin_notes || ''; $('eventRejectionReason').value = record?.rejection_reason || '';
@@ -238,7 +250,7 @@ function readEventForm() {
     expected_attendees: Number($('eventAttendees').value), public_description: $('eventPublicDescription').value.trim(), purpose: $('eventPurpose').value.trim(),
     contact_person: $('eventContactPerson').value.trim(), contact_info: $('eventContactInfo').value.trim(), private_notes: $('eventPrivateNotes').value.trim(),
     admin_notes: isSuperAdmin(state.store) ? $('eventAdminNotes').value.trim() : existing?.admin_notes || '', rejection_reason: isSuperAdmin(state.store) ? $('eventRejectionReason').value.trim() : existing?.rejection_reason || '',
-    event_status: $('eventStatus').value, approval_status: existing?.approval_status || 'pending', created_by: existing?.created_by || currentUser(state.store).id,
+    event_status: $('eventStatus').value, privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
     created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
 }
@@ -313,9 +325,9 @@ function submitEventForm(event) {
   candidate.conflict_event_ids = conflicts.map((item) => item.id);
   state.pendingEvent = candidate;
   if (conflicts.length) {
-    log('event_conflict_warning', `"${candidate.title}" has pending venue/time conflicts.`, { event_id: candidate.id, conflict_ids: candidate.conflict_event_ids });
+    log('event_conflict_warning', `"${candidate.title}" has schedule conflicts.`, { event_id: candidate.id, conflict_ids: candidate.conflict_event_ids });
     state.pendingConflictContinuation = () => openAgreementOrPersist(candidate);
-    return showConflict('Venue Conflict Warning', 'Another organization has an event request at the same venue and time. This request may continue as pending for admin review.', conflicts, true);
+    return showConflict('Schedule Conflict Warning', 'Another organization has an event during this time. You may continue posting, but review the schedule and venue first.', conflicts, true);
   }
   openAgreementOrPersist(candidate);
 }
@@ -341,10 +353,9 @@ function finishAgreement() { if (!$('agreementSubmitButton').disabled && state.p
 
 function saveEvent(candidate) {
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
-  if (existingIndex >= 0 && isManager(state.store) && state.store.events[existingIndex].approval_status === 'approved') candidate.approval_status = 'pending';
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
-  log(existingIndex >= 0 ? 'event_request_updated' : 'event_request_submitted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
-  closeDialog('eventModal'); state.pendingEvent = null; persist('Event request saved.');
+  log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
+  closeDialog('eventModal'); state.pendingEvent = null; persist('Event saved.');
 }
 
 function openDetails(props) {
@@ -363,6 +374,32 @@ function openDetails(props) {
     $('detailsApproveButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'rejected';
   }
   openDialog('detailsModal');
+}
+
+function openPublicDayPanel(date) {
+  state.selectedPublicDate = date;
+  renderPublicDayPanel();
+  $('publicDayPanel').classList.add('open');
+  $('publicDayPanel').setAttribute('aria-hidden', 'false');
+}
+
+function closePublicDayPanel() {
+  state.selectedPublicDate = '';
+  $('publicDayPanel').classList.remove('open');
+  $('publicDayPanel').setAttribute('aria-hidden', 'true');
+}
+
+function renderPublicDayPanel() {
+  if (!state.selectedPublicDate) return;
+  const items = state.store.events
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .flatMap((event) => eventOccurrences(event).filter((occurrence) => occurrence.date === state.selectedPublicDate).map((occurrence) => ({ event, occurrence })))
+    .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
+  $('publicDayTitle').textContent = new Date(`${state.selectedPublicDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('publicDayEvents').innerHTML = items.map(({ event, occurrence }) => {
+    const category = categoryById(state.store, event.category_id);
+    return `<article class="public-day-event" style="border-left-color:${escapeHtml(category.color)}"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatTime(occurrence.start_time))} to ${escapeHtml(formatTime(occurrence.end_time))}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(category.name)} - ${escapeHtml(cap(event.event_status))}</p><p>${escapeHtml(event.public_description)}</p></article>`;
+  }).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
 }
 
 function editSelectedEvent() { const event = state.selectedDetails?.record; if (!event) return; closeDialog('detailsModal'); openEventModal({ start: new Date(event.start_time), end: new Date(event.end_time) }, event); }
@@ -400,7 +437,6 @@ function persistMovedCalendarItem(info) {
   const block = findEventBlock(candidate);
   if (block) { showConflict('Move Blocked', 'This period is blocked by the admin.', [block], false); return info.revert(); }
   candidate.conflict_event_ids = findVenueConflicts(state.store, candidate).map((event) => event.id);
-  if (isManager(state.store) && record.approval_status === 'approved') candidate.approval_status = 'pending';
   Object.assign(record, candidate); log('event_request_moved', `${currentUser(state.store).full_name} moved "${record.title}".`, record); persist('Event schedule updated.');
 }
 
@@ -409,12 +445,27 @@ function renderAnnouncementPreview() { const first = activeAnnouncements(state.s
 function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${isSuperAdmin(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
 function addAnnouncement(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), title: $('announcementTitle').value.trim(), content: $('announcementContent').value.trim(), priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${$('announcementExpiry').value}T23:59:59` }; state.store.announcements.push(item); log('announcement_posted', `Posted announcement "${item.title}".`, item); event.target.reset(); persist('Announcement posted.'); renderAnnouncements(); }
 
+function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
+function renderNotifications() {
+  const user = currentUser(state.store);
+  const upcomingLimit = addDays(new Date(), 7);
+  const ownEvents = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id);
+  const notices = [
+    ...activeAnnouncements(state.store).map((item) => ({ title: `Announcement: ${item.title}`, detail: `${cap(item.priority)} - ${item.content}`, date: item.posted_at })),
+    ...state.store.blockedTimes.filter((item) => new Date(item.end_time) >= new Date()).map((item) => ({ title: `Blocked period: ${item.title}`, detail: `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`, date: item.created_at })),
+    ...ownEvents.filter((item) => eventIsActive(item) && new Date(item.start_time) >= new Date() && new Date(item.start_time) <= upcomingLimit).map((item) => ({ title: `Upcoming event: ${item.title}`, detail: `${item.venue} - ${formatDateTime(item.start_time)}`, date: item.start_time })),
+    ...ownEvents.filter((item) => item.conflict_event_ids?.length).map((item) => ({ title: `Conflict warning: ${item.title}`, detail: `${item.conflict_event_ids.length} overlapping event(s) need review.`, date: item.updated_at })),
+    ...state.store.concerns.filter((item) => isSuperAdmin(state.store) || item.organization_id === user.organization_id).filter((item) => item.admin_response).map((item) => ({ title: `Concern update: ${item.title}`, detail: `${cap(item.status)} - ${item.admin_response}`, date: item.updated_at }))
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  $('notificationsList').innerHTML = notices.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>${escapeHtml(formatDateTime(item.date))}</p></div>`).join('') || empty('No notifications right now.');
+}
+
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }
-function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.status}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${isSuperAdmin(state.store) ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}` : ''}</div>`).join('') || empty('No concerns'); }
+function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.status}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${isSuperAdmin(state.store) ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
 function addConcern(event) { event.preventDefault(); if (!isManager(state.store)) return; const user = currentUser(state.store); const org = state.store.organizations.find((item) => item.id === user.organization_id); const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title: $('concernTitle').value.trim(), category: $('concernCategory').value, priority: $('concernPriority').value, description: $('concernDescription').value.trim(), status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.concerns.push(item); log('concern_submitted', `${user.full_name} raised "${item.title}".`, item); event.target.reset(); persist('Concern submitted.'); renderConcerns(); }
 
 function openDashboard() { if (!requirePermission(!isPublic(state.store), 'Login to view a dashboard.')) return; renderDashboard(); openDialog('dashboardModal'); }
-function renderDashboard() { const user = currentUser(state.store); const events = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id); const upcoming = events.filter((item) => new Date(item.start_time) >= new Date() && item.event_status !== 'cancelled'); const metrics = isSuperAdmin(state.store) ? [['Pending approvals', events.filter((item) => item.approval_status === 'pending').length], ['Upcoming approved', events.filter((item) => item.approval_status === 'approved' && new Date(item.start_time) >= new Date()).length], ['Blocked periods', state.store.blockedTimes.length], ['Open concerns', state.store.concerns.filter((item) => !['resolved', 'rejected'].includes(item.status)).length], ['Conflict warnings', events.filter((item) => item.conflict_event_ids?.length).length], ['Organizations', state.store.organizations.length]] : [['Upcoming events', upcoming.length], ['Submitted requests', events.length], ['Pending requests', events.filter((item) => item.approval_status === 'pending').length], ['Postponed / cancelled', events.filter((item) => ['postponed', 'cancelled'].includes(item.event_status)).length], ['Open concerns', state.store.concerns.filter((item) => item.organization_id === user.organization_id && !['resolved', 'rejected'].includes(item.status)).length], ['Blocked periods', state.store.blockedTimes.length]];
+function renderDashboard() { const user = currentUser(state.store); const events = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id); const upcoming = events.filter((item) => new Date(item.start_time) >= new Date() && eventIsActive(item)); const metrics = isSuperAdmin(state.store) ? [['All posted events', events.length], ['Upcoming programs', upcoming.length], ['Blocked periods', state.store.blockedTimes.length], ['Announcements', activeAnnouncements(state.store).length], ['Open concerns', state.store.concerns.filter((item) => !['resolved', 'rejected'].includes(item.status)).length], ['Conflict warnings', events.filter((item) => item.conflict_event_ids?.length).length], ['Organizations', state.store.organizations.length]] : [['Upcoming events', upcoming.length], ['Submitted events', events.length], ['Postponed / cancelled', events.filter((item) => ['postponed', 'cancelled'].includes(item.event_status)).length], ['Raised concerns', state.store.concerns.filter((item) => item.organization_id === user.organization_id).length], ['Announcements', activeAnnouncements(state.store).length], ['Blocked periods', state.store.blockedTimes.length]];
   $('dashboardTitle').textContent = isSuperAdmin(state.store) ? 'Admin Dashboard' : 'Organization Dashboard'; $('dashboardGrid').innerHTML = metrics.map(([label, value]) => `<div class="metric"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`).join('');
   $('dashboardList').innerHTML = upcoming.slice(0, 8).map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.venue)} - ${escapeHtml(formatDateTime(item.start_time))}</p></div>`).join('') || empty('No upcoming events');
 }
@@ -456,19 +507,20 @@ function handleListAction(event) {
   if (action === 'account-reject') rejectAccount(id);
   if (action === 'concern-review') { const item = state.store.concerns.find((concern) => concern.id === id); const response = prompt('Admin response:', item.admin_response || ''); if (response !== null) { item.admin_response = response.trim(); item.status = 'in_review'; item.updated_at = new Date().toISOString(); log('concern_responded', `Responded to "${item.title}".`, item); persist('Concern response saved.'); renderConcerns(); } }
   if (action === 'concern-resolve') { const item = state.store.concerns.find((concern) => concern.id === id); item.status = 'resolved'; item.updated_at = new Date().toISOString(); log('concern_resolved', `Resolved "${item.title}".`, item); persist('Concern resolved.'); renderConcerns(); }
+  if (action === 'concern-reject') { const item = state.store.concerns.find((concern) => concern.id === id); item.status = 'rejected'; item.updated_at = new Date().toISOString(); log('concern_rejected', `Rejected "${item.title}".`, item); persist('Concern rejected.'); renderConcerns(); }
 }
 
 async function removeById(collection, id, action, message) { const item = state.store[collection].find((entry) => entry.id === id); try { await deleteRecord(collection, id); state.store[collection] = state.store[collection].filter((entry) => entry.id !== id); log(action, message, item); await persist(message); if (collection === 'announcements') renderAnnouncements(); if (collection === 'blockedTimes') renderBlockedTimes(); if (collection === 'categories') renderCategories(); if (collection === 'organizations') renderOrganizations(); } catch (error) { showToast(error.message, 'error'); } }
 function confirmAction(message, action) { state.confirmAction = action; $('confirmMessage').textContent = message; openDialog('confirmModal'); }
 function confirmPendingAction() { const action = state.confirmAction; state.confirmAction = null; closeDialog('confirmModal'); action?.(); }
 
-function updateFilters() { state.filters = { organization: $('filterOrganization').value, venue: $('filterVenue').value.trim(), category: $('filterCategory').value, eventType: $('filterEventType').value.trim(), month: $('filterMonth').value, approval: $('filterApproval').value, eventStatus: $('filterEventStatus').value }; refreshCalendar(); }
-function resetFilters() { state.filters = { organization: '', venue: '', category: '', eventType: '', month: '', approval: '', eventStatus: '' }; ['filterVenue', 'filterEventType', 'filterMonth'].forEach((id) => $(id).value = ''); renderFilterOptions(); $('filterApproval').value = ''; $('filterEventStatus').value = ''; refreshCalendar(); }
+function updateFilters() { state.filters = { organization: $('filterOrganization').value, venue: $('filterVenue').value.trim(), category: $('filterCategory').value, eventType: $('filterEventType').value.trim(), date: $('filterDate').value, month: $('filterMonth').value, approval: $('filterApproval').value, eventStatus: $('filterEventStatus').value }; refreshCalendar(); }
+function resetFilters() { state.filters = { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' }; ['filterVenue', 'filterEventType', 'filterDate', 'filterMonth'].forEach((id) => $(id).value = ''); renderFilterOptions(); $('filterApproval').value = ''; $('filterEventStatus').value = ''; refreshCalendar(); }
 
-function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved').flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Approved Events Only'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : 'Public viewers see approved event information.'; }
+function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : 'Select a calendar date to see its public events.'; }
 function renderMiniCalendar() { const date = state.miniCalendarDate; const first = new Date(date.getFullYear(), date.getMonth(), 1); const offset = (first.getDay() + 6) % 7; const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset); $('miniCalendarTitle').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); $('miniCalendar').innerHTML = ['M','T','W','T','F','S','S'].map((d) => `<div class="mini-weekday">${d}</div>`).join(''); for (let i = 0; i < 42; i += 1) { const day = addMinutes(start, i * 1440); const button = document.createElement('button'); button.className = 'mini-day'; button.type = 'button'; button.textContent = day.getDate(); button.style.opacity = day.getMonth() === first.getMonth() ? '1' : '.35'; button.addEventListener('click', () => { state.calendar.gotoDate(day); closeSidebar(); }); $('miniCalendar').appendChild(button); } }
 function shiftMiniCalendar(amount) { state.miniCalendarDate = new Date(state.miniCalendarDate.getFullYear(), state.miniCalendarDate.getMonth() + amount, 1); renderMiniCalendar(); }
-function changeView(view) { state.calendar.changeView(MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
+function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
 function handleResize() { if (!state.calendar) return; if (!MOBILE_VIEWS.has(state.calendar.view.type)) state.calendar.changeView('timeGridWeek'); state.calendar.updateSize(); }
 function openSidebar() { $('sidebar').classList.add('open'); $('mobileScrim').classList.add('open'); }
 function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileScrim').classList.remove('open'); }
@@ -539,6 +591,7 @@ function dateInput(value) { const date = new Date(value); return new Date(date.g
 function timeInput(value) { return new Date(value).toTimeString().slice(0, 5); }
 function formatDateTime(value) { return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
 function formatTime(value) { return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+function eventIsActive(event) { return !['cancelled', 'completed', 'draft'].includes(event.event_status); }
 function addMinutes(date, minutes) { return new Date(new Date(date).getTime() + minutes * 60000); }
 function addDays(date, days) { const value = new Date(date); value.setDate(value.getDate() + days); return value; }
 function dateRange(start, end) { const dates = []; for (let day = new Date(`${start}T12:00:00`); dateInput(day) <= end; day = addDays(day, 1)) dates.push(dateInput(day)); return dates; }
