@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 LOCAL_SECRETS.md
+*.tsbuildinfo
+next-app/vite.config.js
+next-app/vite.config.d.ts

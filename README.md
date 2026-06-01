@@ -16,6 +16,26 @@ https://centralstudentcouncil2026-rgb.github.io/UniversityWideEventScheduler/
 Pushing a commit to `main` updates the public site automatically. The
 `.nojekyll` marker keeps GitHub Pages in direct static-file mode.
 
+## React Preview
+
+The replacement React/Vite TypeScript interface is published alongside the
+current root app at:
+
+https://centralstudentcouncil2026-rgb.github.io/UniversityWideEventScheduler/next/
+
+Its source lives in `next-app/`, while the production output is committed in
+`next/` for GitHub Pages. Build it with:
+
+```bash
+cd next-app
+npm install
+npm run build
+```
+
+The preview intentionally uses the same Supabase backend and occurrence-based
+event records as the current app. Keep the root entrypoint in place until the
+preview has been reviewed and explicitly promoted.
+
 The backend uses Supabase Auth, relational scheduler tables, role-aware RPCs,
 and Row Level Security. Public viewers can read the approved calendar without
 an account. Organization and admin accounts require admin approval.
