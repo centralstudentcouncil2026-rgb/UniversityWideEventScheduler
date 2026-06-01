@@ -9,6 +9,13 @@ The frontend is configured for Supabase project `xtagvyyopokrhvvnseom`. The
 backend stores scheduler records in relational tables protected by Supabase
 Auth and Row Level Security.
 
+GitHub Pages publishes the static frontend from the `main` branch root:
+
+https://centralstudentcouncil2026-rgb.github.io/UniversityWideEventScheduler/
+
+Pushing a commit to `main` updates the public site automatically. The
+`.nojekyll` marker keeps GitHub Pages in direct static-file mode.
+
 The backend uses Supabase Auth, relational scheduler tables, role-aware RPCs,
 and Row Level Security. Public viewers can read the approved calendar without
 an account. Organization and admin accounts require admin approval.

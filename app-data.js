@@ -24,6 +24,9 @@ export function emptyPublicStore() {
 
 export function normalizeStore(store = {}) {
   const normalized = { ...emptyPublicStore(), ...store };
+  EMPTY_COLLECTIONS.forEach((name) => {
+    if (!Array.isArray(normalized[name])) normalized[name] = [];
+  });
   normalized.users = normalized.users.map(({ password_hash: _passwordHash, ...user }) => user);
   normalized.events = normalized.events.map(normalizeEvent);
   return normalized;

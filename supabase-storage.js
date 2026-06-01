@@ -26,10 +26,10 @@ async function rpc(name, body = {}, authenticated = false) {
 export async function loadStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
-    return { store, notice: 'Connected to the authenticated Supabase backend.' };
+    return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
     clearSession();
-    return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}` };
+    return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
   }
 }
 

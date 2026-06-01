@@ -24,14 +24,14 @@ const state = {
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  const { store, notice } = await loadStore();
+  const { store, notice, noticeType } = await loadStore();
   state.store = store;
   bindEvents();
   populateStaticOptions();
   renderAll();
   initializeCalendar();
   refreshCalendar();
-  if (notice) showToast(notice, 'error');
+  if (notice) showToast(notice, noticeType);
 }
 
 function bindEvents() {
@@ -56,6 +56,7 @@ function bindEvents() {
   $('eventForm').addEventListener('submit', submitEventForm);
   $('eventScheduleType').addEventListener('change', updateScheduleType);
   $('addOccurrenceButton').addEventListener('click', () => addOccurrenceRow());
+  $('applySharedTimesButton').addEventListener('click', applySharedTimes);
   $('occurrenceList').addEventListener('click', (event) => { if (event.target.matches('[data-remove-occurrence]')) { event.target.closest('.occurrence-row').remove(); ensureOccurrenceRows(); } });
   $('cancelEventButton').addEventListener('click', cancelEventFromModal);
   $('detailsEditButton').addEventListener('click', editSelectedEvent);
@@ -108,7 +109,7 @@ async function persist(message = '') {
     if (message) showToast(message, 'success');
     return true;
   } catch (error) {
-    showToast(`Saved locally, but could not sync Supabase: ${error.message}`, 'error');
+    showToast(`Could not sync Supabase: ${error.message}`, 'error');
     return false;
   }
 }
@@ -160,10 +161,11 @@ function initializeCalendar() {
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (_info, success) => success(calendarEvents()),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; state.miniCalendarDate = new Date(info.start); renderMiniCalendar(); updateAvailability(); },
-    select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal({ start: info.start, end: info.end }); state.calendar.unselect(); },
-    dateClick: (info) => { if (window.innerWidth > MOBILE_BREAKPOINT || info.allDay || !canCreateEvents(state.store)) return; const start = roundToNextHalfHour(info.date); openEventModal({ start, end: addMinutes(start, 60) }); },
+    selectAllow: () => window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
+    select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
+    dateClick: (info) => { if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return; openEventModal(mobileTapRange(info)); },
     eventClick: (info) => openDetails(info.event.extendedProps),
-    eventAllow: (_dropInfo, event) => event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record),
+    eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
   state.calendar.render();
@@ -184,9 +186,9 @@ function calendarEvents() {
   }).filter(matchesFilters).flatMap((event) => {
     const category = categoryById(state.store, event.category_id);
     const occurrences = eventOccurrences(event);
-    return occurrences.map((occurrence, index) => ({ id: `${event.id}::${occurrence.id}`, title: `${event.title} - ${event.organization_name}${occurrences.length > 1 ? ` (${index + 1}/${occurrences.length})` : ''}`, start: occurrence.start_time, end: occurrence.end_time, backgroundColor: category.color, borderColor: category.color, editable: canEditEvent(state.store, event), extendedProps: { type: 'event', record: event, occurrence } }));
+    return occurrences.map((occurrence, index) => ({ id: `${event.id}::${occurrence.id}`, title: `${event.title} - ${event.organization_name}${occurrences.length > 1 ? ` (${index + 1}/${occurrences.length})` : ''}`, start: occurrence.start_time, end: occurrence.end_time, backgroundColor: category.color, borderColor: category.color, editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event), extendedProps: { type: 'event', record: event, occurrence } }));
   });
-  const blocks = state.store.blockedTimes.map((block) => ({ id: block.id, title: isSuperAdmin(state.store) ? block.title : 'Unavailable', start: block.start_time, end: block.end_time, backgroundColor: '#071C3D', borderColor: '#071C3D', editable: isSuperAdmin(state.store), extendedProps: { type: 'block', record: block } }));
+  const blocks = state.store.blockedTimes.map((block) => ({ id: block.id, title: isSuperAdmin(state.store) ? block.title : 'Unavailable', start: block.start_time, end: block.end_time, backgroundColor: '#071C3D', borderColor: '#071C3D', editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store), extendedProps: { type: 'block', record: block } }));
   return [...events, ...blocks];
 }
 
@@ -210,9 +212,10 @@ function openEventModal(range, record = null) {
   $('eventOrganization').value = record?.organization_id || currentUser(state.store).organization_id || state.store.organizations[0]?.id || '';
   $('eventCategory').value = record?.category_id || state.store.categories.find((item) => item.active)?.id || '';
   $('eventTitle').value = record?.title || ''; $('eventType').value = record?.event_type || ''; $('eventVenue').value = record?.venue || '';
-  const occurrences = record ? eventOccurrences(record) : [{ id: createId(), start_time: range.start.toISOString(), end_time: range.end.toISOString() }];
+  const occurrences = record ? eventOccurrences(record) : range.occurrences || [{ id: createId(), start_time: range.start.toISOString(), end_time: range.end.toISOString() }];
   $('eventScheduleType').value = record?.schedule_type || (occurrences.length > 1 ? 'multi_day' : 'single_day');
   $('eventDate').value = dateInput(occurrences[0].start_time); $('eventStart').value = timeInput(occurrences[0].start_time); $('eventEnd').value = timeInput(occurrences[0].end_time);
+  $('eventSharedStart').value = timeInput(occurrences[0].start_time); $('eventSharedEnd').value = timeInput(occurrences[0].end_time);
   renderOccurrenceRows(occurrences);
   updateScheduleType();
   $('eventAttendees').value = record?.expected_attendees || ''; $('eventStatus').value = record?.event_status || 'planned';
@@ -255,7 +258,7 @@ function addOccurrenceRow(item = {}) {
   const row = document.createElement('div');
   row.className = 'occurrence-row';
   row.dataset.id = item.id || createId();
-  row.innerHTML = `<label>Date<input type="date" data-occurrence-date value="${escapeHtml(item.date || '')}" required></label><label>Start Time<input type="time" data-occurrence-start value="${escapeHtml(item.start || '')}" required></label><label>End Time<input type="time" data-occurrence-end value="${escapeHtml(item.end || '')}" required></label><button type="button" class="icon-button occurrence-remove" data-remove-occurrence title="Remove day">&times;</button>`;
+  row.innerHTML = `<label>Date<input type="date" data-occurrence-date value="${escapeHtml(item.date || '')}" required></label><label>Start Time<input type="time" data-occurrence-start value="${escapeHtml(item.start || $('eventSharedStart').value || '')}" required></label><label>End Time<input type="time" data-occurrence-end value="${escapeHtml(item.end || $('eventSharedEnd').value || '')}" required></label><button type="button" class="icon-button occurrence-remove" data-remove-occurrence title="Remove day">&times;</button>`;
   $('occurrenceList').appendChild(row);
   ensureOccurrenceRows();
 }
@@ -270,6 +273,16 @@ function readOccurrenceRows() {
   return [...$('occurrenceList').querySelectorAll('.occurrence-row')].map((row) => {
     const date = row.querySelector('[data-occurrence-date]').value;
     return { id: row.dataset.id || createId(), date, start_time: localIso(date, row.querySelector('[data-occurrence-start]').value), end_time: localIso(date, row.querySelector('[data-occurrence-end]').value) };
+  });
+}
+
+function applySharedTimes() {
+  const start = $('eventSharedStart').value;
+  const end = $('eventSharedEnd').value;
+  if (!start || !end) return showToast('Choose shared start and end times first.', 'error');
+  $('occurrenceList').querySelectorAll('.occurrence-row').forEach((row) => {
+    row.querySelector('[data-occurrence-start]').value = start;
+    row.querySelector('[data-occurrence-end]').value = end;
   });
 }
 
@@ -415,11 +428,11 @@ function addBlockedTime(event) { event.preventDefault(); if (!isSuperAdmin(state
 function renderBlockedTimes() { $('blockedTimesList').innerHTML = state.store.blockedTimes.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatTime(item.end_time))}</p><p>${escapeHtml(item.reason)}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`).join('') || empty('No blocked periods'); }
 
 function openCategories() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
-function addCategory(event) { event.preventDefault(); const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
+function addCategory(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
 function renderCategories() { $('categoriesList').innerHTML = state.store.categories.map((item) => `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(item.color)}"></span>${escapeHtml(item.name)}</strong><p>${item.active ? 'Active' : 'Inactive'}</p>${actionButton('category-toggle', item.id, item.active ? 'Deactivate' : 'Activate', 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`).join(''); }
 
 function openOrganizations() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
-function addOrganization(event) { event.preventDefault(); const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
+function addOrganization(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
 function renderOrganizations() { $('organizationsList').innerHTML = state.store.organizations.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.organization_name)}</strong><p>${escapeHtml(item.organization_type)}</p>${actionButton('organization-delete', item.id, 'Delete', 'danger-button')}</div>`).join(''); }
 
 function openUsers() { if (!requirePermission(isSuperAdmin(state.store), 'Only admins can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
@@ -527,6 +540,24 @@ function timeInput(value) { return new Date(value).toTimeString().slice(0, 5); }
 function formatDateTime(value) { return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
 function formatTime(value) { return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
 function addMinutes(date, minutes) { return new Date(new Date(date).getTime() + minutes * 60000); }
+function addDays(date, days) { const value = new Date(date); value.setDate(value.getDate() + days); return value; }
+function dateRange(start, end) { const dates = []; for (let day = new Date(`${start}T12:00:00`); dateInput(day) <= end; day = addDays(day, 1)) dates.push(dateInput(day)); return dates; }
+function occurrenceRange(dates, start, end) { return dates.map((date) => ({ id: createId(), date, start_time: localIso(date, start), end_time: localIso(date, end) })); }
+function selectionRange(info) {
+  const view = state.calendar.view.type;
+  if (view === 'timeGridDay') return { start: info.start, end: info.end };
+  if (view === 'timeGridWeek') return { occurrences: occurrenceRange(dateRange(dateInput(info.start), dateInput(addMinutes(info.end, -0.001))), timeInput(info.start), timeInput(info.end)) };
+  if (view === 'dayGridMonth') return { occurrences: occurrenceRange(dateRange(dateInput(info.start), dateInput(addMinutes(info.end, -0.001))), '09:00', '10:00') };
+  return { start: info.start, end: info.end };
+}
+function mobileTapRange(info) {
+  if (info.allDay) {
+    const date = dateInput(info.date);
+    return { occurrences: occurrenceRange([date], '09:00', '10:00') };
+  }
+  const start = info.date;
+  return { start, end: addMinutes(start, 60) };
+}
 function roundToNextHalfHour(value) { const date = new Date(value); date.setSeconds(0, 0); const minutes = date.getMinutes(); date.setMinutes(minutes <= 30 ? 30 : 60, 0, 0); return date; }
 function defaultRange() { let start = roundToNextHalfHour(addMinutes(new Date(), 60)); let end = addMinutes(start, 60); if (dateInput(start) !== dateInput(end)) { start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 9, 0, 0, 0); end = addMinutes(start, 60); } return { start, end }; }
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }

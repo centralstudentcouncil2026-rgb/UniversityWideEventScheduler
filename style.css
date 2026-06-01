@@ -216,20 +216,6 @@ button {
   min-width: 248px;
 }
 
-.brand-mark {
-  align-items: center;
-  background: var(--aup-blue);
-  border: 3px solid var(--aup-gold);
-  border-radius: 10px;
-  color: #fff;
-  display: flex;
-  font-size: 15px;
-  font-weight: 800;
-  height: 46px;
-  justify-content: center;
-  width: 46px;
-}
-
 .brand-logo {
   background: #fff;
   border-radius: 12px;
@@ -563,10 +549,6 @@ button {
   width: 10px;
 }
 
-.legend-dot.confirmed {
-  background: var(--success);
-}
-
 .legend-dot.approved {
   background: var(--success);
 }
@@ -662,11 +644,6 @@ button {
   border-color: var(--aup-blue);
 }
 
-.event-confirmed {
-  background: var(--success) !important;
-  color: #fff !important;
-}
-
 .event-approved {
   background: var(--success) !important;
   color: #fff !important;
@@ -695,35 +672,6 @@ button {
 .event-blocked {
   background: var(--aup-navy) !important;
   color: #fff !important;
-}
-
-.admin-only {
-  display: none !important;
-}
-
-body.is-admin .admin-only {
-  display: initial !important;
-}
-
-body.is-admin label.admin-only {
-  display: flex !important;
-}
-
-.manager-only,
-.super-admin-only {
-  display: none !important;
-}
-
-body.is-manager .manager-only,
-body.is-super-admin .super-admin-only {
-  display: initial !important;
-}
-
-body.is-manager label.manager-only,
-body.is-super-admin label.super-admin-only,
-body.is-manager .check-row.manager-only,
-body.is-super-admin .check-row.super-admin-only {
-  display: flex !important;
 }
 
 .status-pill {
@@ -765,6 +713,18 @@ body.is-super-admin .check-row.super-admin-only {
 .occurrence-list {
   display: grid;
   gap: 10px;
+}
+
+.shared-time-grid {
+  align-items: end;
+  background: #f8fbff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+  padding: 12px;
 }
 
 .occurrence-row {
@@ -947,8 +907,7 @@ body.is-super-admin .check-row.super-admin-only {
   padding: 0;
 }
 
-.agreement-modal,
-.about-modal {
+.agreement-modal {
   max-height: min(820px, calc(100vh - 40px));
   max-width: min(960px, calc(100vw - 40px));
   width: min(960px, calc(100vw - 40px));
@@ -978,30 +937,9 @@ body.is-super-admin .check-row.super-admin-only {
   width: min(1180px, calc(100vw - 40px));
 }
 
-.agreement-modal .wide-modal,
-.about-modal .wide-modal {
+.agreement-modal .wide-modal {
   height: min(820px, calc(100vh - 40px));
   min-height: 0;
-  width: 100%;
-}
-
-.log-modal,
-.reservation-list-modal,
-.admin-requests-modal,
-.password-reset-requests-modal {
-  max-height: min(820px, calc(100vh - 40px));
-  max-width: min(1180px, calc(100vw - 40px));
-  overflow: hidden;
-  width: min(1180px, calc(100vw - 40px));
-}
-
-.log-modal .wide-modal,
-.reservation-list-modal .wide-modal,
-.admin-requests-modal .wide-modal,
-.password-reset-requests-modal .wide-modal {
-  height: min(820px, calc(100vh - 40px));
-  min-height: 0;
-  min-width: 0;
   width: 100%;
 }
 
@@ -1140,8 +1078,7 @@ body.is-super-admin .check-row.super-admin-only {
   overflow: auto;
 }
 
-.agreement-body,
-.about-sections {
+.agreement-body {
   display: grid;
   gap: 16px;
   line-height: 1.45;
@@ -1152,8 +1089,7 @@ body.is-super-admin .check-row.super-admin-only {
   padding-right: 4px;
 }
 
-.agreement-body h4,
-.about-sections h4 {
+.agreement-body h4 {
   color: var(--aup-navy);
   margin: 0 0 6px;
 }
@@ -1163,8 +1099,7 @@ body.is-super-admin .check-row.super-admin-only {
   padding-left: 22px;
 }
 
-.agreement-body p,
-.about-sections p {
+.agreement-body p {
   margin: 5px 0;
   overflow-wrap: anywhere;
 }
@@ -1213,8 +1148,7 @@ body.is-super-admin .check-row.super-admin-only {
   box-shadow: inset 4px 0 0 #B91C1C;
 }
 
-.agreement-card,
-.about-card {
+.agreement-card {
   gap: 0;
 }
 
@@ -1241,20 +1175,6 @@ body.is-super-admin .check-row.super-admin-only {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 12px;
-}
-
-.temporary-password-box {
-  background: var(--aup-navy);
-  border: 1px solid var(--aup-gold);
-  border-radius: 8px;
-  color: #fff;
-  font-family: Consolas, Monaco, monospace;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-  padding: 18px;
-  text-align: center;
 }
 
 .toast-region {
@@ -1381,11 +1301,6 @@ body.is-super-admin .check-row.super-admin-only {
 
   .brand-area {
     min-width: 0;
-  }
-
-  .brand-mark {
-    height: 40px;
-    width: 40px;
   }
 
   .brand-logo {
@@ -1520,10 +1435,6 @@ body.is-super-admin .check-row.super-admin-only {
     padding: 18px;
   }
 
-  .modal.log-modal,
-  .modal.reservation-list-modal,
-  .modal.admin-requests-modal,
-  .modal.password-reset-requests-modal,
   .modal.tool-modal {
     border-radius: 0;
     height: 100vh;
@@ -1539,10 +1450,6 @@ body.is-super-admin .check-row.super-admin-only {
     width: 100vw;
   }
 
-  .modal.log-modal .wide-modal,
-  .modal.reservation-list-modal .wide-modal,
-  .modal.admin-requests-modal .wide-modal,
-  .modal.password-reset-requests-modal .wide-modal,
   .modal.tool-modal .wide-modal {
     border-radius: 0;
     display: flex;
@@ -1558,27 +1465,15 @@ body.is-super-admin .check-row.super-admin-only {
     width: 100vw;
   }
 
-  .modal.log-modal .activity-list,
-  .modal.reservation-list-modal .activity-list,
-  .modal.admin-requests-modal .activity-list,
-  .modal.password-reset-requests-modal .activity-list,
   .modal.tool-modal .activity-list {
     flex: 1;
     overflow: auto;
   }
 
-  .modal.log-modal .activity-item,
-  .modal.reservation-list-modal .activity-item,
-  .modal.admin-requests-modal .activity-item,
-  .modal.password-reset-requests-modal .activity-item,
   .modal.tool-modal .activity-item {
     padding: 9px 12px;
   }
 
-  .modal.log-modal .activity-item p,
-  .modal.reservation-list-modal .activity-item p,
-  .modal.admin-requests-modal .activity-item p,
-  .modal.password-reset-requests-modal .activity-item p,
   .modal.tool-modal .activity-item p {
     line-height: 1.25;
     margin-top: 2px;
@@ -1589,6 +1484,7 @@ body.is-super-admin .check-row.super-admin-only {
   }
 
   .schedule-grid,
+  .shared-time-grid,
   .occurrence-row {
     grid-template-columns: 1fr;
   }
@@ -1624,11 +1520,7 @@ body.is-super-admin .check-row.super-admin-only {
 
 @media print {
   .danger-button,
-  .admin-only,
   #detailsEditButton,
-  #detailsDeleteButton,
-  #deleteReservationButton,
-  #printButton,
   .modal-actions,
   .sidebar,
   .topbar {
