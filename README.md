@@ -27,7 +27,7 @@ until an admin approves them from the Accounts panel.
 
 Active organization accounts can post events directly. Admin-blocked periods
 prevent posting, while schedule overlaps remain visible warnings. Events marked
-internal or draft remain visible only to the posting organization and admins.
+internal remain visible only to the posting organization and admins.
 
 ## Run Locally
 

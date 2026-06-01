@@ -1,6 +1,6 @@
 export const PUBLIC_USER = { id: 'public', full_name: 'Public Viewer', role: 'public_viewer', organization_id: null };
 export const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'];
-export const EVENT_STATUSES = ['draft', 'planned', 'finalized', 'postponed', 'cancelled', 'completed'];
+export const EVENT_STATUSES = ['planned', 'finalized', 'postponed', 'cancelled', 'completed'];
 
 export function currentUser(store) {
   if (store.currentUserId === 'public') return PUBLIC_USER;
