@@ -666,6 +666,12 @@ body.is-public .view-selector {
   padding: 2px;
 }
 
+.fc .event-month-span {
+  border-radius: 4px;
+  margin-left: -1px;
+  margin-right: -1px;
+}
+
 .fc .fc-event-title,
 .fc .fc-event-time {
   font-weight: 700;

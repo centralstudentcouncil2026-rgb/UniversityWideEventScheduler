@@ -59,6 +59,8 @@ function bindEvents() {
   $('cancelEventButton').addEventListener('click', cancelEventFromModal);
   $('detailsEditButton').addEventListener('click', editSelectedEvent);
   $('detailsCancelButton').addEventListener('click', cancelSelectedEvent);
+  $('detailsDeleteButton').addEventListener('click', deleteSelectedEvent);
+  $('deleteEventButton').addEventListener('click', deleteEventFromModal);
   $('detailsApproveButton').addEventListener('click', () => reviewSelectedEvent('approved'));
   $('detailsRejectButton').addEventListener('click', () => reviewSelectedEvent('rejected'));
   $('agreeRules').addEventListener('change', updateAgreementButton);
@@ -191,11 +193,41 @@ function calendarEvents() {
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters).flatMap((event) => {
     const category = categoryById(state.store, event.category_id);
-    const occurrences = eventOccurrences(event);
-    return occurrences.map((occurrence, index) => ({ id: `${event.id}::${occurrence.id}`, title: `${event.title} - ${event.organization_name}${occurrences.length > 1 ? ` (${index + 1}/${occurrences.length})` : ''}`, start: occurrence.start_time, end: occurrence.end_time, backgroundColor: category.color, borderColor: category.color, editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event), extendedProps: { type: 'event', record: event, occurrence } }));
+    return state.calendar?.view.type === 'dayGridMonth'
+      ? connectedMonthEvents(event, category)
+      : occurrenceCalendarEvents(event, category);
   });
   const blocks = state.store.blockedTimes.map((block) => ({ id: block.id, title: isSuperAdmin(state.store) ? block.title : 'Unavailable', start: block.start_time, end: block.end_time, backgroundColor: '#071C3D', borderColor: '#071C3D', editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store), extendedProps: { type: 'block', record: block } }));
   return [...events, ...blocks];
+}
+
+function occurrenceCalendarEvents(event, category) {
+  const occurrences = eventOccurrences(event);
+  return occurrences.map((occurrence, index) => ({ id: `${event.id}::${occurrence.id}`, title: `${event.title} - ${event.organization_name}${occurrences.length > 1 ? ` (${index + 1}/${occurrences.length})` : ''}`, start: occurrence.start_time, end: occurrence.end_time, backgroundColor: category.color, borderColor: category.color, editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event), extendedProps: { type: 'event', record: event, occurrence } }));
+}
+
+function connectedMonthEvents(event, category) {
+  return groupConsecutiveOccurrences(eventOccurrences(event)).map((group, index) => ({
+    id: `${event.id}::month-span-${index}`,
+    title: `${event.title} - ${event.organization_name}`,
+    start: group[0].date,
+    end: nextDateInput(group.at(-1).date),
+    allDay: true,
+    backgroundColor: category.color,
+    borderColor: category.color,
+    editable: false,
+    classNames: ['event-month-span'],
+    extendedProps: { type: 'event', record: event }
+  }));
+}
+
+function groupConsecutiveOccurrences(occurrences) {
+  return [...occurrences].sort((a, b) => a.date.localeCompare(b.date)).reduce((groups, occurrence) => {
+    const current = groups.at(-1);
+    if (!current || nextDateInput(current.at(-1).date) !== occurrence.date) groups.push([occurrence]);
+    else current.push(occurrence);
+    return groups;
+  }, []);
 }
 
 function matchesFilters(event) {
@@ -230,7 +262,7 @@ function openEventModal(range, record = null) {
   $('eventContactPerson').value = record?.contact_person || currentUser(state.store).full_name; $('eventContactInfo').value = record?.contact_info || '';
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
   $('eventPrivateNotes').value = record?.private_notes || ''; $('eventAdminNotes').value = record?.admin_notes || ''; $('eventRejectionReason').value = record?.rejection_reason || '';
-  $('eventOrganization').disabled = isManager(state.store); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
+  $('eventOrganization').disabled = isManager(state.store); $('deleteEventButton').hidden = !record; $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
   openDialog('eventModal');
 }
 
@@ -359,14 +391,14 @@ function openDetails(props) {
   if (props.type === 'block') {
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = 'Blocked university period';
     $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: isSuperAdmin(state.store) ? record.reason : 'Unavailable' });
-    ['detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
+    ['detailsDeleteButton', 'detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
     const data = { Organization: record.organization_name, Category: category.name, Venue: record.venue, Schedule: scheduleSummary(record), Approval: cap(record.approval_status), Status: cap(record.event_status), Description: record.public_description };
     if (privateView) Object.assign(data, { Purpose: record.purpose, 'Contact Person': record.contact_person, 'Contact Info': record.contact_info, 'Private Notes': record.private_notes || 'None' });
     if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
-    $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
+    $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canEditEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
     $('detailsApproveButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'rejected';
   }
   openDialog('detailsModal');
@@ -402,6 +434,24 @@ function editSelectedEvent() { const event = state.selectedDetails?.record; if (
 function cancelSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmAction(`Cancel "${event.title}"?`, () => cancelEvent(event)); }
 function cancelEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmAction(`Cancel "${event.title}"?`, () => { cancelEvent(event); closeDialog('eventModal'); }); }
 function cancelEvent(event) { event.event_status = 'cancelled'; event.updated_at = new Date().toISOString(); log('event_cancelled', `${currentUser(state.store).full_name} cancelled "${event.title}".`, event); closeDialog('detailsModal'); persist('Event cancelled.'); }
+function deleteSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmDeleteEvent(event); }
+function deleteEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmDeleteEvent(event); }
+function confirmDeleteEvent(event) { if (!requirePermission(canEditEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
+async function deleteEvent(event) {
+  const index = state.store.events.findIndex((item) => item.id === event.id);
+  if (index < 0) return;
+  const logLength = state.store.activityLogs.length;
+  state.store.events.splice(index, 1);
+  log('event_deleted', `${currentUser(state.store).full_name} deleted "${event.title}".`, event);
+  try {
+    await saveStore(state.store);
+    closeDialog('detailsModal'); closeDialog('eventModal'); renderAll(); refreshCalendar(); showToast('Event deleted.', 'success');
+  } catch (error) {
+    state.store.events.splice(index, 0, event);
+    state.store.activityLogs.length = logLength;
+    showToast(`Could not delete event: ${error.message}`, 'error');
+  }
+}
 
 function reviewSelectedEvent(status) { const event = state.selectedDetails?.record; if (event) reviewEvent(event, status); }
 function reviewEvent(event, status) {
@@ -588,6 +638,7 @@ function formatTime(value) { return new Date(value).toLocaleTimeString(undefined
 function eventIsActive(event) { return !['cancelled', 'completed', 'draft'].includes(event.event_status); }
 function addMinutes(date, minutes) { return new Date(new Date(date).getTime() + minutes * 60000); }
 function addDays(date, days) { const value = new Date(date); value.setDate(value.getDate() + days); return value; }
+function nextDateInput(date) { return dateInput(addDays(new Date(`${date}T12:00:00`), 1)); }
 function dateRange(start, end) { const dates = []; for (let day = new Date(`${start}T12:00:00`); dateInput(day) <= end; day = addDays(day, 1)) dates.push(dateInput(day)); return dates; }
 function occurrenceRange(dates, start, end) { return dates.map((date) => ({ id: createId(), date, start_time: localIso(date, start), end_time: localIso(date, end) })); }
 function selectionRange(info) {
