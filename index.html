@@ -7,7 +7,7 @@
   <title>CORE | University Coordination Calendar</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260602-connected-events-v1">
+  <link rel="stylesheet" href="style.css?v=20260603-compact-multiday-v1">
 </head>
 <body>
   <div class="app-shell">
@@ -79,7 +79,7 @@
       <label>Organization<select id="eventOrganization" required></select></label><label>Category<select id="eventCategory" required></select></label>
       <label>Venue<input id="eventVenue" required maxlength="140"></label><label>Schedule<select id="eventScheduleType"><option value="single_day">Single day</option><option value="multi_day">Multiple days</option></select></label>
       <div class="schedule-grid full-span" id="singleScheduleFields"><label>Date<input type="date" id="eventDate" required></label><label>Start Time<input type="time" id="eventStart" required></label><label>End Time<input type="time" id="eventEnd" required></label></div>
-      <section class="multi-schedule full-span" id="multiScheduleSection" hidden><div class="section-heading"><div><strong>Daily Schedule</strong><p>Set shared hours, then edit any daily row that needs an exception.</p></div><button type="button" class="secondary-button" id="addOccurrenceButton">Add Day</button></div><div class="shared-time-grid"><label>Shared Start Time<input type="time" id="eventSharedStart"></label><label>Shared End Time<input type="time" id="eventSharedEnd"></label><button type="button" class="secondary-button" id="applySharedTimesButton">Apply to All Days</button></div><div class="occurrence-list" id="occurrenceList"></div></section>
+      <section class="multi-schedule full-span" id="multiScheduleSection" hidden><div class="section-heading"><div><strong>Daily Schedule</strong><p>All selected days use the shared hours by default. Open a date only when it needs different times.</p></div><button type="button" class="secondary-button" id="addOccurrenceButton">Add Day</button></div><div class="shared-time-grid"><label>Shared Start Time<input type="time" id="eventSharedStart"></label><label>Shared End Time<input type="time" id="eventSharedEnd"></label><button type="button" class="secondary-button" id="applySharedTimesButton">Apply Shared Times</button></div><div class="occurrence-list" id="occurrenceList"></div></section>
       <label>Expected Attendees<input type="number" id="eventAttendees" min="1" max="99999" required></label><label>Event Status<select id="eventStatus"><option value="planned">Planned</option><option value="finalized">Finalized</option><option value="postponed">Postponed</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option></select></label>
       <label>Privacy Level<select id="eventPrivacy"><option value="basic">Basic public details</option><option value="internal">Organization and admin only</option></select></label>
       <label>Contact Person<input id="eventContactPerson" required></label><label>Contact Email or Number<input id="eventContactInfo" required></label>
@@ -125,6 +125,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="supabaseClient.js?v=20260601-supabase-v1"></script>
-  <script type="module" src="script.js?v=20260603-html-calendar-v1"></script>
+  <script type="module" src="script.js?v=20260603-compact-multiday-v1"></script>
 </body>
 </html>

@@ -765,8 +765,38 @@ body.is-public .view-selector {
 }
 
 .occurrence-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) 44px;
+  padding: 10px;
+}
+
+.occurrence-summary {
+  align-items: center;
+  color: var(--aup-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.occurrence-row.has-exception {
+  border-color: var(--aup-gold);
+}
+
+.occurrence-exception-fields {
   align-items: end;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) 44px;
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  padding-top: 4px;
+}
+
+.occurrence-exception-fields[hidden] {
+  display: none;
 }
 
 .occurrence-remove {
@@ -1528,6 +1558,10 @@ body.is-super-admin .check-row.super-admin-only {
   .schedule-grid,
   .shared-time-grid,
   .occurrence-row {
+    grid-template-columns: 1fr;
+  }
+
+  .occurrence-exception-fields {
     grid-template-columns: 1fr;
   }
 

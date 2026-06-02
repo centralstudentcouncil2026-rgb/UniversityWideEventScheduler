@@ -55,7 +55,7 @@ function bindEvents() {
   $('eventScheduleType').addEventListener('change', updateScheduleType);
   $('addOccurrenceButton').addEventListener('click', () => addOccurrenceRow());
   $('applySharedTimesButton').addEventListener('click', applySharedTimes);
-  $('occurrenceList').addEventListener('click', (event) => { if (event.target.matches('[data-remove-occurrence]')) { event.target.closest('.occurrence-row').remove(); ensureOccurrenceRows(); } });
+  $('occurrenceList').addEventListener('click', handleOccurrenceListClick);
   $('cancelEventButton').addEventListener('click', cancelEventFromModal);
   $('detailsEditButton').addEventListener('click', editSelectedEvent);
   $('detailsCancelButton').addEventListener('click', cancelSelectedEvent);
@@ -298,8 +298,9 @@ function addOccurrenceRow(item = {}) {
   const row = document.createElement('div');
   row.className = 'occurrence-row';
   row.dataset.id = item.id || createId();
-  row.innerHTML = `<label>Date<input type="date" data-occurrence-date value="${escapeHtml(item.date || '')}" required></label><label>Start Time<input type="time" data-occurrence-start value="${escapeHtml(item.start || $('eventSharedStart').value || '')}" required></label><label>End Time<input type="time" data-occurrence-end value="${escapeHtml(item.end || $('eventSharedEnd').value || '')}" required></label><button type="button" class="icon-button occurrence-remove" data-remove-occurrence title="Remove day">&times;</button>`;
+  row.innerHTML = `<label>Date<input type="date" data-occurrence-date value="${escapeHtml(item.date || '')}" required></label><div class="occurrence-summary"><span data-occurrence-summary></span><button type="button" class="text-button" data-edit-occurrence-times>Edit times</button></div><div class="occurrence-exception-fields" hidden><label>Custom Start<input type="time" data-occurrence-start value="${escapeHtml(item.start || $('eventSharedStart').value || '')}" required></label><label>Custom End<input type="time" data-occurrence-end value="${escapeHtml(item.end || $('eventSharedEnd').value || '')}" required></label><button type="button" class="text-button" data-done-occurrence-times>Done</button></div><button type="button" class="icon-button occurrence-remove" data-remove-occurrence title="Remove day">&times;</button>`;
   $('occurrenceList').appendChild(row);
+  updateOccurrenceRow(row);
   ensureOccurrenceRows();
 }
 
@@ -307,6 +308,23 @@ function ensureOccurrenceRows() {
   if (!$('occurrenceList').children.length) addOccurrenceRow({ date: $('eventDate').value, start: $('eventStart').value, end: $('eventEnd').value });
   const removable = $('occurrenceList').children.length > 1;
   $('occurrenceList').querySelectorAll('[data-remove-occurrence]').forEach((button) => { button.hidden = !removable; });
+  $('occurrenceList').querySelectorAll('.occurrence-row').forEach(updateOccurrenceRow);
+}
+
+function handleOccurrenceListClick(event) {
+  const row = event.target.closest('.occurrence-row');
+  if (!row) return;
+  if (event.target.matches('[data-remove-occurrence]')) { row.remove(); ensureOccurrenceRows(); return; }
+  if (event.target.matches('[data-edit-occurrence-times]')) { row.classList.add('editing-times'); row.querySelector('.occurrence-exception-fields').hidden = false; row.querySelector('[data-occurrence-start]').focus(); }
+  if (event.target.matches('[data-done-occurrence-times]')) { row.classList.remove('editing-times'); row.querySelector('.occurrence-exception-fields').hidden = true; updateOccurrenceRow(row); }
+}
+
+function updateOccurrenceRow(row) {
+  const start = row.querySelector('[data-occurrence-start]').value;
+  const end = row.querySelector('[data-occurrence-end]').value;
+  const shared = start === $('eventSharedStart').value && end === $('eventSharedEnd').value;
+  row.querySelector('[data-occurrence-summary]').textContent = `${formatInputTime(start)} to ${formatInputTime(end)}${shared ? ' · Shared schedule' : ' · Custom times'}`;
+  row.classList.toggle('has-exception', !shared);
 }
 
 function readOccurrenceRows() {
@@ -323,6 +341,9 @@ function applySharedTimes() {
   $('occurrenceList').querySelectorAll('.occurrence-row').forEach((row) => {
     row.querySelector('[data-occurrence-start]').value = start;
     row.querySelector('[data-occurrence-end]').value = end;
+    row.classList.remove('editing-times');
+    row.querySelector('.occurrence-exception-fields').hidden = true;
+    updateOccurrenceRow(row);
   });
 }
 
@@ -635,6 +656,7 @@ function dateInput(value) { const date = new Date(value); return new Date(date.g
 function timeInput(value) { return new Date(value).toTimeString().slice(0, 5); }
 function formatDateTime(value) { return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
 function formatTime(value) { return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+function formatInputTime(value) { if (!value) return 'Choose time'; const [hour, minute] = value.split(':').map(Number); return new Date(2000, 0, 1, hour, minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
 function eventIsActive(event) { return !['cancelled', 'completed', 'draft'].includes(event.event_status); }
 function addMinutes(date, minutes) { return new Date(new Date(date).getTime() + minutes * 60000); }
 function addDays(date, days) { const value = new Date(date); value.setDate(value.getDate() + days); return value; }
