@@ -1,5 +1,5 @@
 import { createId } from './app-data.js?v=20260601-public-month-v2';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260601-public-month-v2';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
   canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,

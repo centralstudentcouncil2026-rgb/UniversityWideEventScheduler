@@ -1,6 +1,6 @@
 export type Role = 'public_viewer' | 'organization_manager' | 'super_admin';
 export type CalendarView = 'month' | 'week' | 'day' | 'year' | 'agenda';
-export type Workspace = 'calendar' | 'dashboard' | 'announcements' | 'concerns' | 'admin';
+export type Workspace = 'calendar' | 'dashboard' | 'notifications' | 'announcements' | 'concerns' | 'admin';
 
 export interface User { id: string; full_name: string; username?: string; role: Role; organization_id: string | null }
 export interface Organization { id: string; organization_name: string; organization_type?: string }

@@ -15,6 +15,14 @@ function headers(authenticated = false) {
 async function request(endpoint, options = {}, authenticated = false) {
   const response = await fetch(`${url}${endpoint}`, { ...options, headers: { ...headers(authenticated), ...options.headers } });
   const payload = response.status === 204 ? null : await response.json().catch(() => ({}));
+  if (authenticated && response.status === 401 && session()?.refresh_token && !options.skipRefresh) {
+    try {
+      await refreshSession();
+      return request(endpoint, { ...options, skipRefresh: true }, authenticated);
+    } catch {
+      clearSession();
+    }
+  }
   if (!response.ok) throw new Error(payload?.message || payload?.error_description || payload?.error || `Supabase request failed (${response.status})`);
   return payload;
 }
@@ -41,6 +49,18 @@ export async function authenticate(username, password) {
   const payload = await request('/auth/v1/token?grant_type=password', {
     method: 'POST',
     body: JSON.stringify({ email: `${username.trim().toLowerCase()}@core.local`, password })
+  });
+  localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  return payload;
+}
+
+async function refreshSession() {
+  const refreshToken = session()?.refresh_token;
+  if (!refreshToken) throw new Error('Your session has expired. Please log in again.');
+  const payload = await request('/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    skipRefresh: true
   });
   localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
   return payload;

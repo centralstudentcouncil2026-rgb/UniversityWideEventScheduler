@@ -8,9 +8,18 @@ export const publicUser: User = { id: 'public', full_name: 'Public Viewer', role
 
 const session = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const headers = (authenticated = false) => ({ apikey: publishableKey, Authorization: `Bearer ${authenticated ? session()?.access_token || publishableKey : publishableKey}`, 'Content-Type': 'application/json' });
-async function request(endpoint: string, options: RequestInit = {}, authenticated = false) {
+type RequestOptions = RequestInit & { skipRefresh?: boolean };
+async function request(endpoint: string, options: RequestOptions = {}, authenticated = false) {
   const response = await fetch(`${url}${endpoint}`, { ...options, headers: { ...headers(authenticated), ...options.headers } });
   const payload = response.status === 204 ? null : await response.json().catch(() => ({}));
+  if (authenticated && response.status === 401 && session()?.refresh_token && !options.skipRefresh) {
+    try {
+      await refreshSession();
+      return request(endpoint, { ...options, skipRefresh: true }, authenticated);
+    } catch {
+      logout();
+    }
+  }
   if (!response.ok) throw new Error(payload?.message || payload?.error_description || payload?.error || `Supabase request failed (${response.status})`);
   return payload;
 }
@@ -31,6 +40,13 @@ export const login = async (username: string, password: string) => {
   localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
 };
 export const logout = () => localStorage.removeItem(SESSION_KEY);
+const refreshSession = async () => {
+  const refreshToken = session()?.refresh_token;
+  if (!refreshToken) throw new Error('Your session has expired. Please log in again.');
+  const payload = await request('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }), skipRefresh: true });
+  localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  return payload;
+};
 export const requestAccount = (body: { username: string; password: string; fullName: string; role: string; organizationName: string }) =>
   rpc('create_scheduler_account', { p_username: body.username, p_password: body.password, p_full_name: body.fullName, p_requested_role: body.role, p_organization_name: body.organizationName });
 export const decideAccount = (id: string, decision: string) => rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
