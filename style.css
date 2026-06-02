@@ -672,6 +672,31 @@ body.is-public .view-selector {
   margin-right: -1px;
 }
 
+.fc .fc-daygrid-event-harness:has(.event-month-span-multi) {
+  margin-left: -2px;
+  margin-right: -2px;
+}
+
+.fc .event-month-span-multi {
+  border-radius: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.fc .event-month-span-multi.fc-event-start {
+  border-bottom-left-radius: 5px;
+  border-top-left-radius: 5px;
+}
+
+.fc .event-month-span-multi.fc-event-end {
+  border-bottom-right-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+.fc .event-month-span-continuation .fc-event-title {
+  display: none;
+}
+
 .fc .fc-event-title,
 .fc .fc-event-time {
   font-weight: 700;

@@ -8,6 +8,7 @@ import {
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
+const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const state = {
   store: null,
@@ -163,7 +164,7 @@ function initializeCalendar() {
     eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotMinTime: '07:00:00',
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
-    events: (_info, success) => success(calendarEvents()),
+    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isMonthFetch(info))); },
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
     selectAllow: () => !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
@@ -173,6 +174,7 @@ function initializeCalendar() {
       openEventModal(mobileTapRange(info));
     },
     eventClick: (info) => isPublic(state.store) ? openPublicDayPanel(clickedEventDate(info)) : openDetails(info.event.extendedProps),
+    eventDidMount: deduplicateMonthSpanLabel,
     eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
@@ -185,7 +187,7 @@ function refreshCalendar() {
   if (state.selectedPublicDate) renderPublicDayPanel();
 }
 
-function calendarEvents() {
+function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth') {
   const user = currentUser(state.store);
   const events = state.store.events.filter((event) => {
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
@@ -193,13 +195,22 @@ function calendarEvents() {
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters).flatMap((event) => {
     const category = categoryById(state.store, event.category_id);
-    return state.calendar?.view.type === 'dayGridMonth'
+    return monthView
       ? connectedMonthEvents(event, category)
       : occurrenceCalendarEvents(event, category);
   });
   const blocks = state.store.blockedTimes.map((block) => ({ id: block.id, title: isSuperAdmin(state.store) ? block.title : 'Unavailable', start: block.start_time, end: block.end_time, backgroundColor: '#071C3D', borderColor: '#071C3D', editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store), extendedProps: { type: 'block', record: block } }));
   return [...events, ...blocks];
 }
+
+function deduplicateMonthSpanLabel(info) {
+  if (!info.el.classList.contains('event-month-span-multi')) return;
+  const recordId = info.event.extendedProps.record?.id || info.event.id;
+  if (monthSpanLabels.has(recordId)) info.el.classList.add('event-month-span-continuation');
+  else monthSpanLabels.add(recordId);
+}
+
+function isMonthFetch(info) { const days = (info.end - info.start) / 86400000; return days > 7 && days < 60; }
 
 function occurrenceCalendarEvents(event, category) {
   const occurrences = eventOccurrences(event);
@@ -216,7 +227,7 @@ function connectedMonthEvents(event, category) {
     backgroundColor: category.color,
     borderColor: category.color,
     editable: false,
-    classNames: ['event-month-span'],
+    classNames: ['event-month-span', group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'],
     extendedProps: { type: 'event', record: event }
   }));
 }
