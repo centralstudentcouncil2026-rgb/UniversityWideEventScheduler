@@ -214,7 +214,21 @@ function isMonthFetch(info) { const days = (info.end - info.start) / 86400000; r
 
 function occurrenceCalendarEvents(event, category) {
   const occurrences = eventOccurrences(event);
-  return occurrences.map((occurrence, index) => ({ id: `${event.id}::${occurrence.id}`, title: `${event.title} - ${event.organization_name}${occurrences.length > 1 ? ` (${index + 1}/${occurrences.length})` : ''}`, start: occurrence.start_time, end: occurrence.end_time, backgroundColor: category.color, borderColor: category.color, editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event), extendedProps: { type: 'event', record: event, occurrence } }));
+  const weekParts = state.calendar?.view.type === 'timeGridWeek' ? weekSpanParts(occurrences) : new Map();
+  return occurrences.map((occurrence, index) => {
+    const weekPart = weekParts.get(occurrence.id);
+    return {
+      id: `${event.id}::${occurrence.id}`,
+      title: `${event.title} - ${event.organization_name}${occurrences.length > 1 && !weekPart ? ` (${index + 1}/${occurrences.length})` : ''}`,
+      start: occurrence.start_time,
+      end: occurrence.end_time,
+      backgroundColor: category.color,
+      borderColor: category.color,
+      editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event),
+      classNames: weekPart ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`] : [],
+      extendedProps: { type: 'event', record: event, occurrence }
+    };
+  });
 }
 
 function connectedMonthEvents(event, category) {
@@ -236,6 +250,25 @@ function groupConsecutiveOccurrences(occurrences) {
   return [...occurrences].sort((a, b) => a.date.localeCompare(b.date)).reduce((groups, occurrence) => {
     const current = groups.at(-1);
     if (!current || nextDateInput(current.at(-1).date) !== occurrence.date) groups.push([occurrence]);
+    else current.push(occurrence);
+    return groups;
+  }, []);
+}
+
+function weekSpanParts(occurrences) {
+  const parts = new Map();
+  groupConsecutiveSharedTimeOccurrences(occurrences).forEach((group) => {
+    if (group.length < 2) return;
+    group.forEach((occurrence, index) => parts.set(occurrence.id, { position: index === 0 ? 'start' : index === group.length - 1 ? 'end' : 'middle' }));
+  });
+  return parts;
+}
+
+function groupConsecutiveSharedTimeOccurrences(occurrences) {
+  return [...occurrences].sort((a, b) => a.date.localeCompare(b.date)).reduce((groups, occurrence) => {
+    const current = groups.at(-1);
+    const previous = current?.at(-1);
+    if (!previous || nextDateInput(previous.date) !== occurrence.date || timeInput(previous.start_time) !== timeInput(occurrence.start_time) || timeInput(previous.end_time) !== timeInput(occurrence.end_time)) groups.push([occurrence]);
     else current.push(occurrence);
     return groups;
   }, []);
@@ -677,7 +710,10 @@ function occurrenceRange(dates, start, end) { return dates.map((date) => ({ id: 
 function selectionRange(info) {
   const view = state.calendar.view.type;
   if (view === 'timeGridDay') return { start: info.start, end: info.end };
-  if (view === 'timeGridWeek') return { occurrences: occurrenceRange(dateRange(dateInput(info.start), dateInput(addMinutes(info.end, -0.001))), timeInput(info.start), timeInput(info.end)) };
+  if (view === 'timeGridWeek') {
+    const [start, end] = [timeInput(info.start), timeInput(info.end)].sort();
+    return { occurrences: occurrenceRange(dateRange(dateInput(info.start), dateInput(addMinutes(info.end, -0.001))), start, end) };
+  }
   if (view === 'dayGridMonth') return { occurrences: occurrenceRange(dateRange(dateInput(info.start), dateInput(addMinutes(info.end, -0.001))), '09:00', '10:00') };
   return { start: info.start, end: info.end };
 }

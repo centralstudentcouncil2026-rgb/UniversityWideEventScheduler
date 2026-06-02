@@ -697,6 +697,32 @@ body.is-public .view-selector {
   display: none;
 }
 
+.fc .event-week-span-multi {
+  border-radius: 0;
+  box-shadow: none;
+  margin-left: -3px;
+  margin-right: -3px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+.fc .event-week-span-start {
+  border-bottom-left-radius: 7px;
+  border-top-left-radius: 7px;
+  margin-left: 0;
+}
+
+.fc .event-week-span-end {
+  border-bottom-right-radius: 7px;
+  border-top-right-radius: 7px;
+  margin-right: 0;
+}
+
+.fc .event-week-span-middle .fc-event-main-frame,
+.fc .event-week-span-end .fc-event-main-frame {
+  visibility: hidden;
+}
+
 .fc .fc-event-title,
 .fc .fc-event-time {
   font-weight: 700;
