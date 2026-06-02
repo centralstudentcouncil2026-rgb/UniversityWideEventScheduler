@@ -638,9 +638,24 @@ body.is-public .view-selector {
   background: rgba(244, 180, 0, 0.22);
 }
 
-#calendar.week-rectangle-selecting .fc-timegrid-col-bg .fc-highlight {
-  bottom: var(--week-select-bottom) !important;
-  top: var(--week-select-top) !important;
+.fc .fc-timegrid-col {
+  position: relative;
+}
+
+.week-selection-preview {
+  background: rgba(244, 180, 0, 0.42);
+  border-bottom: 1px solid rgba(201, 151, 0, 0.9);
+  border-top: 1px solid rgba(201, 151, 0, 0.9);
+  color: var(--aup-navy);
+  font-size: 11px;
+  font-weight: 700;
+  left: 0;
+  min-height: 2px;
+  padding: 2px 4px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  z-index: 4;
 }
 
 .fc .fc-daygrid-day-bg {
