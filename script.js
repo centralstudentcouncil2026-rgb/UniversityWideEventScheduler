@@ -172,7 +172,7 @@ function initializeCalendar() {
       if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return;
       openEventModal(mobileTapRange(info));
     },
-    eventClick: (info) => isPublic(state.store) ? openPublicDayPanel(dateInput(info.event.start)) : openDetails(info.event.extendedProps),
+    eventClick: (info) => isPublic(state.store) ? openPublicDayPanel(clickedEventDate(info)) : openDetails(info.event.extendedProps),
     eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
@@ -656,6 +656,7 @@ function mobileTapRange(info) {
   const start = info.date;
   return { start, end: addMinutes(start, 60) };
 }
+function clickedEventDate(info) { return info.jsEvent.target.closest('.fc-daygrid-day')?.dataset.date || dateInput(info.event.start); }
 function roundToNextHalfHour(value) { const date = new Date(value); date.setSeconds(0, 0); const minutes = date.getMinutes(); date.setMinutes(minutes <= 30 ? 30 : 60, 0, 0); return date; }
 function defaultRange() { let start = roundToNextHalfHour(addMinutes(new Date(), 60)); let end = addMinutes(start, 60); if (dateInput(start) !== dateInput(end)) { start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 9, 0, 0, 0); end = addMinutes(start, 60); } return { start, end }; }
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
