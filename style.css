@@ -638,6 +638,11 @@ body.is-public .view-selector {
   background: rgba(244, 180, 0, 0.22);
 }
 
+#calendar.week-rectangle-selecting .fc-timegrid-col-bg .fc-highlight {
+  bottom: var(--week-select-bottom) !important;
+  top: var(--week-select-top) !important;
+}
+
 .fc .fc-daygrid-day-bg {
   align-items: center;
   display: flex;

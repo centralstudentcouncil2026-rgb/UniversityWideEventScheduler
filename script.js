@@ -8,6 +8,8 @@ import {
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
+const WEEK_SLOT_START_MINUTES = 7 * 60;
+const WEEK_SLOT_END_MINUTES = 21 * 60;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -96,6 +98,8 @@ function bindEvents() {
   $('activityLogButton').addEventListener('click', openActivityLog);
   $('confirmYesButton').addEventListener('click', confirmPendingAction);
   $('closePublicDayPanel').addEventListener('click', closePublicDayPanel);
+  document.addEventListener('pointerup', () => setTimeout(clearWeekSelectionMirror, 0));
+  document.addEventListener('pointercancel', clearWeekSelectionMirror);
   document.addEventListener('click', (event) => {
     const closer = event.target.closest('[data-close]');
     if (closer) closeDialog(closer.dataset.close);
@@ -165,9 +169,9 @@ function initializeCalendar() {
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isMonthFetch(info))); },
-    datesSet: (info) => { $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
-    selectAllow: () => !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
-    select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
+    datesSet: (info) => { clearWeekSelectionMirror(); $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
+    selectAllow: (info) => { syncWeekSelectionMirror(info); return !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear'; },
+    select: (info) => { clearWeekSelectionMirror(); if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
     dateClick: (info) => {
       if (isPublic(state.store)) return openPublicDayPanel(dateInput(info.date));
       if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return;
@@ -211,6 +215,25 @@ function deduplicateMonthSpanLabel(info) {
 }
 
 function isMonthFetch(info) { const days = (info.end - info.start) / 86400000; return days > 7 && days < 60; }
+
+function syncWeekSelectionMirror(info) {
+  const calendar = $('calendar');
+  if (state.calendar?.view.type !== 'timeGridWeek') return clearWeekSelectionMirror();
+  const [start, end] = [minutesFromDate(info.start), minutesFromDate(info.end)].sort((a, b) => a - b);
+  const duration = WEEK_SLOT_END_MINUTES - WEEK_SLOT_START_MINUTES;
+  calendar.style.setProperty('--week-select-top', `${Math.max(0, start - WEEK_SLOT_START_MINUTES) / duration * 100}%`);
+  calendar.style.setProperty('--week-select-bottom', `${Math.max(0, WEEK_SLOT_END_MINUTES - end) / duration * 100}%`);
+  calendar.classList.add('week-rectangle-selecting');
+}
+
+function clearWeekSelectionMirror() {
+  const calendar = $('calendar');
+  calendar?.classList.remove('week-rectangle-selecting');
+  calendar?.style.removeProperty('--week-select-top');
+  calendar?.style.removeProperty('--week-select-bottom');
+}
+
+function minutesFromDate(value) { return value.getHours() * 60 + value.getMinutes(); }
 
 function occurrenceCalendarEvents(event, category) {
   const occurrences = eventOccurrences(event);
