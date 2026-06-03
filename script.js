@@ -202,12 +202,22 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
     if (isSuperAdmin(state.store)) return true;
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters).flatMap((event) => {
-    const category = categoryById(state.store, event.category_id);
+    const eventColor = organizationColor(state.store, event);
     return monthView
-      ? connectedMonthEvents(event, category)
-      : occurrenceCalendarEvents(event, category);
+      ? connectedMonthEvents(event, eventColor)
+      : occurrenceCalendarEvents(event, eventColor);
   });
-  const blocks = state.store.blockedTimes.map((block) => ({ id: block.id, title: isSuperAdmin(state.store) ? block.title : 'Unavailable', start: block.start_time, end: block.end_time, backgroundColor: '#071C3D', borderColor: '#071C3D', editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store), extendedProps: { type: 'block', record: block } }));
+  const blocks = state.store.blockedTimes.map((block) => ({
+    id: block.id,
+    title: isSuperAdmin(state.store) ? block.title : 'Unavailable',
+    start: block.start_time,
+    end: block.end_time,
+    backgroundColor: '#071C3D',
+    borderColor: '#F4B400',
+    editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store),
+    classNames: ['event-blocked', 'event-super-admin-block'],
+    extendedProps: { type: 'block', record: block }
+  }));
   return [...events, ...blocks];
 }
 
@@ -219,6 +229,16 @@ function deduplicateMonthSpanLabel(info) {
 }
 
 function isMonthFetch(info) { const days = (info.end - info.start) / 86400000; return days > 7 && days < 60; }
+
+const ORGANIZATION_COLOR_FALLBACKS = ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2', '#BE185D', '#4F46E5', '#0D9488', '#B45309'];
+function organizationColor(store, event) {
+  const organization = store.organizations.find((item) => item.id === event.organization_id || item.organization_name === event.organization_name);
+  const assignedColor = organization?.color || organization?.organization_color || organization?.assigned_color || organization?.theme_color || organization?.color_hex;
+  if (isCssColor(assignedColor)) return assignedColor;
+  return ORGANIZATION_COLOR_FALLBACKS[Math.abs(hashText(event.organization_id || event.organization_name || event.title)) % ORGANIZATION_COLOR_FALLBACKS.length];
+}
+function isCssColor(value) { return typeof value === 'string' && /^(#(?:[0-9a-f]{3}){1,2}|rgb\(|rgba\(|hsl\(|hsla\()/i.test(value.trim()); }
+function hashText(value) { return String(value || '').split('').reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0); }
 
 function startWeekRectangleSelection(event) {
   if (event.button !== 0 || !canStartWeekRectangleSelection(event)) return;
@@ -311,7 +331,7 @@ function snapWeekMinutes(value) { return Math.max(WEEK_SLOT_START_MINUTES, Math.
 function minutesTime(value) { return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
 function formatMinutes(value) { return formatInputTime(minutesTime(value)); }
 
-function occurrenceCalendarEvents(event, category) {
+function occurrenceCalendarEvents(event, eventColor) {
   const occurrences = eventOccurrences(event);
   const weekParts = state.calendar?.view.type === 'timeGridWeek' ? weekSpanParts(occurrences) : new Map();
   return occurrences.map((occurrence, index) => {
@@ -321,8 +341,8 @@ function occurrenceCalendarEvents(event, category) {
       title: `${event.title} - ${event.organization_name}${occurrences.length > 1 && !weekPart ? ` (${index + 1}/${occurrences.length})` : ''}`,
       start: occurrence.start_time,
       end: occurrence.end_time,
-      backgroundColor: category.color,
-      borderColor: category.color,
+      backgroundColor: eventColor,
+      borderColor: eventColor,
       editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event),
       classNames: weekPart ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`] : [],
       extendedProps: { type: 'event', record: event, occurrence }
@@ -330,15 +350,15 @@ function occurrenceCalendarEvents(event, category) {
   });
 }
 
-function connectedMonthEvents(event, category) {
+function connectedMonthEvents(event, eventColor) {
   return groupConsecutiveOccurrences(eventOccurrences(event)).map((group, index) => ({
     id: `${event.id}::month-span-${index}`,
     title: `${event.title} - ${event.organization_name}`,
     start: group[0].date,
     end: nextDateInput(group.at(-1).date),
     allDay: true,
-    backgroundColor: category.color,
-    borderColor: category.color,
+    backgroundColor: eventColor,
+    borderColor: eventColor,
     editable: false,
     classNames: ['event-month-span', group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'],
     extendedProps: { type: 'event', record: event }
@@ -590,7 +610,7 @@ function renderPublicDayPanel() {
   $('publicDayTitle').textContent = new Date(`${state.selectedPublicDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   $('publicDayEvents').innerHTML = items.map(({ event, occurrence }) => {
     const category = categoryById(state.store, event.category_id);
-    return `<article class="public-day-event" style="border-left-color:${escapeHtml(category.color)}"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatTime(occurrence.start_time))} to ${escapeHtml(formatTime(occurrence.end_time))}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(category.name)} - ${escapeHtml(cap(event.event_status))}</p><p>${escapeHtml(event.public_description)}</p></article>`;
+    return `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(state.store, event))}"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatTime(occurrence.start_time))} to ${escapeHtml(formatTime(occurrence.end_time))}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(category.name)} - ${escapeHtml(cap(event.event_status))}</p><p>${escapeHtml(event.public_description)}</p></article>`;
   }).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
 }
 
@@ -631,6 +651,7 @@ async function deleteEvent(event) {
     showToast(`Could not delete event: ${error.message}`, 'error');
   }
 }
+
 function reviewSelectedEvent(status) { const event = state.selectedDetails?.record; if (event) reviewEvent(event, status); }
 function reviewEvent(event, status) {
   if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can review requests.')) return;
