@@ -1,0 +1,69 @@
+/* CONNECT calendar refinements: organization-colored events + AUP admin blocks */
+.fc .event-month-span,
+.fc .event-week-span-multi {
+  border: 0 !important;
+  color: #ffffff !important;
+}
+
+.fc .event-month-span-single {
+  border-radius: 999px !important;
+  margin-left: 4px !important;
+  margin-right: 4px !important;
+}
+
+.fc .event-month-span-multi {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin-left: -3px !important;
+  margin-right: -3px !important;
+}
+
+.fc .event-month-span-multi.fc-event-start {
+  border-bottom-left-radius: 999px !important;
+  border-top-left-radius: 999px !important;
+  margin-left: 4px !important;
+}
+
+.fc .event-month-span-multi.fc-event-end {
+  border-bottom-right-radius: 999px !important;
+  border-top-right-radius: 999px !important;
+  margin-right: 4px !important;
+}
+
+.fc .event-week-span-multi {
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  margin-left: -7px !important;
+  margin-right: -7px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.fc .event-week-span-start {
+  border-bottom-left-radius: 14px !important;
+  border-top-left-radius: 14px !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16) !important;
+  margin-left: 0 !important;
+}
+
+.fc .event-week-span-end {
+  border-bottom-right-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+  margin-right: 0 !important;
+}
+
+.fc .event-week-span-middle .fc-event-main-frame,
+.fc .event-week-span-end .fc-event-main-frame,
+.fc .event-month-span-continuation .fc-event-title {
+  visibility: hidden !important;
+}
+
+.fc .event-super-admin-block,
+.fc .event-blocked {
+  background: linear-gradient(135deg, #071c3d 0%, #0b3b75 72%, #f4b400 170%) !important;
+  border: 1px solid #f4b400 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(7, 28, 61, 0.24) !important;
+}
