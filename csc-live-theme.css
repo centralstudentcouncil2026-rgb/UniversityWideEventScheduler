@@ -89,6 +89,15 @@ body::before {
   font-weight: 800;
 }
 
+.brand-area h1 {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.brand-area p {
+  max-width: 520px;
+}
+
 .brand-area p,
 .calendar-nav h2,
 .profile-pill,
@@ -156,6 +165,77 @@ body::before {
   border-radius: 10px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
   font-family: 'Inter', Arial, Helvetica, sans-serif;
+}
+
+.fc .event-month-span {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 68%, #facc15 170%) !important;
+  border: 0 !important;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.24);
+  color: #ffffff !important;
+  min-height: 26px;
+}
+
+.fc .event-month-span-single {
+  border-radius: 999px !important;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+
+.fc .event-month-span-multi {
+  border-radius: 0 !important;
+  margin-left: -2px !important;
+  margin-right: -2px !important;
+}
+
+.fc .event-month-span-multi.fc-event-start,
+.fc .event-month-span-multi.event-month-span:first-child {
+  border-bottom-left-radius: 999px !important;
+  border-top-left-radius: 999px !important;
+  margin-left: 4px !important;
+}
+
+.fc .event-month-span-multi.fc-event-end,
+.fc .event-month-span-multi.event-month-span:last-child {
+  border-bottom-right-radius: 999px !important;
+  border-top-right-radius: 999px !important;
+  margin-right: 4px !important;
+}
+
+.fc .event-month-span-continuation .fc-event-title {
+  display: none;
+}
+
+.fc .event-week-span-multi {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 72%, #facc15 165%) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  margin-left: -4px !important;
+  margin-right: -4px !important;
+}
+
+.fc .event-week-span-start {
+  border-bottom-left-radius: 14px !important;
+  border-top-left-radius: 14px !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2) !important;
+  margin-left: 0 !important;
+}
+
+.fc .event-week-span-end {
+  border-bottom-right-radius: 14px !important;
+  border-top-right-radius: 14px !important;
+  margin-right: 0 !important;
+}
+
+.fc .event-week-span-middle .fc-event-main-frame,
+.fc .event-week-span-end .fc-event-main-frame {
+  visibility: hidden;
+}
+
+.fc .fc-event-title,
+.fc .fc-event-time {
+  font-weight: 800;
 }
 
 .toolbar-button,
@@ -279,6 +359,10 @@ body::before {
   .topbar {
     min-height: auto;
     padding: 10px;
+  }
+
+  .brand-area p {
+    max-width: 220px;
   }
 
   .calendar-panel {
