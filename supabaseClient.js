@@ -4,12 +4,18 @@ window.SUPABASE_CONFIG = Object.freeze({
 });
 
 (() => {
-  const href = 'csc-live-theme.css?v=20260603-connect-theme-v2';
-  if (document.querySelector(`link[href="${href}"]`)) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = href;
-  document.head.appendChild(link);
+  const stylesheets = [
+    'csc-live-theme.css?v=20260603-connect-theme-v2',
+    'connect-calendar-overrides.css?v=20260603-org-week-continuous-v1'
+  ];
+
+  stylesheets.forEach((href) => {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  });
 })();
 
 (() => {
@@ -30,4 +36,28 @@ window.SUPABASE_CONFIG = Object.freeze({
 
   applyConnectBranding();
   document.addEventListener('DOMContentLoaded', applyConnectBranding);
+})();
+
+(() => {
+  function normalizeCalendarEventColors() {
+    document.querySelectorAll('.fc-event').forEach((eventElement) => {
+      if (eventElement.classList.contains('event-super-admin-block') || eventElement.classList.contains('event-blocked')) return;
+
+      const organizationColor = eventElement.style.backgroundColor || eventElement.style.borderColor;
+      if (!organizationColor) return;
+
+      eventElement.style.setProperty('background', organizationColor, 'important');
+      eventElement.style.setProperty('background-color', organizationColor, 'important');
+      eventElement.style.setProperty('border-color', organizationColor, 'important');
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    normalizeCalendarEventColors();
+    const calendar = document.getElementById('calendar');
+    if (!calendar) return;
+
+    const observer = new MutationObserver(normalizeCalendarEventColors);
+    observer.observe(calendar, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+  });
 })();
