@@ -2,6 +2,24 @@ import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-dat
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
+let lastEventIds = new Set();
+
+function eventIds(store) {
+  return new Set((store?.events || []).map((event) => event.id).filter(Boolean));
+}
+
+function rememberEventIds(store) {
+  lastEventIds = eventIds(store);
+}
+
+async function deleteRemovedEvents(store) {
+  const nextEventIds = eventIds(store);
+  const removedIds = [...lastEventIds].filter((id) => !nextEventIds.has(id));
+  if (removedIds.length) {
+    await Promise.all(removedIds.map((id) => deleteRecord('events', id)));
+  }
+  rememberEventIds(store);
+}
 
 function session() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
@@ -34,15 +52,18 @@ async function rpc(name, body = {}, authenticated = false) {
 export async function loadStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
+    rememberEventIds(store);
     return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
     clearSession();
+    lastEventIds = new Set();
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
   }
 }
 
 export async function saveStore(store) {
   await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
+  await deleteRemovedEvents(store);
 }
 
 export async function authenticate(username, password) {
