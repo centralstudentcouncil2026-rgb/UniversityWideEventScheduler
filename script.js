@@ -601,7 +601,7 @@ function cancelEvent(event) { event.event_status = 'cancelled'; event.updated_at
 function deleteSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmDeleteEvent(event); }
 function deleteEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmDeleteEvent(event); }
 function confirmDeleteEvent(event) { if (!requirePermission(canEditEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
-aasync function deleteEvent(event) {
+async function deleteEvent(event) {
   const index = state.store.events.findIndex((item) => item.id === event.id);
   if (index < 0) return;
 
