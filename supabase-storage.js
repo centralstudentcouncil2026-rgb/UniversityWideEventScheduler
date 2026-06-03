@@ -80,8 +80,16 @@ export async function decideAccountRequest(id, decision) {
   return rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
 }
 
+const DELETE_COLLECTION_MAP = {
+  events: 'reservations',
+  blockedTimes: 'blocked_times',
+  activityLogs: 'activity_logs',
+  accountRequests: 'account_requests'
+};
+
 export async function deleteRecord(collection, id) {
-  return rpc('delete_scheduler_record', { p_collection: collection, p_id: id }, true);
+  const mappedCollection = DELETE_COLLECTION_MAP[collection] || collection;
+  return rpc('delete_scheduler_record', { p_collection: mappedCollection, p_id: id }, true);
 }
 
 export function clearSession() {
