@@ -604,15 +604,30 @@ function confirmDeleteEvent(event) { if (!requirePermission(canEditEvent(state.s
 async function deleteEvent(event) {
   const index = state.store.events.findIndex((item) => item.id === event.id);
   if (index < 0) return;
+
+  const deletedEvent = state.store.events[index];
   const logLength = state.store.activityLogs.length;
-  state.store.events.splice(index, 1);
-  log('event_deleted', `${currentUser(state.store).full_name} deleted "${event.title}".`, event);
+
   try {
-    await saveStore(state.store);
-    closeDialog('detailsModal'); closeDialog('eventModal'); renderAll(); refreshCalendar(); showToast('Event deleted.', 'success');
+    await deleteRecord('events', deletedEvent.id);
+
+    state.store.events.splice(index, 1);
+
+    log(
+      'event_deleted',
+      `${currentUser(state.store).full_name} deleted "${deletedEvent.title}".`,
+      deletedEvent
+    );
+
+    await persist('Event deleted.');
+
+    closeDialog('detailsModal');
+    closeDialog('eventModal');
+    renderAll();
+    refreshCalendar();
   } catch (error) {
-    state.store.events.splice(index, 0, event);
     state.store.activityLogs.length = logLength;
+    await reloadStore();
     showToast(`Could not delete event: ${error.message}`, 'error');
   }
 }
