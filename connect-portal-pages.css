@@ -134,7 +134,10 @@
 
 .status-card::before,
 .public-login-card::before,
-.participating-card::before,
+.participating-card::before {
+  display: none !important;
+}
+
 .public-shell .announcement-preview::before,
 .portal-shell .announcement-preview::before {
   background: linear-gradient(90deg, #2563eb, #facc15);
@@ -144,6 +147,12 @@
   position: absolute;
   right: 0;
   top: 0;
+}
+
+.public-shell .announcement-preview .notice,
+.portal-shell .announcement-preview .notice {
+  border-left: 0 !important;
+  padding-left: 0 !important;
 }
 
 .status-card strong,
@@ -322,6 +331,13 @@
   min-height: 38px;
   padding: 8px 10px;
   text-align: left;
+}
+
+.public-multi-day-event {
+  border-radius: 999px !important;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.16) !important;
+  margin-left: 4px !important;
+  margin-right: 4px !important;
 }
 
 @media (max-width: 1024px) {
