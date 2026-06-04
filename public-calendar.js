@@ -7,12 +7,18 @@ const state = { store: null, calendar: null, selectedDate: '' };
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
 async function initPublicCalendar() {
-  const { store, notice } = await loadStore();
-  state.store = store;
-  renderAnnouncements();
-  renderStatuses();
-  initializePublicCalendar();
-  if (notice) console.info(notice);
+  try {
+    const result = await loadStore();
+    state.store = result.store;
+    renderAnnouncements();
+    renderStatuses();
+    initializePublicCalendar();
+    if (result.notice) console.info(result.notice);
+  } catch (error) {
+    console.error('CONNECT public calendar failed to load:', error);
+    const calendar = $('calendar');
+    if (calendar) calendar.innerHTML = '<div class="activity-item"><strong>Calendar failed to load.</strong><p>Please refresh the page.</p></div>';
+  }
 }
 
 function initializePublicCalendar() {
@@ -24,15 +30,26 @@ function initializePublicCalendar() {
     events: publicEvents(),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
     dateClick: (info) => openPublicDayPanel(info.dateStr),
-    eventClick: (info) => openPublicDayPanel((info.event.extendedProps?.panelDate || info.event.startStr).slice(0, 10))
+    eventClick: (info) => {
+      const panelDate = info.event.extendedProps && info.event.extendedProps.panelDate ? info.event.extendedProps.panelDate : info.event.startStr;
+      openPublicDayPanel(String(panelDate).slice(0, 10));
+    }
   });
 
-  $('todayButton')?.addEventListener('click', () => state.calendar.today());
-  $('prevButton')?.addEventListener('click', () => state.calendar.prev());
-  $('nextButton')?.addEventListener('click', () => state.calendar.next());
-  $('closePublicDayPanel')?.addEventListener('click', closePublicDayPanel);
-  $('mobileMenuButton')?.addEventListener('click', () => $('sidebar')?.classList.add('open'));
-  $('mobileScrim')?.addEventListener('click', () => $('sidebar')?.classList.remove('open'));
+  const todayButton = $('todayButton');
+  const prevButton = $('prevButton');
+  const nextButton = $('nextButton');
+  const closeButton = $('closePublicDayPanel');
+  const menuButton = $('mobileMenuButton');
+  const scrim = $('mobileScrim');
+
+  if (todayButton) todayButton.addEventListener('click', () => state.calendar.today());
+  if (prevButton) prevButton.addEventListener('click', () => state.calendar.prev());
+  if (nextButton) nextButton.addEventListener('click', () => state.calendar.next());
+  if (closeButton) closeButton.addEventListener('click', closePublicDayPanel);
+  if (menuButton) menuButton.addEventListener('click', () => $('sidebar') && $('sidebar').classList.add('open'));
+  if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));
+
   state.calendar.render();
 }
 
@@ -51,7 +68,7 @@ function publicCalendarItems(event) {
   return ranges.map((range, index) => {
     const color = organizationColor(event);
     const first = range[0];
-    const last = range.at(-1);
+    const last = range[range.length - 1];
     const isMultiDay = range.length > 1;
     const displayTime = formatCompactTime(first.start_time);
 
@@ -71,9 +88,9 @@ function publicCalendarItems(event) {
 
 function consecutiveOccurrenceRanges(occurrences) {
   return occurrences.reduce((ranges, occurrence) => {
-    const lastRange = ranges.at(-1);
-    const lastOccurrence = lastRange?.at(-1);
-    if (!lastRange || nextDate(lastOccurrence.date) !== occurrence.date) {
+    const lastRange = ranges.length ? ranges[ranges.length - 1] : null;
+    const lastOccurrence = lastRange && lastRange.length ? lastRange[lastRange.length - 1] : null;
+    if (!lastRange || !lastOccurrence || nextDate(lastOccurrence.date) !== occurrence.date) {
       ranges.push([occurrence]);
     } else {
       lastRange.push(occurrence);
@@ -122,7 +139,7 @@ function organizationColor(event) {
 
 function readableStatus(value) {
   if (!value) return '';
-  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return String(value).split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatTime(value) {
