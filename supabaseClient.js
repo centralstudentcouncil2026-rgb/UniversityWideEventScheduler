@@ -6,7 +6,8 @@ window.SUPABASE_CONFIG = Object.freeze({
 (() => {
   const stylesheets = [
     'csc-live-theme.css?v=20260603-connect-theme-v2',
-    'connect-calendar-overrides.css?v=20260603-org-week-continuous-v1'
+    'connect-calendar-overrides.css?v=20260603-org-week-continuous-v1',
+    'connect-portal-pages.css?v=20260604-design-restore-v2'
   ];
 
   stylesheets.forEach((href) => {
@@ -19,8 +20,8 @@ window.SUPABASE_CONFIG = Object.freeze({
 })();
 
 (() => {
-  const fullName = 'Centralized Organization Network for News, Events, Coordination, & Timely Updates';
-  const compactName = ['Centralized Organization Network', 'News • Events • Coordination • Timely Updates'];
+  const fullName = 'Centralized Organization Network for News, Events, Coordination, & Timely Events';
+  const compactName = ['Centralized Organization Network', 'News • Events • Coordination • Timely Events'];
 
   function applyConnectBranding() {
     document.title = document.title?.startsWith('CONNECT') ? document.title : `CONNECT | ${fullName}`;
