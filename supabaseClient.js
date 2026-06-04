@@ -19,8 +19,8 @@ window.SUPABASE_CONFIG = Object.freeze({
 })();
 
 (() => {
-  const fullName = 'Centralized Organization Network for News, Events, Communication, & Timely Updates';
-  const compactName = ['Centralized Organization Network', 'News • Events • Communication • Timely Updates'];
+  const fullName = 'Centralized Organization Network for News, Events, Coordination, & Timely Updates';
+  const compactName = ['Centralized Organization Network', 'News • Events • Coordination • Timely Updates'];
 
   function applyConnectBranding() {
     document.title = document.title?.startsWith('CONNECT') ? document.title : `CONNECT | ${fullName}`;
