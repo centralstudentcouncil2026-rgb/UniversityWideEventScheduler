@@ -24,7 +24,7 @@ function initializePublicCalendar() {
     events: publicEvents(),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
     dateClick: (info) => openPublicDayPanel(info.dateStr),
-    eventClick: (info) => openPublicDayPanel(info.event.startStr.slice(0, 10))
+    eventClick: (info) => openPublicDayPanel((info.event.extendedProps?.panelDate || info.event.startStr).slice(0, 10))
   });
 
   $('todayButton')?.addEventListener('click', () => state.calendar.today());
@@ -39,15 +39,47 @@ function initializePublicCalendar() {
 function publicEvents() {
   return state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-    .flatMap((event) => eventOccurrences(event).map((occurrence) => ({
-      id: `${event.id}::${occurrence.id}`,
-      title: `${event.title} - ${event.organization_name}`,
-      start: occurrence.start_time,
-      end: occurrence.end_time,
-      backgroundColor: organizationColor(event),
-      borderColor: organizationColor(event),
-      extendedProps: { event, occurrence }
-    })));
+    .flatMap((event) => publicCalendarItems(event));
+}
+
+function publicCalendarItems(event) {
+  const occurrences = eventOccurrences(event)
+    .filter((occurrence) => occurrence.date && occurrence.start_time && occurrence.end_time)
+    .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.start_time) - new Date(b.start_time));
+
+  const ranges = consecutiveOccurrenceRanges(occurrences);
+  return ranges.map((range, index) => {
+    const color = organizationColor(event);
+    const first = range[0];
+    const last = range.at(-1);
+    const isMultiDay = range.length > 1;
+    const displayTime = formatCompactTime(first.start_time);
+
+    return {
+      id: `${event.id}::public-range-${index}`,
+      title: `${displayTime} ${event.title} - ${event.organization_name}`,
+      start: isMultiDay ? first.date : first.start_time,
+      end: isMultiDay ? nextDate(last.date) : first.end_time,
+      allDay: isMultiDay,
+      backgroundColor: color,
+      borderColor: color,
+      classNames: [isMultiDay ? 'event-month-span event-month-span-multi public-multi-day-event' : 'public-single-day-event'],
+      extendedProps: { event, occurrence: first, panelDate: first.date }
+    };
+  });
+}
+
+function consecutiveOccurrenceRanges(occurrences) {
+  return occurrences.reduce((ranges, occurrence) => {
+    const lastRange = ranges.at(-1);
+    const lastOccurrence = lastRange?.at(-1);
+    if (!lastRange || nextDate(lastOccurrence.date) !== occurrence.date) {
+      ranges.push([occurrence]);
+    } else {
+      lastRange.push(occurrence);
+    }
+    return ranges;
+  }, []);
 }
 
 function renderAnnouncements() {
@@ -95,6 +127,16 @@ function readableStatus(value) {
 
 function formatTime(value) {
   return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatCompactTime(value) {
+  return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).replace(' AM', 'a').replace(' PM', 'p');
+}
+
+function nextDate(dateString) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function hashText(value) {
