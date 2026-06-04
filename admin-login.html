@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CONNECT admin login">
+  <title>CONNECT | Admin Login</title>
+  <link rel="stylesheet" href="style.css?v=20260603-week-rectangle-v1">
+  <link rel="stylesheet" href="csc-live-theme.css?v=20260603-connect-theme-v2">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260604-login-pages-v1">
+</head>
+<body class="auth-active auth-screen login-page" data-login-type="admin">
+  <header class="auth-brand">
+    <img class="brand-logo" src="assets/csc-logo.png" alt="CSC logo">
+    <div>
+      <h1>CONNECT</h1>
+      <p>Centralized Organization Network for News, Events, Communication, & Timely Updates</p>
+    </div>
+  </header>
+
+  <main class="auth-layout" aria-label="Admin login">
+    <section class="auth-card login-card">
+      <span class="login-kind-badge">Admin Portal</span>
+      <h2>Admin Login</h2>
+      <p>Use this page only for CONNECT administrators and approved admin-role accounts.</p>
+
+      <form class="auth-form" id="pageLoginForm">
+        <label>Username
+          <input id="loginUsername" required autocomplete="username" autofocus>
+        </label>
+        <label>Password
+          <input id="loginPassword" type="password" required autocomplete="current-password">
+        </label>
+        <button class="primary-button" type="submit">Open Admin Portal</button>
+      </form>
+
+      <p class="login-message" id="loginMessage" aria-live="polite"></p>
+      <div class="login-footer-links">
+        <a href="student-login.html">Student organization login</a>
+        <a href="index.html">Back to public calendar</a>
+      </div>
+    </section>
+  </main>
+
+  <p class="auth-footnote">Only approved administrator accounts can enter from this login page.</p>
+
+  <script src="supabaseClient.js?v=20260601-supabase-v1"></script>
+  <script type="module" src="login.js?v=20260604-role-login-v1"></script>
+</body>
+</html>
