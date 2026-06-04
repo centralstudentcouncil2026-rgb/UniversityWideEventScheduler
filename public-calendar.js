@@ -1,0 +1,106 @@
+import { loadStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260601-public-month-v2';
+
+const $ = (id) => document.getElementById(id);
+const state = { store: null, calendar: null, selectedDate: '' };
+
+document.addEventListener('DOMContentLoaded', initPublicCalendar);
+
+async function initPublicCalendar() {
+  const { store, notice } = await loadStore();
+  state.store = store;
+  renderAnnouncements();
+  renderStatuses();
+  initializePublicCalendar();
+  if (notice) console.info(notice);
+}
+
+function initializePublicCalendar() {
+  state.calendar = new FullCalendar.Calendar($('calendar'), {
+    initialView: 'dayGridMonth',
+    firstDay: 1,
+    height: '100%',
+    headerToolbar: false,
+    events: publicEvents(),
+    datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
+    dateClick: (info) => openPublicDayPanel(info.dateStr),
+    eventClick: (info) => openPublicDayPanel(info.event.startStr.slice(0, 10))
+  });
+
+  $('todayButton')?.addEventListener('click', () => state.calendar.today());
+  $('prevButton')?.addEventListener('click', () => state.calendar.prev());
+  $('nextButton')?.addEventListener('click', () => state.calendar.next());
+  $('closePublicDayPanel')?.addEventListener('click', closePublicDayPanel);
+  $('mobileMenuButton')?.addEventListener('click', () => $('sidebar')?.classList.add('open'));
+  $('mobileScrim')?.addEventListener('click', () => $('sidebar')?.classList.remove('open'));
+  state.calendar.render();
+}
+
+function publicEvents() {
+  return state.store.events
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .flatMap((event) => eventOccurrences(event).map((occurrence) => ({
+      id: `${event.id}::${occurrence.id}`,
+      title: `${event.title} - ${event.organization_name}`,
+      start: occurrence.start_time,
+      end: occurrence.end_time,
+      backgroundColor: organizationColor(event),
+      borderColor: organizationColor(event),
+      extendedProps: { event, occurrence }
+    })));
+}
+
+function renderAnnouncements() {
+  const announcements = activeAnnouncements(state.store).slice(0, 4);
+  $('announcementPreview').innerHTML = announcements.map((item) => `<div class="notice ${escapeHtml(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`).join('') || '<p class="empty-text">No active announcements.</p>';
+}
+
+function renderStatuses() {
+  const statuses = Array.isArray(state.store.activityStatuses) ? state.store.activityStatuses : [];
+  const office = statuses.find((item) => item.id === 'incampus_offcampus' || item.key === 'incampus_offcampus');
+  const president = statuses.find((item) => item.id === 'csc_president' || item.key === 'csc_president');
+  $('officeStatusValue').textContent = office?.status_label || readableStatus(office?.status) || 'Status not posted';
+  $('presidentStatusValue').textContent = president?.status_label || readableStatus(president?.status) || 'Status not posted';
+}
+
+function openPublicDayPanel(date) {
+  state.selectedDate = date;
+  const items = state.store.events
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .flatMap((event) => eventOccurrences(event).filter((occurrence) => occurrence.date === date).map((occurrence) => ({ event, occurrence })))
+    .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
+
+  $('publicDayTitle').textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('publicDayEvents').innerHTML = items.map(({ event, occurrence }) => `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
+  $('publicDayPanel').classList.add('open');
+  $('publicDayPanel').setAttribute('aria-hidden', 'false');
+}
+
+function closePublicDayPanel() {
+  $('publicDayPanel').classList.remove('open');
+  $('publicDayPanel').setAttribute('aria-hidden', 'true');
+}
+
+function organizationColor(event) {
+  const org = state.store.organizations.find((item) => item.id === event.organization_id || item.organization_name === event.organization_name);
+  const assigned = org?.color || org?.organization_color || org?.assigned_color || org?.theme_color || org?.color_hex;
+  if (typeof assigned === 'string' && assigned.trim()) return assigned;
+  return ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2'][Math.abs(hashText(event.organization_id || event.organization_name || event.title)) % 6];
+}
+
+function readableStatus(value) {
+  if (!value) return '';
+  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function hashText(value) {
+  return String(value || '').split('').reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
