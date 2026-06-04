@@ -1,6 +1,6 @@
 export const PUBLIC_USER = { id: 'public', full_name: 'Public Viewer', role: 'public_viewer', organization_id: null };
 export const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'];
-export const EVENT_STATUSES = ['planned', 'finalized', 'postponed', 'cancelled', 'completed'];
+export const EVENT_STATUSES = ['planned', 'finalized', 'postponed', 'cancelled', 'disabled', 'completed'];
 
 export function currentUser(store) {
   if (store.currentUserId === 'public') return PUBLIC_USER;
@@ -33,7 +33,7 @@ export function canEditEvent(store, event) {
 }
 
 export function isPublicEvent(event) {
-  return event.privacy_level !== 'internal' && event.event_status !== 'draft';
+  return event.privacy_level !== 'internal' && !['draft', 'cancelled', 'disabled'].includes(event.event_status);
 }
 
 export function normalizeVenue(value) {
@@ -58,7 +58,7 @@ export function findVenueConflicts(store, candidate, approvalStatuses = ['pendin
   return store.events.filter((event) =>
     event.id !== candidate.id
     && approvalStatuses.includes(event.approval_status)
-    && !['cancelled', 'completed'].includes(event.event_status)
+    && !['cancelled', 'disabled', 'completed'].includes(event.event_status)
     && eventOccurrences(candidate).some((candidateOccurrence) =>
       eventOccurrences(event).some((eventOccurrence) =>
         overlaps(candidateOccurrence.start_time, candidateOccurrence.end_time, eventOccurrence.start_time, eventOccurrence.end_time)
