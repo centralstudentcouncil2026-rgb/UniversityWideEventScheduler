@@ -20,9 +20,10 @@ window.SUPABASE_CONFIG = Object.freeze({
 
 (() => {
   const fullName = 'Centralized Organization Network for News, Events, Communication, & Timely Updates';
+  const compactName = ['Centralized Organization Network', 'News • Events • Communication • Timely Updates'];
 
   function applyConnectBranding() {
-    document.title = `CONNECT | ${fullName}`;
+    document.title = document.title?.startsWith('CONNECT') ? document.title : `CONNECT | ${fullName}`;
 
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) metaDescription.setAttribute('content', fullName);
@@ -31,7 +32,14 @@ window.SUPABASE_CONFIG = Object.freeze({
     if (brandTitle) brandTitle.textContent = 'CONNECT';
 
     const brandSubtitle = document.querySelector('.brand-area p');
-    if (brandSubtitle) brandSubtitle.textContent = fullName;
+    if (!brandSubtitle) return;
+
+    if (brandSubtitle.classList.contains('brand-tagline-grid')) {
+      brandSubtitle.innerHTML = `<span>${compactName[0]}</span><span>${compactName[1]}</span>`;
+      return;
+    }
+
+    brandSubtitle.textContent = fullName;
   }
 
   applyConnectBranding();
