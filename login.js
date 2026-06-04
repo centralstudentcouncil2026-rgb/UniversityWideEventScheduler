@@ -1,5 +1,5 @@
 import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
-import { currentUser, isManager, isPublic, isSuperAdmin } from './app-rules.js?v=20260601-public-month-v2';
+import { currentUser, isManager, isPublic } from './app-rules.js?v=20260601-public-month-v2';
 
 const loginType = document.body.dataset.loginType;
 const form = document.getElementById('pageLoginForm');
@@ -11,8 +11,9 @@ function setMessage(text, type = 'error') {
 }
 
 function roleAllowed(store) {
+  const user = currentUser(store);
   if (loginType === 'student') return isManager(store);
-  if (loginType === 'admin') return isSuperAdmin(store) || currentUser(store).role === 'admin' || String(currentUser(store).role || '').endsWith('_admin');
+  if (loginType === 'admin') return !isPublic(store) && user.role !== 'organization_manager';
   return !isPublic(store);
 }
 
