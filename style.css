@@ -1027,13 +1027,14 @@ body.is-super-admin .check-row.super-admin-only {
 .tool-modal {
   max-height: min(860px, calc(100vh - 40px));
   max-width: min(1180px, calc(100vw - 40px));
-  overflow: hidden;
+  overflow: auto;
   width: min(1180px, calc(100vw - 40px));
 }
 
 .tool-modal .wide-modal {
   height: min(860px, calc(100vh - 40px));
   min-height: 0;
+  overflow: auto;
   width: 100%;
 }
 
@@ -1069,9 +1070,9 @@ body.is-super-admin .check-row.super-admin-only {
   display: flex;
   flex-direction: column;
   max-height: min(820px, calc(100vh - 40px));
-  min-height: min(820px, calc(100vh - 40px));
+  min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow: auto;
   width: min(1180px, calc(100vw - 40px));
 }
 
@@ -1605,6 +1606,7 @@ body.is-super-admin .check-row.super-admin-only {
 
   .modal.tool-modal .activity-list {
     flex: 1;
+    min-height: 0;
     overflow: auto;
   }
 

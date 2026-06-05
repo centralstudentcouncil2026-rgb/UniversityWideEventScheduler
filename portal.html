@@ -7,10 +7,10 @@
   <title>CONNECT | Portal</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260603-week-rectangle-v1">
+  <link rel="stylesheet" href="style.css?v=20260605-mobile-layout-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260605-accent-horizontal-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260605-accent-horizontal-v1">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260605-accent-horizontal-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260605-mobile-layout-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -48,8 +48,8 @@
       <button class="create-button restricted-only" id="createEventButton">+ Post University Event</button>
       <section class="sidebar-section announcement-preview"><span class="section-label">Announcements</span><div id="announcementPreview"></div><button class="secondary-button" id="announcementsButton">View Announcements</button></section>
       <section class="sidebar-section availability-card"><span class="section-label">Shared Calendar</span><strong id="availabilityStatus">Public Events Overview</strong><p id="availabilityDetail">Select a calendar date to see its public events.</p></section>
-      <section class="sidebar-section status-card"><span class="section-label">Incampus & Offcampus</span><strong>Coordinator Status</strong><p>Office availability for document submissions and coordination.</p><span class="status-value" id="officeStatusValue">Status not posted</span></section>
-      <section class="sidebar-section status-card"><span class="section-label">CSC President</span><strong>Active Status</strong><p>Availability of the CSC President for coordination concerns.</p><span class="status-value" id="presidentStatusValue">Status not posted</span></section>
+      <section class="sidebar-section status-card"><span class="section-label">Incampus & Offcampus</span><strong>Coordinator Status</strong><span class="status-value" id="officeStatusValue">Status not posted</span></section>
+      <section class="sidebar-section status-card"><span class="section-label">CSC President</span><strong>Active Status</strong><span class="status-value" id="presidentStatusValue">Status not posted</span></section>
       <section class="sidebar-section participating-card super-admin-only"><span class="section-label">Participating Organizations</span><strong>Organization Calendar Filter</strong><p>Use Filters in the header for now. This section is reserved for clickable organization filtering.</p></section>
       <section class="sidebar-section">
         <span class="section-label">Portal</span>

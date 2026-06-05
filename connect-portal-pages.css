@@ -118,6 +118,15 @@
   align-content: start;
 }
 
+.public-shell .announcement-preview {
+  min-height: 220px;
+}
+
+.public-shell .announcement-preview #announcementPreview {
+  display: grid;
+  gap: 10px;
+}
+
 .status-card,
 .public-login-card,
 .participating-card,
@@ -306,6 +315,14 @@
 
 .portal-shell .sidebar .announcement-preview {
   order: -5;
+}
+
+.public-shell .sidebar .announcement-preview {
+  order: -5;
+}
+
+.public-shell .sidebar .public-login-card {
+  padding: 10px;
 }
 
 .portal-shell .sidebar .availability-card {

@@ -7,7 +7,7 @@ window.SUPABASE_CONFIG = Object.freeze({
   const stylesheets = [
     'csc-live-theme.css?v=20260605-accent-horizontal-v1',
     'connect-calendar-overrides.css?v=20260605-accent-horizontal-v1',
-    'connect-portal-pages.css?v=20260605-accent-horizontal-v1'
+    'connect-portal-pages.css?v=20260605-mobile-layout-v1'
   ];
 
   stylesheets.forEach((href) => {
