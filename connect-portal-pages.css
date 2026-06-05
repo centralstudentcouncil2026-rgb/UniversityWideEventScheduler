@@ -122,6 +122,10 @@
   min-height: 220px;
 }
 
+.portal-shell .announcement-preview {
+  min-height: 190px;
+}
+
 .public-shell .announcement-preview #announcementPreview {
   display: grid;
   gap: 10px;
@@ -405,6 +409,10 @@
   border-radius: 14px;
   padding: 10px 12px 10px 14px;
   position: relative;
+}
+
+.status-card {
+  overflow: visible;
 }
 
 .public-day-event::before {
