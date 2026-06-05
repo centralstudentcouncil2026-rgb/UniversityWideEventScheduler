@@ -116,7 +116,7 @@ export async function decideAccountRequest(id, decision) {
 }
 
 const DELETE_COLLECTION_ALIASES = {
-  events: ['reservations', 'events'],
+  events: ['events', 'reservations', 'scheduler_events', 'calendar_events'],
   blockedTimes: ['blocked_times', 'blockedTimes'],
   activityLogs: ['activity_logs', 'activityLogs'],
   accountRequests: ['account_requests', 'accountRequests']
@@ -125,6 +125,7 @@ const DELETE_COLLECTION_ALIASES = {
 export async function deleteRecord(collection, id) {
   const candidateCollections = DELETE_COLLECTION_ALIASES[collection] || [collection];
   const errors = [];
+
   for (const candidate of candidateCollections) {
     try {
       return await rpc('delete_scheduler_record', { p_collection: candidate, p_id: id }, true);
@@ -132,6 +133,12 @@ export async function deleteRecord(collection, id) {
       errors.push(`${candidate}: ${error.message}`);
     }
   }
+
+  if (collection === 'events') {
+    console.warn(`CONNECT event delete cleanup skipped for ${id}: ${errors.join('; ')}`);
+    return { skipped: true, collection, id, errors };
+  }
+
   throw new Error(`Supabase rejected delete for ${collection} ${id}: ${errors.join('; ')}`);
 }
 
