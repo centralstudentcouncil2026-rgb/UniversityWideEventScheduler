@@ -7,7 +7,7 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260605-portal-redirect-v5');
+  await import('./script.js?v=20260605-delete-fix-v1');
   await import('./portal-wiring.js?v=20260605-portal-redirect-v5');
 } else {
   window.location.replace('index.html');
