@@ -184,7 +184,7 @@ function initializeCalendar() {
       if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return;
       openEventModal(mobileTapRange(info));
     },
-    eventClick: (info) => isPublic(state.store) ? openPublicDayDialog(clickedEventDate(info), info.el) : openDetails(info.event.extendedProps),
+    eventClick: (info) => handleCalendarEventClick(info),
     eventDidMount: mountCalendarEvent,
     eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
@@ -376,7 +376,7 @@ function connectedMonthEvents(event, eventColor, accentColor) {
     borderColor: eventColor,
     editable: false,
     classNames: ['event-month-span', group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'],
-    extendedProps: { type: 'event', record: event, accentColor }
+    extendedProps: { type: 'event', record: event, occurrences: group, accentColor }
   }));
 }
 
@@ -593,7 +593,9 @@ function openDetails(props) {
     ['detailsDeleteButton', 'detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
-    const data = { Organization: record.organization_name, Category: category.name, Venue: record.venue, Schedule: scheduleSummary(record), Approval: cap(record.approval_status), Status: cap(record.event_status), Description: record.public_description };
+    const selectedOccurrence = props.occurrence || eventOccurrences(record)[0];
+    const scheduleLabel = selectedOccurrence ? `${formatDateTime(selectedOccurrence.start_time)} to ${formatTime(selectedOccurrence.end_time)}` : scheduleSummary(record);
+    const data = { Organization: record.organization_name, Category: category.name, Venue: record.venue, Schedule: scheduleLabel, Approval: cap(record.approval_status), Status: cap(record.event_status), Description: record.public_description };
     if (privateView) Object.assign(data, { Purpose: record.purpose, 'Contact Person': record.contact_person, 'Contact Info': record.contact_info, 'Private Notes': record.private_notes || 'None' });
     if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
@@ -601,6 +603,20 @@ function openDetails(props) {
     $('detailsApproveButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'rejected';
   }
   openDialog('detailsModal');
+}
+
+function handleCalendarEventClick(info) {
+  if (isPublic(state.store)) return openPublicDayDialog(clickedEventDate(info), info.el);
+  openDetails(clickedEventDetails(info));
+}
+
+function clickedEventDetails(info) {
+  const props = info.event.extendedProps;
+  if (props.type !== 'event') return props;
+  const clickedDate = clickedEventDate(info);
+  const occurrences = props.occurrences || eventOccurrences(props.record);
+  const occurrence = occurrences.find((item) => item.date === clickedDate) || props.occurrence || occurrences[0];
+  return { ...props, occurrence };
 }
 
 function openPublicDayDialog(date, anchorEl) {
@@ -1068,7 +1084,19 @@ function mobileTapRange(info) {
   const start = info.date;
   return { start, end: addMinutes(start, 60) };
 }
-function clickedEventDate(info) { return info.jsEvent.target.closest('.fc-daygrid-day')?.dataset.date || dateInput(info.event.start); }
+function clickedEventDate(info) {
+  return calendarDateAtPoint(info.jsEvent.clientX, info.jsEvent.clientY)
+    || info.jsEvent.target.closest('.fc-daygrid-day, .fc-timegrid-col')?.dataset.date
+    || dateInput(info.event.start);
+}
+function calendarDateAtPoint(clientX, clientY) {
+  const cells = [...document.querySelectorAll('.fc-daygrid-day[data-date], .fc-timegrid-col[data-date]')];
+  const match = cells.find((cell) => {
+    const rect = cell.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  });
+  return match?.dataset.date || '';
+}
 function roundToNextHalfHour(value) { const date = new Date(value); date.setSeconds(0, 0); const minutes = date.getMinutes(); date.setMinutes(minutes <= 30 ? 30 : 60, 0, 0); return date; }
 function defaultRange() { let start = roundToNextHalfHour(addMinutes(new Date(), 60)); let end = addMinutes(start, 60); if (dateInput(start) !== dateInput(end)) { start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 9, 0, 0, 0); end = addMinutes(start, 60); } return { start, end }; }
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
