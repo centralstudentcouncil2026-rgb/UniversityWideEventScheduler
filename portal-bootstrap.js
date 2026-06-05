@@ -1,6 +1,6 @@
-import './portal-guard.js?v=20260605-delete-persist-v2';
+import './portal-guard.js?v=20260605-cleanup-v1';
 
 if (window.CONNECT_AUTHENTICATED_USER) {
-  await import('./script.js?v=20260605-delete-persist-v2');
-  await import('./portal-wiring.js?v=20260605-delete-persist-v2');
+  await import('./script.js?v=20260605-cleanup-v1');
+  await import('./portal-wiring.js?v=20260605-cleanup-v1');
 }

@@ -1,4 +1,4 @@
-import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
+import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
 import { currentUser, isManager, isPublic } from './app-rules.js?v=20260601-public-month-v2';
 
 const loginType = document.body.dataset.loginType;
@@ -23,7 +23,7 @@ function roleError() {
     : 'This login is for administrators only.';
 }
 
-form?.addEventListener('submit', async (event) => {
+if (form) form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const username = document.getElementById('loginUsername').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;

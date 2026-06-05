@@ -1,4 +1,4 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
 import { currentUser } from './app-rules.js?v=20260601-public-month-v2';
 
 document.addEventListener('click', (event) => {
@@ -26,13 +26,9 @@ async function hydratePortalExtras() {
   const office = findStatus(store, 'incampus_offcampus');
   const president = findStatus(store, 'csc_president');
 
-  setText('officeStatusValue', office?.status_label || readableStatus(office?.status) || 'Status not posted');
-  setText('presidentStatusValue', president?.status_label || readableStatus(president?.status) || 'Status not posted');
-
-  const unread = Array.isArray(store.notifications)
-    ? store.notifications.filter((item) => !item.read && (!item.user_id || item.user_id === user.id) && (!item.organization_id || item.organization_id === user.organization_id)).length
-    : 0;
-  setText('notificationBadge', String(unread));
+  setText('officeStatusValue', statusLabel(office));
+  setText('presidentStatusValue', statusLabel(president));
+  setText('notificationBadge', String(unreadNotificationCount(store, user)));
 }
 
 function findStatus(store, key) {
@@ -42,7 +38,21 @@ function findStatus(store, key) {
 
 function readableStatus(value) {
   if (!value) return '';
-  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return String(value).split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function statusLabel(status) {
+  if (!status) return 'Status not posted';
+  return status.status_label || readableStatus(status.status) || 'Status not posted';
+}
+
+function unreadNotificationCount(store, user) {
+  const notifications = Array.isArray(store.notifications) ? store.notifications : [];
+  return notifications.filter((item) => {
+    const matchesUser = !item.user_id || item.user_id === user.id;
+    const matchesOrganization = !item.organization_id || item.organization_id === user.organization_id;
+    return !item.read && matchesUser && matchesOrganization;
+  }).length;
 }
 
 function setText(id, value) {

@@ -12,15 +12,17 @@ const EMPTY_COLLECTIONS = [
 const INTERNAL_PRIVACY_MARKER = '[[privacy:internal]]';
 
 export function createId() {
-  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function emptyPublicStore() {
-  return Object.fromEntries([
-    ['version', 3],
-    ...EMPTY_COLLECTIONS.map((name) => [name, []]),
-    ['currentUserId', 'public']
-  ]);
+  const store = { version: 3, currentUserId: 'public' };
+  EMPTY_COLLECTIONS.forEach((name) => {
+    store[name] = [];
+  });
+  return store;
 }
 
 export function normalizeStore(store = {}) {
@@ -46,18 +48,20 @@ export function storeForPersistence(store) {
 }
 
 function normalizeEvent(event) {
-  const occurrences = event.occurrences?.length
+  const occurrences = Array.isArray(event.occurrences) && event.occurrences.length
     ? event.occurrences.map((item) => occurrenceFromRange(item.start_time, item.end_time, item.id))
     : [occurrenceFromRange(event.start_time, event.end_time)];
   occurrences.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  const firstOccurrence = occurrences[0] || {};
+  const lastOccurrence = occurrences[occurrences.length - 1] || {};
   return {
     ...event,
     privacy_level: String(event.private_notes || '').includes(INTERNAL_PRIVACY_MARKER) ? 'internal' : event.privacy_level || 'basic',
     private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
     occurrences,
-    start_time: occurrences[0]?.start_time || event.start_time,
-    end_time: occurrences.at(-1)?.end_time || event.end_time
+    start_time: firstOccurrence.start_time || event.start_time,
+    end_time: lastOccurrence.end_time || event.end_time
   };
 }
 

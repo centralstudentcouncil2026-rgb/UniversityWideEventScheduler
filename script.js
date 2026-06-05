@@ -1,5 +1,5 @@
-import { createId } from './app-data.js?v=20260601-public-month-v2';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
+import { createId } from './app-data.js?v=20260605-cleanup-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260605-cleanup-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
   canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
@@ -717,46 +717,178 @@ function renderDashboard() { const user = currentUser(state.store); const events
 }
 
 function openEventRequests() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can review event requests.')) return; renderEventRequests(); openDialog('eventRequestsModal'); }
-function renderEventRequests() { $('eventRequestsList').innerHTML = [...state.store.events].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.approval_status}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${item.conflict_event_ids?.length ? `Warning: ${item.conflict_event_ids.length} schedule conflict(s)` : 'No schedule conflict warning'}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`).join('') || empty('No event requests'); }
+function renderEventRequests() {
+  const eventCards = [...state.store.events]
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .map(eventRequestHtml);
+  $('eventRequestsList').innerHTML = eventCards.join('') || empty('No event requests');
+}
+
+function eventRequestHtml(item) {
+  const conflictCount = Array.isArray(item.conflict_event_ids) ? item.conflict_event_ids.length : 0;
+  const conflictText = conflictCount ? `Warning: ${conflictCount} schedule conflict(s)` : 'No schedule conflict warning';
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.approval_status}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
+}
 
 function openBlockedTimes() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
 function updateBlockTimeFields() { $('blockStart').disabled = $('blockAllDay').checked; $('blockEnd').disabled = $('blockAllDay').checked; }
 function addBlockedTime(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const date = $('blockDate').value; const allDay = $('blockAllDay').checked; const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value); const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value); if (new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error'); const item = { id: createId(), title: $('blockTitle').value.trim(), start_time: start, end_time: end, all_day: allDay, reason: $('blockReason').value.trim(), created_by: currentUser(state.store).id, created_at: new Date().toISOString() }; state.store.blockedTimes.push(item); log('blocked_time_created', `Added blocked period "${item.title}".`, item); event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes(); }
-function renderBlockedTimes() { $('blockedTimesList').innerHTML = state.store.blockedTimes.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatTime(item.end_time))}</p><p>${escapeHtml(item.reason)}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`).join('') || empty('No blocked periods'); }
+function renderBlockedTimes() {
+  $('blockedTimesList').innerHTML = state.store.blockedTimes.map(blockedTimeHtml).join('') || empty('No blocked periods');
+}
+
+function blockedTimeHtml(item) {
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatTime(item.end_time))}</p><p>${escapeHtml(item.reason)}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
+}
 
 function openCategories() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
 function addCategory(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
-function renderCategories() { $('categoriesList').innerHTML = state.store.categories.map((item) => `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(item.color)}"></span>${escapeHtml(item.name)}</strong><p>${item.active ? 'Active' : 'Inactive'}</p>${actionButton('category-toggle', item.id, item.active ? 'Deactivate' : 'Activate', 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`).join(''); }
+function renderCategories() {
+  $('categoriesList').innerHTML = state.store.categories.map(categoryHtml).join('');
+}
+
+function categoryHtml(item) {
+  const status = item.active ? 'Active' : 'Inactive';
+  const toggleLabel = item.active ? 'Deactivate' : 'Activate';
+  return `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(item.color)}"></span>${escapeHtml(item.name)}</strong><p>${status}</p>${actionButton('category-toggle', item.id, toggleLabel, 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`;
+}
 
 function openOrganizations() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
 function addOrganization(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
-function renderOrganizations() { $('organizationsList').innerHTML = state.store.organizations.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.organization_name)}</strong><p>${escapeHtml(item.organization_type)}</p>${actionButton('organization-delete', item.id, 'Delete', 'danger-button')}</div>`).join(''); }
+function renderOrganizations() {
+  $('organizationsList').innerHTML = state.store.organizations.map(organizationHtml).join('');
+}
+
+function organizationHtml(item) {
+  return `<div class="activity-item"><strong>${escapeHtml(item.organization_name)}</strong><p>${escapeHtml(item.organization_type)}</p>${actionButton('organization-delete', item.id, 'Delete', 'danger-button')}</div>`;
+}
 
 function openUsers() { if (!requirePermission(isSuperAdmin(state.store), 'Only admins can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
 function renderUsers() {
   const requests = state.store.accountRequests.filter((item) => item.status === 'pending');
-  $('accountRequestsList').innerHTML = requests.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.full_name)} <span class="status-pill pending">Pending</span></strong><p>${escapeHtml(roleLabel(item.role))} - @${escapeHtml(item.username)}</p><p>${escapeHtml(item.organization_name || 'No organization')}</p>${actionButton('account-approve', item.id, 'Approve', 'primary-button')}${actionButton('account-reject', item.id, 'Reject', 'danger-button')}</div>`).join('') || empty('No pending account requests');
-  $('usersList').innerHTML = state.store.users.map((user) => `<div class="activity-item"><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.role))}</p><p>${escapeHtml(state.store.organizations.find((org) => org.id === user.organization_id)?.organization_name || 'No organization')}</p></div>`).join('');
+  $('accountRequestsList').innerHTML = requests.map(accountRequestHtml).join('') || empty('No pending account requests');
+  $('usersList').innerHTML = state.store.users.map(userHtml).join('');
 }
-function openActivityLog() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can view logs.')) return; $('activityList').innerHTML = [...state.store.activityLogs].reverse().map((item) => `<div class="activity-item"><strong>${escapeHtml(cap(item.action.replaceAll('_', ' ')))}</strong><p>${escapeHtml(formatDateTime(item.created_at))}</p><p>${escapeHtml(item.description)}</p><p>${escapeHtml(item.performed_by)} - ${escapeHtml(roleLabel(item.performed_by_role))}</p></div>`).join('') || empty('No activity logs'); openDialog('activityLogModal'); }
+
+function accountRequestHtml(item) {
+  return `<div class="activity-item"><strong>${escapeHtml(item.full_name)} <span class="status-pill pending">Pending</span></strong><p>${escapeHtml(roleLabel(item.role))} - @${escapeHtml(item.username)}</p><p>${escapeHtml(item.organization_name || 'No organization')}</p>${actionButton('account-approve', item.id, 'Approve', 'primary-button')}${actionButton('account-reject', item.id, 'Reject', 'danger-button')}</div>`;
+}
+
+function userHtml(user) {
+  const organization = state.store.organizations.find((org) => org.id === user.organization_id);
+  return `<div class="activity-item"><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.role))}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div>`;
+}
+
+function openActivityLog() {
+  if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can view logs.')) return;
+  $('activityList').innerHTML = [...state.store.activityLogs].reverse().map(activityLogHtml).join('') || empty('No activity logs');
+  openDialog('activityLogModal');
+}
+
+function activityLogHtml(item) {
+  return `<div class="activity-item"><strong>${escapeHtml(cap(String(item.action || '').split('_').join(' ')))}</strong><p>${escapeHtml(formatDateTime(item.created_at))}</p><p>${escapeHtml(item.description)}</p><p>${escapeHtml(item.performed_by)} - ${escapeHtml(roleLabel(item.performed_by_role))}</p></div>`;
+}
 
 function handleListAction(event) {
-  const button = event.target.closest('[data-action]'); if (!button) return; const { action, id } = button.dataset;
-  if (action === 'event-view') { const item = state.store.events.find((event) => event.id === id); if (item) openDetails({ type: 'event', record: item }); }
-  if (action === 'event-approve' || action === 'event-reject') { const item = state.store.events.find((event) => event.id === id); if (item) reviewEvent(item, action.split('-')[1] === 'approve' ? 'approved' : 'rejected'); renderEventRequests(); }
-  if (action === 'announcement-delete') confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.'));
-  if (action === 'block-delete') confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.'));
-  if (action === 'category-toggle') { const item = state.store.categories.find((category) => category.id === id); item.active = !item.active; log('category_updated', `Changed category "${item.name}".`, item); persist('Category updated.'); renderCategories(); }
-  if (action === 'category-delete') confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.'));
-  if (action === 'organization-delete') confirmAction('Delete this organization? Assigned users will become unassigned.', () => { state.store.users.forEach((user) => { if (user.organization_id === id) user.organization_id = null; }); removeById('organizations', id, 'organization_deleted', 'Organization deleted.'); });
-  if (action === 'account-approve') approveAccount(id);
-  if (action === 'account-reject') rejectAccount(id);
-  if (action === 'concern-review') { const item = state.store.concerns.find((concern) => concern.id === id); const response = prompt('Admin response:', item.admin_response || ''); if (response !== null) { item.admin_response = response.trim(); item.status = 'in_review'; item.updated_at = new Date().toISOString(); log('concern_responded', `Responded to "${item.title}".`, item); persist('Concern response saved.'); renderConcerns(); } }
-  if (action === 'concern-resolve') { const item = state.store.concerns.find((concern) => concern.id === id); item.status = 'resolved'; item.updated_at = new Date().toISOString(); log('concern_resolved', `Resolved "${item.title}".`, item); persist('Concern resolved.'); renderConcerns(); }
-  if (action === 'concern-reject') { const item = state.store.concerns.find((concern) => concern.id === id); item.status = 'rejected'; item.updated_at = new Date().toISOString(); log('concern_rejected', `Rejected "${item.title}".`, item); persist('Concern rejected.'); renderConcerns(); }
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+  const { action, id } = button.dataset;
+  const handlers = {
+    'event-view': () => viewEventRequest(id),
+    'event-approve': () => reviewEventRequest(id, 'approved'),
+    'event-reject': () => reviewEventRequest(id, 'rejected'),
+    'announcement-delete': () => confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
+    'block-delete': () => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
+    'category-toggle': () => toggleCategory(id),
+    'category-delete': () => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
+    'organization-delete': () => confirmOrganizationDelete(id),
+    'account-approve': () => approveAccount(id),
+    'account-reject': () => rejectAccount(id),
+    'concern-review': () => reviewConcern(id),
+    'concern-resolve': () => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
+    'concern-reject': () => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
+  };
+  if (handlers[action]) handlers[action]();
 }
 
-async function removeById(collection, id, action, message) { const item = state.store[collection].find((entry) => entry.id === id); try { await deleteRecord(collection, id); state.store[collection] = state.store[collection].filter((entry) => entry.id !== id); log(action, message, item); await persist(message); if (collection === 'announcements') renderAnnouncements(); if (collection === 'blockedTimes') renderBlockedTimes(); if (collection === 'categories') renderCategories(); if (collection === 'organizations') renderOrganizations(); } catch (error) { showToast(error.message, 'error'); } }
+function viewEventRequest(id) {
+  const item = state.store.events.find((event) => event.id === id);
+  if (item) openDetails({ type: 'event', record: item });
+}
+
+function reviewEventRequest(id, status) {
+  const item = state.store.events.find((event) => event.id === id);
+  if (!item) return;
+  reviewEvent(item, status);
+  renderEventRequests();
+}
+
+function toggleCategory(id) {
+  const item = state.store.categories.find((category) => category.id === id);
+  if (!item) return;
+  item.active = !item.active;
+  log('category_updated', `Changed category "${item.name}".`, item);
+  persist('Category updated.');
+  renderCategories();
+}
+
+function confirmOrganizationDelete(id) {
+  confirmAction('Delete this organization? Assigned users will become unassigned.', () => {
+    state.store.users.forEach((user) => {
+      if (user.organization_id === id) user.organization_id = null;
+    });
+    removeById('organizations', id, 'organization_deleted', 'Organization deleted.');
+  });
+}
+
+function reviewConcern(id) {
+  const item = state.store.concerns.find((concern) => concern.id === id);
+  if (!item) return;
+  const response = prompt('Admin response:', item.admin_response || '');
+  if (response === null) return;
+  item.admin_response = response.trim();
+  updateConcernStatus(
+    id,
+    'in_review',
+    'concern_responded',
+    'Concern response saved.',
+    `Responded to "${item.title}".`
+  );
+}
+
+function updateConcernStatus(id, status, action, message, description) {
+  const item = state.store.concerns.find((concern) => concern.id === id);
+  if (!item) return;
+  item.status = status;
+  item.updated_at = new Date().toISOString();
+  log(action, description || `${message.replace(/\.$/, '')} "${item.title}".`, item);
+  persist(message);
+  renderConcerns();
+}
+
+async function removeById(collection, id, action, message) {
+  const item = state.store[collection].find((entry) => entry.id === id);
+  if (!item) return;
+  try {
+    await deleteRecord(collection, id);
+    state.store[collection] = state.store[collection].filter((entry) => entry.id !== id);
+    log(action, message, item);
+    await persist(message);
+    renderCollection(collection);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function renderCollection(collection) {
+  const renderers = {
+    announcements: renderAnnouncements,
+    blockedTimes: renderBlockedTimes,
+    categories: renderCategories,
+    organizations: renderOrganizations
+  };
+  if (renderers[collection]) renderers[collection]();
+}
 function confirmAction(message, action) { state.confirmAction = action; $('confirmMessage').textContent = message; openDialog('confirmModal'); }
 function confirmPendingAction() { const action = state.confirmAction; state.confirmAction = null; closeDialog('confirmModal'); action?.(); }
 
@@ -818,18 +950,58 @@ async function reloadStore() {
   renderAll();
   refreshCalendar();
 }
-function openDialog(id) { $(id).showModal(); closeSidebar(); }
-function closeDialog(id) { if ($(id)?.open) $(id).close(); }
-function requirePermission(ok, message) { if (!ok) showToast(message, 'error'); return ok; }
-function showToast(message, type = 'info') { const host = [...document.querySelectorAll('dialog[open]')].at(-1) || document.body; host.appendChild($('toastRegion')); const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = message; $('toastRegion').appendChild(toast); setTimeout(() => toast.remove(), 4200); }
-function fillSelect(id, options, selectedValue = '') { const select = $(id); select.innerHTML = options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join(''); select.value = selectedValue || ''; }
-function actionButton(action, id, label, className) { return `<button type="button" class="${className}" data-action="${action}" data-id="${id}">${escapeHtml(label)}</button>`; }
+function openDialog(id) {
+  $(id).showModal();
+  closeSidebar();
+}
+
+function closeDialog(id) {
+  const dialog = $(id);
+  if (dialog && dialog.open) dialog.close();
+}
+
+function requirePermission(ok, message) {
+  if (!ok) showToast(message, 'error');
+  return ok;
+}
+
+function showToast(message, type = 'info') {
+  const openDialogs = [...document.querySelectorAll('dialog[open]')];
+  const host = openDialogs.length ? openDialogs[openDialogs.length - 1] : document.body;
+  const region = $('toastRegion');
+  host.appendChild(region);
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  region.appendChild(toast);
+  setTimeout(() => toast.remove(), 4200);
+}
+
+function fillSelect(id, options, selectedValue = '') {
+  const select = $(id);
+  select.innerHTML = options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
+  select.value = selectedValue || '';
+}
+
+function actionButton(action, id, label, className) {
+  return `<button type="button" class="${className}" data-action="${action}" data-id="${id}">${escapeHtml(label)}</button>`;
+}
+
 function empty(text) { return `<div class="activity-item"><strong>${escapeHtml(text)}</strong></div>`; }
-function rows(data) { return Object.entries(data).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value ?? '')}</dd>`).join(''); }
-function cap(value) { return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function rows(data) { return Object.entries(data).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value == null ? '' : value)}</dd>`).join(''); }
+function cap(value) { return String(value || '').split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function roleLabel(value) { return cap(value); }
 function initials(value) { return String(value || 'PV').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join(''); }
-function escapeHtml(value) { return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[char]));
+}
 function localIso(date, time) { const value = new Date(`${date}T${time}:00`); return Number.isNaN(value.getTime()) ? '' : value.toISOString(); }
 function dateInput(value) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function timeInput(value) { return new Date(value).toTimeString().slice(0, 5); }

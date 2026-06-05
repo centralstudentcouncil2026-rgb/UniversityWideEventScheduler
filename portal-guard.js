@@ -1,4 +1,4 @@
-import { loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
+import { loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
 import { currentUser, isPublic } from './app-rules.js?v=20260601-public-month-v2';
 
 const { store } = await loadStore();

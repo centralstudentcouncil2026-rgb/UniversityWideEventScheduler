@@ -1,4 +1,4 @@
-import { loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
+import { loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260601-public-month-v2';
 
 const $ = (id) => document.getElementById(id);
@@ -8,17 +8,26 @@ document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
 async function initPublicCalendar() {
   try {
-    const result = await loadStore();
-    state.store = result.store;
+    state.store = await loadPublicStore();
     renderAnnouncements();
     renderStatuses();
     initializePublicCalendar();
-    if (result.notice) console.info(result.notice);
   } catch (error) {
     console.error('CONNECT public calendar failed to load:', error);
-    const calendar = $('calendar');
-    if (calendar) calendar.innerHTML = '<div class="activity-item"><strong>Calendar failed to load.</strong><p>Please refresh the page.</p></div>';
+    showCalendarError();
   }
+}
+
+async function loadPublicStore() {
+  const result = await loadStore();
+  if (result.notice) console.info(result.notice);
+  return result.store;
+}
+
+function showCalendarError() {
+  const calendar = $('calendar');
+  if (!calendar) return;
+  calendar.innerHTML = '<div class="activity-item"><strong>Calendar failed to load.</strong><p>Please refresh the page.</p></div>';
 }
 
 function initializePublicCalendar() {
@@ -54,36 +63,39 @@ function initializePublicCalendar() {
 }
 
 function publicEvents() {
-  return state.store.events
+  const approvedEvents = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-    .reduce((items, event) => items.concat(publicCalendarItems(event)), []);
+  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event)), []);
 }
 
 function publicCalendarItems(event) {
-  const occurrences = eventOccurrences(event)
+  return consecutiveOccurrenceRanges(sortedEventOccurrences(event))
+    .map((range, index) => fullCalendarRangeItem(event, range, index));
+}
+
+function sortedEventOccurrences(event) {
+  return eventOccurrences(event)
     .filter((occurrence) => occurrence.date && occurrence.start_time && occurrence.end_time)
     .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.start_time) - new Date(b.start_time));
+}
 
-  const ranges = consecutiveOccurrenceRanges(occurrences);
-  return ranges.map((range, index) => {
-    const color = organizationColor(event);
-    const first = range[0];
-    const last = range[range.length - 1];
-    const isMultiDay = range.length > 1;
-    const displayTime = formatCompactTime(first.start_time);
+function fullCalendarRangeItem(event, range, index) {
+  const color = organizationColor(event);
+  const first = range[0];
+  const last = range[range.length - 1];
+  const isMultiDay = range.length > 1;
 
-    return {
-      id: `${event.id}::public-range-${index}`,
-      title: `${displayTime} ${event.title} - ${event.organization_name}`,
-      start: isMultiDay ? first.date : first.start_time,
-      end: isMultiDay ? nextDate(last.date) : first.end_time,
-      allDay: isMultiDay,
-      backgroundColor: color,
-      borderColor: color,
-      classNames: isMultiDay ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event'] : ['public-single-day-event'],
-      extendedProps: { event, occurrence: first, panelDate: first.date }
-    };
-  });
+  return {
+    id: `${event.id}::public-range-${index}`,
+    title: `${formatCompactTime(first.start_time)} ${event.title} - ${event.organization_name}`,
+    start: isMultiDay ? first.date : first.start_time,
+    end: isMultiDay ? nextDate(last.date) : first.end_time,
+    allDay: isMultiDay,
+    backgroundColor: color,
+    borderColor: color,
+    classNames: isMultiDay ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event'] : ['public-single-day-event'],
+    extendedProps: { event, occurrence: first, panelDate: first.date }
+  };
 }
 
 function consecutiveOccurrenceRanges(occurrences) {
@@ -114,15 +126,28 @@ function renderStatuses() {
 
 function openPublicDayPanel(date) {
   state.selectedDate = date;
-  const items = state.store.events
-    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-    .reduce((results, event) => results.concat(eventOccurrences(event).filter((occurrence) => occurrence.date === date).map((occurrence) => ({ event, occurrence }))), [])
-    .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
+  const items = publicDayItems(date);
 
   $('publicDayTitle').textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  $('publicDayEvents').innerHTML = items.map(({ event, occurrence }) => `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
+  $('publicDayEvents').innerHTML = items.map(publicDayEventHtml).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
   $('publicDayPanel').classList.add('open');
   $('publicDayPanel').setAttribute('aria-hidden', 'false');
+}
+
+function publicDayItems(date) {
+  return state.store.events
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .reduce((results, event) => {
+      const matchingOccurrences = eventOccurrences(event)
+        .filter((occurrence) => occurrence.date === date)
+        .map((occurrence) => ({ event, occurrence }));
+      return results.concat(matchingOccurrences);
+    }, [])
+    .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
+}
+
+function publicDayEventHtml({ event, occurrence }) {
+  return `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`;
 }
 
 function closePublicDayPanel() {

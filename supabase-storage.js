@@ -1,28 +1,30 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260601-public-month-v2';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260605-cleanup-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
 let lastEventIds = new Set();
 
-function eventIds(store) {
-  return new Set((store?.events || []).map((event) => event.id).filter(Boolean));
+function currentEventIds(store) {
+  const events = store && Array.isArray(store.events) ? store.events : [];
+  return new Set(events.map((event) => event.id).filter(Boolean));
 }
 
 function rememberEventIds(store) {
-  lastEventIds = eventIds(store);
+  lastEventIds = currentEventIds(store);
 }
 
-async function deleteRemovedEvents(store) {
-  const nextEventIds = eventIds(store);
-  const removedIds = [...lastEventIds].filter((id) => !nextEventIds.has(id));
+function removedEventIds(store) {
+  const nextEventIds = currentEventIds(store);
+  return [...lastEventIds].filter((id) => !nextEventIds.has(id));
+}
+
+async function cleanupRemovedEvents(store) {
   const failures = [];
-  if (removedIds.length) {
-    for (const id of removedIds) {
-      try {
-        await deleteRecord('events', id);
-      } catch (error) {
-        failures.push({ id, error });
-      }
+  for (const id of removedEventIds(store)) {
+    try {
+      await deleteRecord('events', id);
+    } catch (error) {
+      failures.push({ id, error });
     }
   }
   rememberEventIds(store);
@@ -71,7 +73,7 @@ export async function loadStore() {
 
 export async function saveStore(store) {
   await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
-  const deleteFailures = await deleteRemovedEvents(store);
+  const deleteFailures = await cleanupRemovedEvents(store);
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
   }
@@ -121,9 +123,9 @@ const DELETE_COLLECTION_ALIASES = {
 };
 
 export async function deleteRecord(collection, id) {
-  const collections = DELETE_COLLECTION_ALIASES[collection] || [collection];
+  const candidateCollections = DELETE_COLLECTION_ALIASES[collection] || [collection];
   const errors = [];
-  for (const candidate of collections) {
+  for (const candidate of candidateCollections) {
     try {
       return await rpc('delete_scheduler_record', { p_collection: candidate, p_id: id }, true);
     } catch (error) {
