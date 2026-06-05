@@ -1,4 +1,4 @@
-import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
+import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
 import { currentUser, isManager, isPublic } from './app-rules.js?v=20260601-public-month-v2';
 
 const loginType = document.body.dataset.loginType;

@@ -15,10 +15,18 @@ function rememberEventIds(store) {
 async function deleteRemovedEvents(store) {
   const nextEventIds = eventIds(store);
   const removedIds = [...lastEventIds].filter((id) => !nextEventIds.has(id));
+  const failures = [];
   if (removedIds.length) {
-    await Promise.all(removedIds.map((id) => deleteRecord('events', id)));
+    for (const id of removedIds) {
+      try {
+        await deleteRecord('events', id);
+      } catch (error) {
+        failures.push({ id, error });
+      }
+    }
   }
   rememberEventIds(store);
+  return failures;
 }
 
 function session() {
@@ -63,7 +71,11 @@ export async function loadStore() {
 
 export async function saveStore(store) {
   await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
-  await deleteRemovedEvents(store);
+  const deleteFailures = await deleteRemovedEvents(store);
+  if (deleteFailures.length) {
+    console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
+  }
+  return { deleteFailures };
 }
 
 export async function authenticate(username, password) {
@@ -101,8 +113,24 @@ export async function decideAccountRequest(id, decision) {
   return rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
 }
 
+const DELETE_COLLECTION_ALIASES = {
+  events: ['reservations', 'events'],
+  blockedTimes: ['blocked_times', 'blockedTimes'],
+  activityLogs: ['activity_logs', 'activityLogs'],
+  accountRequests: ['account_requests', 'accountRequests']
+};
+
 export async function deleteRecord(collection, id) {
-  return rpc('delete_scheduler_record', { p_collection: collection, p_id: id }, true);
+  const collections = DELETE_COLLECTION_ALIASES[collection] || [collection];
+  const errors = [];
+  for (const candidate of collections) {
+    try {
+      return await rpc('delete_scheduler_record', { p_collection: candidate, p_id: id }, true);
+    } catch (error) {
+      errors.push(`${candidate}: ${error.message}`);
+    }
+  }
+  throw new Error(`Supabase rejected delete for ${collection} ${id}: ${errors.join('; ')}`);
 }
 
 export function clearSession() {

@@ -1,4 +1,4 @@
-import { loadStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
+import { loadStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260601-public-month-v2';
 
 const $ = (id) => document.getElementById(id);
@@ -56,7 +56,7 @@ function initializePublicCalendar() {
 function publicEvents() {
   return state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-    .flatMap((event) => publicCalendarItems(event));
+    .reduce((items, event) => items.concat(publicCalendarItems(event)), []);
 }
 
 function publicCalendarItems(event) {
@@ -80,7 +80,7 @@ function publicCalendarItems(event) {
       allDay: isMultiDay,
       backgroundColor: color,
       borderColor: color,
-      classNames: [isMultiDay ? 'event-month-span event-month-span-multi public-multi-day-event' : 'public-single-day-event'],
+      classNames: isMultiDay ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event'] : ['public-single-day-event'],
       extendedProps: { event, occurrence: first, panelDate: first.date }
     };
   });
@@ -108,15 +108,15 @@ function renderStatuses() {
   const statuses = Array.isArray(state.store.activityStatuses) ? state.store.activityStatuses : [];
   const office = statuses.find((item) => item.id === 'incampus_offcampus' || item.key === 'incampus_offcampus');
   const president = statuses.find((item) => item.id === 'csc_president' || item.key === 'csc_president');
-  $('officeStatusValue').textContent = office?.status_label || readableStatus(office?.status) || 'Status not posted';
-  $('presidentStatusValue').textContent = president?.status_label || readableStatus(president?.status) || 'Status not posted';
+  $('officeStatusValue').textContent = (office && office.status_label) || readableStatus(office && office.status) || 'Status not posted';
+  $('presidentStatusValue').textContent = (president && president.status_label) || readableStatus(president && president.status) || 'Status not posted';
 }
 
 function openPublicDayPanel(date) {
   state.selectedDate = date;
   const items = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-    .flatMap((event) => eventOccurrences(event).filter((occurrence) => occurrence.date === date).map((occurrence) => ({ event, occurrence })))
+    .reduce((results, event) => results.concat(eventOccurrences(event).filter((occurrence) => occurrence.date === date).map((occurrence) => ({ event, occurrence }))), [])
     .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
 
   $('publicDayTitle').textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -132,7 +132,7 @@ function closePublicDayPanel() {
 
 function organizationColor(event) {
   const org = state.store.organizations.find((item) => item.id === event.organization_id || item.organization_name === event.organization_name);
-  const assigned = org?.color || org?.organization_color || org?.assigned_color || org?.theme_color || org?.color_hex;
+  const assigned = org && (org.color || org.organization_color || org.assigned_color || org.theme_color || org.color_hex);
   if (typeof assigned === 'string' && assigned.trim()) return assigned;
   return ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2'][Math.abs(hashText(event.organization_id || event.organization_name || event.title)) % 6];
 }
@@ -161,5 +161,5 @@ function hashText(value) {
 }
 
 function escapeHtml(value) {
-  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 }

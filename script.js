@@ -1,5 +1,5 @@
 import { createId } from './app-data.js?v=20260601-public-month-v2';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260602-jwt-refresh-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260605-delete-persist-v2';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
   canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
@@ -629,23 +629,24 @@ async function deleteEvent(event) {
   const logLength = state.store.activityLogs.length;
 
   try {
-    await deleteRecord('events', deletedEvent.id);
-
     state.store.events.splice(index, 1);
-
     log(
       'event_deleted',
       `${currentUser(state.store).full_name} deleted "${deletedEvent.title}".`,
       deletedEvent
     );
 
-    await persist('Event deleted.');
-
     closeDialog('detailsModal');
     closeDialog('eventModal');
     renderAll();
     refreshCalendar();
+
+    await saveStore(state.store);
+    renderAll();
+    refreshCalendar();
+    showToast('Event deleted.', 'success');
   } catch (error) {
+    state.store.events.splice(index, 0, deletedEvent);
     state.store.activityLogs.length = logLength;
     await reloadStore();
     showToast(`Could not delete event: ${error.message}`, 'error');
