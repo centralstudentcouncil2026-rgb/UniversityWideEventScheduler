@@ -394,11 +394,11 @@
   background: var(--event-accent-color, #facc15);
   border-radius: 999px;
   content: "";
-  height: 9px;
+  height: 4px;
+  left: 14px;
   position: absolute;
-  right: 12px;
-  top: 12px;
-  width: 9px;
+  right: 14px;
+  top: 0;
 }
 
 .public-day-event p {

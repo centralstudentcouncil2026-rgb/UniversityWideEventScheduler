@@ -15,19 +15,19 @@
 .fc .event-week-span::before,
 .fc .public-single-day-event::before {
   background: var(--event-accent-color, #facc15);
-  bottom: 0;
   content: "";
+  height: 5px;
   left: 0;
   position: absolute;
   top: 0;
-  width: 5px;
+  width: 100%;
   z-index: 1;
 }
 
 .fc .event-month-span .fc-event-main,
 .fc .event-week-span .fc-event-main,
 .fc .public-single-day-event .fc-event-main {
-  padding-left: 6px;
+  padding-top: 4px;
   position: relative;
   z-index: 2;
 }
