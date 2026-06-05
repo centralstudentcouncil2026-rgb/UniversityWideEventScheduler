@@ -41,7 +41,7 @@ body::before {
 .app-shell,
 .modal,
 .toast-region,
-.public-day-panel {
+.public-day-dialog {
   position: relative;
   z-index: 1;
 }
@@ -52,7 +52,7 @@ body::before {
 
 .auth-card,
 .modal-card,
-.public-day-panel,
+.public-day-dialog,
 .sidebar,
 .fc .fc-scrollgrid,
 .activity-list,

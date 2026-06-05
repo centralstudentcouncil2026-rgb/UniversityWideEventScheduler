@@ -99,7 +99,8 @@ function bindEvents() {
   $('accountRequestsList').addEventListener('click', handleListAction);
   $('activityLogButton').addEventListener('click', openActivityLog);
   $('confirmYesButton').addEventListener('click', confirmPendingAction);
-  $('closePublicDayPanel').addEventListener('click', closePublicDayPanel);
+  const closePublicDialogButton = $('closePublicDayDialog');
+  if (closePublicDialogButton) closePublicDialogButton.addEventListener('click', closePublicDayDialog);
   $('calendar').addEventListener('pointerdown', startWeekRectangleSelection, true);
   document.addEventListener('pointermove', updateWeekRectangleSelection);
   document.addEventListener('pointerup', finishWeekRectangleSelection);
@@ -108,6 +109,8 @@ function bindEvents() {
     const closer = event.target.closest('[data-close]');
     if (closer) closeDialog(closer.dataset.close);
   });
+  document.addEventListener('pointerdown', handlePublicDialogPointerDown);
+  document.addEventListener('keydown', handlePublicDialogKeyDown);
   window.addEventListener('resize', debounce(handleResize, 160));
   window.addEventListener('orientationchange', () => setTimeout(handleResize, 260));
 }
@@ -150,7 +153,7 @@ function renderRole() {
   $('profileName').textContent = user.full_name;
   $('profileInitials').textContent = initials(user.full_name);
   if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
-  if (!isPublic(state.store)) closePublicDayPanel();
+  if (!isPublic(state.store)) closePublicDayDialog();
 }
 
 function renderFormOptions() {
@@ -177,12 +180,12 @@ function initializeCalendar() {
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
     dateClick: (info) => {
-      if (isPublic(state.store)) return openPublicDayPanel(dateInput(info.date));
+      if (isPublic(state.store)) return openPublicDayDialog(dateInput(info.date), info.dayEl);
       if (window.innerWidth > MOBILE_BREAKPOINT || state.calendar.view.type === 'multiMonthYear' || !canCreateEvents(state.store)) return;
       openEventModal(mobileTapRange(info));
     },
-    eventClick: (info) => isPublic(state.store) ? openPublicDayPanel(clickedEventDate(info)) : openDetails(info.event.extendedProps),
-    eventDidMount: deduplicateMonthSpanLabel,
+    eventClick: (info) => isPublic(state.store) ? openPublicDayDialog(clickedEventDate(info), info.el) : openDetails(info.event.extendedProps),
+    eventDidMount: mountCalendarEvent,
     eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
@@ -192,7 +195,7 @@ function initializeCalendar() {
 function refreshCalendar() {
   state.calendar?.refetchEvents();
   updateAvailability();
-  if (state.selectedPublicDate) renderPublicDayPanel();
+  if (state.selectedPublicDate) renderPublicDayDialog();
 }
 
 function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth') {
@@ -203,9 +206,10 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters).flatMap((event) => {
     const eventColor = organizationColor(state.store, event);
+    const accentColor = eventAccentColor(state.store, event);
     return monthView
-      ? connectedMonthEvents(event, eventColor)
-      : occurrenceCalendarEvents(event, eventColor);
+      ? connectedMonthEvents(event, eventColor, accentColor)
+      : occurrenceCalendarEvents(event, eventColor, accentColor);
   });
   const blocks = state.store.blockedTimes.map((block) => ({
     id: block.id,
@@ -219,6 +223,12 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
     extendedProps: { type: 'block', record: block }
   }));
   return [...events, ...blocks];
+}
+
+function mountCalendarEvent(info) {
+  const accentColor = info.event.extendedProps?.accentColor;
+  if (accentColor) info.el.style.setProperty('--event-accent-color', accentColor);
+  deduplicateMonthSpanLabel(info);
 }
 
 function deduplicateMonthSpanLabel(info) {
@@ -236,6 +246,11 @@ function organizationColor(store, event) {
   const assignedColor = organization?.color || organization?.organization_color || organization?.assigned_color || organization?.theme_color || organization?.color_hex;
   if (isCssColor(assignedColor)) return assignedColor;
   return ORGANIZATION_COLOR_FALLBACKS[Math.abs(hashText(event.organization_id || event.organization_name || event.title)) % ORGANIZATION_COLOR_FALLBACKS.length];
+}
+function eventAccentColor(store, event) {
+  const category = categoryById(store, event.category_id);
+  if (category && isCssColor(category.color)) return category.color;
+  return '#FACC15';
 }
 function isCssColor(value) { return typeof value === 'string' && /^(#(?:[0-9a-f]{3}){1,2}|rgb\(|rgba\(|hsl\(|hsla\()/i.test(value.trim()); }
 function hashText(value) { return String(value || '').split('').reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0); }
@@ -331,7 +346,7 @@ function snapWeekMinutes(value) { return Math.max(WEEK_SLOT_START_MINUTES, Math.
 function minutesTime(value) { return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
 function formatMinutes(value) { return formatInputTime(minutesTime(value)); }
 
-function occurrenceCalendarEvents(event, eventColor) {
+function occurrenceCalendarEvents(event, eventColor, accentColor) {
   const occurrences = eventOccurrences(event);
   const weekParts = state.calendar?.view.type === 'timeGridWeek' ? weekSpanParts(occurrences) : new Map();
   return occurrences.map((occurrence, index) => {
@@ -345,12 +360,12 @@ function occurrenceCalendarEvents(event, eventColor) {
       borderColor: eventColor,
       editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event),
       classNames: weekPart ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`] : [],
-      extendedProps: { type: 'event', record: event, occurrence }
+      extendedProps: { type: 'event', record: event, occurrence, accentColor }
     };
   });
 }
 
-function connectedMonthEvents(event, eventColor) {
+function connectedMonthEvents(event, eventColor, accentColor) {
   return groupConsecutiveOccurrences(eventOccurrences(event)).map((group, index) => ({
     id: `${event.id}::month-span-${index}`,
     title: `${event.title} - ${event.organization_name}`,
@@ -361,7 +376,7 @@ function connectedMonthEvents(event, eventColor) {
     borderColor: eventColor,
     editable: false,
     classNames: ['event-month-span', group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'],
-    extendedProps: { type: 'event', record: event }
+    extendedProps: { type: 'event', record: event, accentColor }
   }));
 }
 
@@ -588,30 +603,55 @@ function openDetails(props) {
   openDialog('detailsModal');
 }
 
-function openPublicDayPanel(date) {
+function openPublicDayDialog(date, anchorEl) {
   state.selectedPublicDate = date;
-  renderPublicDayPanel();
-  $('publicDayPanel').classList.add('open');
-  $('publicDayPanel').setAttribute('aria-hidden', 'false');
+  renderPublicDayDialog();
+  positionPublicDayDialog($('publicDayDialog'), anchorEl);
+  $('publicDayDialog').classList.add('open');
+  $('publicDayDialog').setAttribute('aria-hidden', 'false');
 }
 
-function closePublicDayPanel() {
+function closePublicDayDialog() {
   state.selectedPublicDate = '';
-  $('publicDayPanel').classList.remove('open');
-  $('publicDayPanel').setAttribute('aria-hidden', 'true');
+  const dialog = $('publicDayDialog');
+  if (!dialog) return;
+  dialog.classList.remove('open');
+  dialog.setAttribute('aria-hidden', 'true');
 }
 
-function renderPublicDayPanel() {
+function renderPublicDayDialog() {
   if (!state.selectedPublicDate) return;
   const items = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
     .flatMap((event) => eventOccurrences(event).filter((occurrence) => occurrence.date === state.selectedPublicDate).map((occurrence) => ({ event, occurrence })))
     .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
   $('publicDayTitle').textContent = new Date(`${state.selectedPublicDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('publicDayCount').textContent = `${items.length} public event${items.length === 1 ? '' : 's'}`;
   $('publicDayEvents').innerHTML = items.map(({ event, occurrence }) => {
     const category = categoryById(state.store, event.category_id);
-    return `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(state.store, event))}"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatTime(occurrence.start_time))} to ${escapeHtml(formatTime(occurrence.end_time))}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(category.name)} - ${escapeHtml(cap(event.event_status))}</p><p>${escapeHtml(event.public_description)}</p></article>`;
+    return `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(state.store, event))};--event-accent-color:${escapeHtml(eventAccentColor(state.store, event))}"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(formatTime(occurrence.start_time))} to ${escapeHtml(formatTime(occurrence.end_time))}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(category.name)} - ${escapeHtml(cap(event.event_status))}</p><p>${escapeHtml(event.public_description)}</p></article>`;
   }).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
+}
+
+function positionPublicDayDialog(dialog, anchorEl) {
+  if (!dialog || !anchorEl || window.innerWidth <= 640) return;
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth - 32);
+  const left = Math.min(Math.max(anchorRect.left, 16), window.innerWidth - width - 16);
+  const top = Math.min(Math.max(anchorRect.bottom + 8, 16), window.innerHeight - 260);
+  dialog.style.setProperty('--dialog-left', `${left}px`);
+  dialog.style.setProperty('--dialog-top', `${top}px`);
+}
+
+function handlePublicDialogPointerDown(event) {
+  const dialog = $('publicDayDialog');
+  if (!dialog || !dialog.classList.contains('open')) return;
+  if (dialog.contains(event.target) || event.target.closest('.fc-daygrid-day, .fc-event')) return;
+  closePublicDayDialog();
+}
+
+function handlePublicDialogKeyDown(event) {
+  if (event.key === 'Escape') closePublicDayDialog();
 }
 
 function editSelectedEvent() { const event = state.selectedDetails?.record; if (!event) return; closeDialog('detailsModal'); openEventModal({ start: new Date(event.start_time), end: new Date(event.end_time) }, event); }

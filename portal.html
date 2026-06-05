@@ -8,9 +8,9 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260603-week-rectangle-v1">
-  <link rel="stylesheet" href="csc-live-theme.css?v=20260603-connect-theme-v2">
-  <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260603-org-week-continuous-v1">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260604-login-pages-v1">
+  <link rel="stylesheet" href="csc-live-theme.css?v=20260605-dialog-v1">
+  <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260605-dialog-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260605-dialog-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -130,10 +130,10 @@
 
   <dialog class="modal confirm-modal" id="confirmModal"><article class="modal-card"><div class="modal-header"><div><h3>Confirm Action</h3><p id="confirmMessage">Continue?</p></div><button class="icon-button" data-close="confirmModal">&times;</button></div><div class="modal-actions"><button class="secondary-button" data-close="confirmModal">Cancel</button><button class="danger-button" id="confirmYesButton">Confirm</button></div></article></dialog>
 
-  <aside class="public-day-panel" id="publicDayPanel" aria-label="Selected day events" aria-hidden="true"><div class="public-day-header"><div><span class="section-label">Selected Date</span><h3 id="publicDayTitle">Events</h3></div><button type="button" class="icon-button" id="closePublicDayPanel" aria-label="Close selected day events">&times;</button></div><div class="public-day-events" id="publicDayEvents"></div></aside>
+  <div class="public-day-dialog" id="publicDayDialog" role="dialog" aria-label="Selected day events" aria-hidden="true"><div class="public-day-header"><div><span class="section-label" id="publicDayCount">Selected Date</span><h3 id="publicDayTitle">Events</h3></div><button type="button" class="icon-button" id="closePublicDayDialog" aria-label="Close selected day events">&times;</button></div><div class="public-day-events" id="publicDayEvents"></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="supabaseClient.js?v=20260601-supabase-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260605-cleanup-v1"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260605-dialog-v1"></script>
 </body>
 </html>

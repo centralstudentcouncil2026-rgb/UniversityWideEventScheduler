@@ -38,26 +38,30 @@ function initializePublicCalendar() {
     headerToolbar: false,
     events: publicEvents(),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
-    dateClick: (info) => openPublicDayPanel(info.dateStr),
+    dateClick: (info) => openPublicDayDialog(info.dateStr, info.dayEl),
     eventClick: (info) => {
       const panelDate = info.event.extendedProps && info.event.extendedProps.panelDate ? info.event.extendedProps.panelDate : info.event.startStr;
-      openPublicDayPanel(String(panelDate).slice(0, 10));
-    }
+      openPublicDayDialog(String(panelDate).slice(0, 10), info.el);
+    },
+    eventDidMount: applyPublicEventAccent
   });
 
   const todayButton = $('todayButton');
   const prevButton = $('prevButton');
   const nextButton = $('nextButton');
-  const closeButton = $('closePublicDayPanel');
+  const closeButton = $('closePublicDayDialog');
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
 
   if (todayButton) todayButton.addEventListener('click', () => state.calendar.today());
   if (prevButton) prevButton.addEventListener('click', () => state.calendar.prev());
   if (nextButton) nextButton.addEventListener('click', () => state.calendar.next());
-  if (closeButton) closeButton.addEventListener('click', closePublicDayPanel);
+  if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', () => $('sidebar') && $('sidebar').classList.add('open'));
   if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));
+  document.addEventListener('pointerdown', handlePublicDialogPointerDown);
+  document.addEventListener('keydown', handlePublicDialogKeyDown);
+  window.addEventListener('resize', closePublicDayDialog);
 
   state.calendar.render();
 }
@@ -80,7 +84,8 @@ function sortedEventOccurrences(event) {
 }
 
 function fullCalendarRangeItem(event, range, index) {
-  const color = organizationColor(event);
+  const color = eventPrimaryColor(event);
+  const accentColor = eventAccentColor(event);
   const first = range[0];
   const last = range[range.length - 1];
   const isMultiDay = range.length > 1;
@@ -94,8 +99,13 @@ function fullCalendarRangeItem(event, range, index) {
     backgroundColor: color,
     borderColor: color,
     classNames: isMultiDay ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event'] : ['public-single-day-event'],
-    extendedProps: { event, occurrence: first, panelDate: first.date }
+    extendedProps: { event, occurrence: first, panelDate: first.date, accentColor }
   };
+}
+
+function applyPublicEventAccent(info) {
+  const accentColor = info.event.extendedProps && info.event.extendedProps.accentColor;
+  if (accentColor) info.el.style.setProperty('--event-accent-color', accentColor);
 }
 
 function consecutiveOccurrenceRanges(occurrences) {
@@ -124,14 +134,17 @@ function renderStatuses() {
   $('presidentStatusValue').textContent = (president && president.status_label) || readableStatus(president && president.status) || 'Status not posted';
 }
 
-function openPublicDayPanel(date) {
+function openPublicDayDialog(date, anchorEl) {
   state.selectedDate = date;
   const items = publicDayItems(date);
+  const dialog = $('publicDayDialog');
 
   $('publicDayTitle').textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('publicDayCount').textContent = `${items.length} public event${items.length === 1 ? '' : 's'}`;
   $('publicDayEvents').innerHTML = items.map(publicDayEventHtml).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
-  $('publicDayPanel').classList.add('open');
-  $('publicDayPanel').setAttribute('aria-hidden', 'false');
+  positionPublicDayDialog(dialog, anchorEl);
+  dialog.classList.add('open');
+  dialog.setAttribute('aria-hidden', 'false');
 }
 
 function publicDayItems(date) {
@@ -147,19 +160,52 @@ function publicDayItems(date) {
 }
 
 function publicDayEventHtml({ event, occurrence }) {
-  return `<article class="public-day-event" style="border-left-color:${escapeHtml(organizationColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`;
+  return `<article class="public-day-event" style="border-left-color:${escapeHtml(eventPrimaryColor(event))};--event-accent-color:${escapeHtml(eventAccentColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`;
 }
 
-function closePublicDayPanel() {
-  $('publicDayPanel').classList.remove('open');
-  $('publicDayPanel').setAttribute('aria-hidden', 'true');
+function positionPublicDayDialog(dialog, anchorEl) {
+  if (!dialog || !anchorEl || window.innerWidth <= 640) return;
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth - 32);
+  const left = Math.min(Math.max(anchorRect.left, 16), window.innerWidth - width - 16);
+  const top = Math.min(Math.max(anchorRect.bottom + 8, 16), window.innerHeight - 260);
+  dialog.style.setProperty('--dialog-left', `${left}px`);
+  dialog.style.setProperty('--dialog-top', `${top}px`);
 }
 
-function organizationColor(event) {
+function handlePublicDialogPointerDown(event) {
+  const dialog = $('publicDayDialog');
+  if (!dialog || !dialog.classList.contains('open')) return;
+  if (dialog.contains(event.target) || event.target.closest('.fc-daygrid-day, .fc-event')) return;
+  closePublicDayDialog();
+}
+
+function handlePublicDialogKeyDown(event) {
+  if (event.key === 'Escape') closePublicDayDialog();
+}
+
+function closePublicDayDialog() {
+  const dialog = $('publicDayDialog');
+  if (!dialog) return;
+  dialog.classList.remove('open');
+  dialog.setAttribute('aria-hidden', 'true');
+}
+
+function eventPrimaryColor(event) {
   const org = state.store.organizations.find((item) => item.id === event.organization_id || item.organization_name === event.organization_name);
   const assigned = org && (org.color || org.organization_color || org.assigned_color || org.theme_color || org.color_hex);
-  if (typeof assigned === 'string' && assigned.trim()) return assigned;
+  if (isCssColor(assigned)) return assigned;
   return ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2'][Math.abs(hashText(event.organization_id || event.organization_name || event.title)) % 6];
+}
+
+function eventAccentColor(event) {
+  const category = state.store.categories.find((item) => item.id === event.category_id || item.name === event.event_type);
+  if (category && isCssColor(category.color)) return category.color;
+  return '#FACC15';
+}
+
+function isCssColor(value) {
+  return typeof value === 'string' && /^(#(?:[0-9a-f]{3}){1,2}|rgb\(|rgba\(|hsl\(|hsla\()/i.test(value.trim());
 }
 
 function readableStatus(value) {
