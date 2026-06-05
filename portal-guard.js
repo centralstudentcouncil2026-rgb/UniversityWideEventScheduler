@@ -8,5 +8,6 @@ if (isPublic(store)) {
   window.location.replace('index.html');
 } else {
   window.CONNECT_AUTHENTICATED_USER = user;
+  window.CONNECT_BOOTSTRAP_STORE = store;
   document.body.classList.add('portal-authenticated');
 }

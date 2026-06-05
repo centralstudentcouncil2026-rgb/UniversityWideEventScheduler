@@ -18,7 +18,8 @@ document.addEventListener('click', (event) => {
   }
 }, true);
 
-document.addEventListener('DOMContentLoaded', hydratePortalExtras);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hydratePortalExtras);
+else queueMicrotask(hydratePortalExtras);
 
 async function hydratePortalExtras() {
   const { store } = await loadStore();

@@ -26,17 +26,34 @@ const state = {
   search: ''
 };
 
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else queueMicrotask(init);
 
 async function init() {
-  const { store, notice, noticeType } = await loadStore();
-  state.store = store;
-  bindEvents();
-  populateStaticOptions();
-  renderAll();
-  initializeCalendar();
-  refreshCalendar();
-  if (notice) showToast(notice, noticeType);
+  try {
+    const bootstrappedStore = window.CONNECT_BOOTSTRAP_STORE;
+    const { store, notice, noticeType } = bootstrappedStore
+      ? { store: bootstrappedStore, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' }
+      : await loadStore();
+    if (isPublic(store) && document.body.classList.contains('portal-shell')) {
+      window.location.replace('index.html');
+      return;
+    }
+    state.store = store;
+    window.CONNECT_STATE = state;
+    bindEvents();
+    populateStaticOptions();
+    renderAll();
+    initializeCalendar();
+    refreshCalendar();
+    if (notice) showToast(notice, noticeType);
+  } catch (error) {
+    console.error('CONNECT portal failed to initialize:', error);
+    const calendar = $('calendar');
+    if (calendar) {
+      calendar.innerHTML = `<div class="activity-item"><strong>Calendar failed to load.</strong><p>${escapeHtml(error.message || 'Please refresh and try again.')}</p></div>`;
+    }
+  }
 }
 
 function bindEvents() {
