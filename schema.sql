@@ -8,6 +8,7 @@
 --   20260606072919_fix_account_request_pgcrypto_schema
 --   harden_connect_store_permissions
 --   fix_connect_status_permission_array_append
+--   tighten_connect_helper_rpc_grants
 --
 -- The live backend uses Supabase Auth for login and a compact JSON scheduler
 -- state table for the browser-facing CONNECT store:
