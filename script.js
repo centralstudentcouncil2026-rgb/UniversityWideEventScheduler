@@ -714,6 +714,7 @@ async function deleteEvent(event) {
     renderAll();
     refreshCalendar();
 
+    await deleteRecord('events', deletedEvent.id);
     const result = await saveStore(state.store);
     if (result?.deleteFailures?.length) {
       console.warn('CONNECT event delete cleanup warning:', result.deleteFailures);

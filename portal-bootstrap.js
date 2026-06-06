@@ -1,5 +1,5 @@
 try {
-  await import('./portal-guard.js?v=20260606-login-strict-v1');
+  await import('./portal-guard.js?v=20260606-delete-rpc-v1');
 } catch (error) {
   console.error('CONNECT portal guard failed:', error);
   window.location.replace('index.html');
@@ -7,8 +7,8 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260606-login-strict-v1');
-  await import('./portal-wiring.js?v=20260606-login-strict-v1');
+  await import('./script.js?v=20260606-delete-rpc-v1');
+  await import('./portal-wiring.js?v=20260606-delete-rpc-v1');
 } else {
   window.location.replace('index.html');
 }

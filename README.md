@@ -5,9 +5,9 @@ Supabase backend. It does not use the original scheduler Supabase project.
 
 ## Deployment
 
-The frontend is configured for Supabase project `xtagvyyopokrhvvnseom`. The
-backend stores scheduler records in relational tables protected by Supabase
-Auth and Row Level Security.
+The frontend is configured for Supabase project `lcmyqhyxtipzovmgbdtf`. The
+backend stores the CONNECT scheduler payload in Supabase behind Auth-backed
+RPCs and Row Level Security.
 
 GitHub Pages publishes the static frontend from the `main` branch root:
 
@@ -16,7 +16,7 @@ https://centralstudentcouncil2026-rgb.github.io/UniversityWideEventScheduler/
 Pushing a commit to `main` updates the public site automatically. The
 `.nojekyll` marker keeps GitHub Pages in direct static-file mode.
 
-The backend uses Supabase Auth, relational scheduler tables, role-aware RPCs,
+The backend uses Supabase Auth, a JSON scheduler state table, role-aware RPCs,
 and Row Level Security. Public viewers can read the approved calendar without
 an account. Organization and admin accounts require admin approval.
 
@@ -39,8 +39,8 @@ Open `http://127.0.0.1:5173/index.html`.
 
 ## Backend
 
-`schema.sql` documents the relational Auth schema applied to project
-`xtagvyyopokrhvvnseom`. The authoritative migration is recorded in that fresh
+`schema.sql` documents the CONNECT Auth/RPC backend applied to project
+`lcmyqhyxtipzovmgbdtf`. The authoritative migrations are recorded in that
 project's Supabase migration history.
 
 ## Supabase MCP For Codex
@@ -53,5 +53,5 @@ codex mcp login supabase
 ```
 
 Then run `/mcp` inside Codex to verify authentication. The deployed frontend
-currently points at `xtagvyyopokrhvvnseom.supabase.co`, so verify the intended
-backend target before applying migrations or changing live data.
+points at `lcmyqhyxtipzovmgbdtf.supabase.co`; verify the intended backend
+target before applying migrations or changing live data.

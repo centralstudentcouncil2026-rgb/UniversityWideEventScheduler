@@ -1,23 +1,19 @@
--- CORE relational backend
--- Applied to fresh Supabase project: xtagvyyopokrhvvnseom
+-- CONNECT Supabase backend
+-- Applied to Supabase project: lcmyqhyxtipzovmgbdtf
 --
--- Migration name:
---   20260601000000_upgrade_scheduler_to_relational_auth_backend
+-- Migration names:
+--   20260606071206_create_connect_json_backend_schema
+--   20260606071433_fix_connect_auth_user_defaults
+--   20260606071809_tighten_connect_rpc_grants
+--   20260606072919_fix_account_request_pgcrypto_schema
 --
--- The live migration replaces the temporary scheduler_state review document
--- with the conference-room scheduler backend pattern:
+-- The live backend uses Supabase Auth for login and a compact JSON scheduler
+-- state table for the browser-facing CONNECT store:
 --
 --   auth.users
 --     -> public.profiles
---     -> public.account_requests
 --
---   public.organizations
---   public.categories
---   public.reservations
---   public.blocked_times
---   public.announcements
---   public.concerns
---   public.activity_logs
+--   public.scheduler_state
 --
 -- Browser clients use these RPCs:
 --
@@ -25,12 +21,13 @@
 --   public.apply_account_request_decision(...)
 --   public.get_scheduler_store()
 --   public.save_scheduler_store(jsonb)
+--   public.delete_scheduler_record(text, text)
 --
 -- Public viewers can call get_scheduler_store() without an account. New
--- accounts are created in Supabase Auth with pending profiles. Only an active
--- super-admin can approve access requests. Authenticated save calls are
--- checked against active profile role and organization membership.
+-- accounts are created in Supabase Auth with pending profiles and pending
+-- account request entries in scheduler_state. Only an active super-admin can
+-- approve access requests. Authenticated save and delete calls require an
+-- active CONNECT profile.
 --
 -- The authoritative SQL is stored in the Supabase migration history for
--- project xtagvyyopokrhvvnseom. Do not apply this backend to the original
--- conference-room scheduler project.
+-- project lcmyqhyxtipzovmgbdtf.
