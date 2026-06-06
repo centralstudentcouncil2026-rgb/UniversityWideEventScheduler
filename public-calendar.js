@@ -1,5 +1,5 @@
-import { loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260601-public-month-v2';
+import { loadStore } from './supabase-storage.js?v=20260607-account-presets-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-account-presets-v1';
 
 const $ = (id) => document.getElementById(id);
 const state = { store: null, calendar: null, selectedDate: '' };

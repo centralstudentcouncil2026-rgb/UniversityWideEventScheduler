@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260606-login-strict-v1';
-import { currentUser } from './app-rules.js?v=20260606-delete-permissions-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260607-account-presets-v1';
+import { currentUser } from './app-rules.js?v=20260607-account-presets-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');

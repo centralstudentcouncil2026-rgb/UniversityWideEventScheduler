@@ -1014,6 +1014,69 @@ body.is-super-admin .check-row.super-admin-only {
   margin: 8px 8px 0 0;
 }
 
+.account-card {
+  display: grid;
+  gap: 12px;
+}
+
+.account-card-head {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+}
+
+.account-card-head label {
+  color: var(--aup-muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 5px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.account-card-head select {
+  border: 1px solid var(--aup-border);
+  border-radius: 8px;
+  color: var(--aup-navy);
+  font: inherit;
+  min-height: 40px;
+  padding: 8px 10px;
+  text-transform: none;
+}
+
+.permission-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.permission-toggle {
+  align-items: center;
+  background: var(--aup-light-bg);
+  border: 1px solid var(--aup-border);
+  border-radius: 8px;
+  color: var(--aup-navy);
+  display: flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.permission-toggle input {
+  accent-color: var(--aup-blue);
+  height: 16px;
+  width: 16px;
+}
+
+.status-update-button {
+  margin-top: 10px;
+  width: 100%;
+}
+
 .status-pill.in_review,
 .status-pill.planned,
 .status-pill.finalized,
@@ -1667,6 +1730,11 @@ body.is-super-admin .check-row.super-admin-only {
 
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-card-head,
+  .permission-grid {
+    grid-template-columns: 1fr;
   }
 }
 

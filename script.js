@@ -1,10 +1,12 @@
-import { createId } from './app-data.js?v=20260605-cleanup-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260606-login-strict-v1';
+import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-account-presets-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-account-presets-v1';
 import {
-  APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
-  canDeleteEvent, canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
-  eventOccurrences, findBlockingTime, findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260606-delete-permissions-v1';
+  APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
+  canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
+  canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
+  categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
+  findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
+} from './app-rules.js?v=20260607-account-presets-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -114,7 +116,10 @@ function bindEvents() {
   $('organizationsList').addEventListener('click', handleListAction);
   $('usersButton').addEventListener('click', openUsers);
   $('accountRequestsList').addEventListener('click', handleListAction);
+  $('usersList').addEventListener('change', handleUserPermissionChange);
   $('activityLogButton').addEventListener('click', openActivityLog);
+  $('updateOfficeStatusButton').addEventListener('click', () => updateAppStatus('incampus_offcampus', 'Incampus & Offcampus'));
+  $('updatePresidentStatusButton').addEventListener('click', () => updateAppStatus('csc_president', 'CSC President'));
   $('confirmYesButton').addEventListener('click', confirmPendingAction);
   const closePublicDialogButton = $('closePublicDayDialog');
   if (closePublicDialogButton) closePublicDialogButton.addEventListener('click', closePublicDayDialog);
@@ -157,6 +162,7 @@ function populateStaticOptions() {
 
 function renderAll() {
   renderRole();
+  renderStatuses();
   renderFormOptions();
   renderFilterOptions();
   renderAnnouncementPreview();
@@ -169,6 +175,14 @@ function renderRole() {
   document.body.classList.toggle('is-public', isPublic(state.store));
   $('profileName').textContent = user.full_name;
   $('profileInitials').textContent = initials(user.full_name);
+  setHidden('eventRequestsButton', !canApproveEvents(state.store));
+  setHidden('blockedTimesButton', !canManageBlockedTimes(state.store));
+  setHidden('categoriesButton', !canManageCategories(state.store));
+  setHidden('organizationsButton', !canManageAccounts(state.store));
+  setHidden('usersButton', !canManageAccounts(state.store));
+  setHidden('activityLogButton', !canManageAccounts(state.store));
+  setHidden('updateOfficeStatusButton', !canUpdateOfficeStatus(state.store));
+  setHidden('updatePresidentStatusButton', !canUpdatePresidentStatus(state.store));
   if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
   if (!isPublic(state.store)) closePublicDayDialog();
 }
@@ -183,6 +197,23 @@ function renderFormOptions() {
 function renderFilterOptions() {
   fillSelect('filterOrganization', [['', 'All organizations'], ...state.store.organizations.map((org) => [org.id, org.organization_name])], state.filters.organization);
   fillSelect('filterCategory', [['', 'All categories'], ...state.store.categories.filter((item) => item.active).map((item) => [item.id, item.name])], state.filters.category);
+}
+
+function renderStatuses() {
+  const office = findStatus('incampus_offcampus');
+  const president = findStatus('csc_president');
+  $('officeStatusValue').textContent = statusLabel(office);
+  $('presidentStatusValue').textContent = statusLabel(president);
+}
+
+function findStatus(key) {
+  const statuses = Array.isArray(state.store.activityStatuses) ? state.store.activityStatuses : [];
+  return statuses.find((item) => item.id === key || item.key === key);
+}
+
+function statusLabel(status) {
+  if (!status) return 'Status not posted';
+  return status.status_label || cap(status.status || '') || 'Status not posted';
 }
 
 function initializeCalendar() {
@@ -203,7 +234,7 @@ function initializeCalendar() {
     },
     eventClick: (info) => handleCalendarEventClick(info),
     eventDidMount: mountCalendarEvent,
-    eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? isSuperAdmin(state.store) : canEditEvent(state.store, event.extendedProps.record)),
+    eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? canManageBlockedTimes(state.store) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
   state.calendar.render();
@@ -232,12 +263,12 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
   });
   const blocks = state.store.blockedTimes.map((block) => ({
     id: block.id,
-    title: isSuperAdmin(state.store) ? block.title : 'Unavailable',
+    title: canManageBlockedTimes(state.store) ? block.title : 'Unavailable',
     start: block.start_time,
     end: block.end_time,
     backgroundColor: '#071C3D',
     borderColor: '#F4B400',
-    editable: state.calendar?.view.type !== 'multiMonthYear' && isSuperAdmin(state.store),
+    editable: state.calendar?.view.type !== 'multiMonthYear' && canManageBlockedTimes(state.store),
     classNames: ['event-blocked', 'event-super-admin-block'],
     extendedProps: { type: 'block', record: block }
   }));
@@ -581,7 +612,7 @@ function readEventForm() {
     venue: $('eventVenue').value.trim(), schedule_type, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: $('eventPublicDescription').value.trim(), purpose: $('eventPurpose').value.trim(),
     contact_person: $('eventContactPerson').value.trim(), contact_info: $('eventContactInfo').value.trim(), private_notes: $('eventPrivateNotes').value.trim(),
-    admin_notes: isSuperAdmin(state.store) ? $('eventAdminNotes').value.trim() : existing?.admin_notes || '', rejection_reason: isSuperAdmin(state.store) ? $('eventRejectionReason').value.trim() : existing?.rejection_reason || '',
+    admin_notes: isSuperAdmin(state.store) ? $('eventAdminNotes').value.trim() : existing?.admin_notes || '', rejection_reason: canApproveEvents(state.store) ? $('eventRejectionReason').value.trim() : existing?.rejection_reason || '',
     event_status: $('eventStatus').value, privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
     created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
@@ -711,7 +742,7 @@ function openDetails(props) {
   state.selectedDetails = props; const record = props.record;
   if (props.type === 'block') {
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = 'Blocked university period';
-    $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: isSuperAdmin(state.store) ? record.reason : 'Unavailable' });
+    $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: canManageBlockedTimes(state.store) ? record.reason : 'Unavailable' });
     ['detailsDeleteButton', 'detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
@@ -722,7 +753,7 @@ function openDetails(props) {
     if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
     $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canDeleteEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
-    $('detailsApproveButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'rejected';
+    $('detailsApproveButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'rejected';
   }
   openDialog('detailsModal');
 }
@@ -837,7 +868,7 @@ async function deleteEvent(event) {
 
 function reviewSelectedEvent(status) { const event = state.selectedDetails?.record; if (event) reviewEvent(event, status); }
 function reviewEvent(event, status) {
-  if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can review requests.')) return;
+  if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return;
   if (status === 'approved') {
     const block = findEventBlock(event);
     if (block) return showConflict('Approval Blocked', 'This request overlaps an admin-blocked period.', [block], false);
@@ -870,8 +901,8 @@ function persistMovedCalendarItem(info) {
 
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
 function renderAnnouncementPreview() { const first = activeAnnouncements(state.store)[0]; $('announcementPreview').innerHTML = first ? `<div class="notice ${first.priority}"><strong>${escapeHtml(first.title)}</strong><p>${escapeHtml(first.content)}</p></div>` : '<p class="empty-text">No active announcements.</p>'; }
-function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${isSuperAdmin(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
-function addAnnouncement(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), title: $('announcementTitle').value.trim(), content: $('announcementContent').value.trim(), priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${$('announcementExpiry').value}T23:59:59` }; state.store.announcements.push(item); log('announcement_posted', `Posted announcement "${item.title}".`, item); event.target.reset(); persist('Announcement posted.'); renderAnnouncements(); }
+function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
+function addAnnouncement(event) { event.preventDefault(); if (!canManageAnnouncements(state.store)) return; const item = { id: createId(), title: $('announcementTitle').value.trim(), content: $('announcementContent').value.trim(), priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${$('announcementExpiry').value}T23:59:59` }; state.store.announcements.push(item); log('announcement_posted', `Posted announcement "${item.title}".`, item); event.target.reset(); persist('Announcement posted.'); renderAnnouncements(); }
 
 function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
 function renderNotifications() {
@@ -888,8 +919,29 @@ function renderNotifications() {
   $('notificationsList').innerHTML = notices.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>${escapeHtml(formatDateTime(item.date))}</p></div>`).join('') || empty('No notifications right now.');
 }
 
+function updateAppStatus(key, label) {
+  const allowed = key === 'csc_president' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
+  if (!requirePermission(allowed, `This account cannot update ${label} status.`)) return;
+  const existing = findStatus(key);
+  const next = prompt(`${label} status:`, existing?.status_label || existing?.status || 'Active');
+  if (next === null) return;
+  const statusLabelValue = next.trim();
+  if (!statusLabelValue) return showToast('Status cannot be empty.', 'error');
+  if (!Array.isArray(state.store.activityStatuses)) state.store.activityStatuses = [];
+  const item = existing || { id: key, key, created_at: new Date().toISOString() };
+  Object.assign(item, {
+    status: statusLabelValue.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'active',
+    status_label: statusLabelValue,
+    updated_at: new Date().toISOString(),
+    updated_by: currentUser(state.store).full_name
+  });
+  if (!existing) state.store.activityStatuses.push(item);
+  log('app_status_updated', `${currentUser(state.store).full_name} updated ${label} status to "${statusLabelValue}".`, item);
+  persist(`${label} status updated.`);
+}
+
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }
-function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.status}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${isSuperAdmin(state.store) ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
+function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); const canRespond = canApproveEvents(state.store); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.status}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${canRespond ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
 function addConcern(event) { event.preventDefault(); if (!isManager(state.store)) return; const user = currentUser(state.store); const org = state.store.organizations.find((item) => item.id === user.organization_id); const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title: $('concernTitle').value.trim(), category: $('concernCategory').value, priority: $('concernPriority').value, description: $('concernDescription').value.trim(), status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.concerns.push(item); log('concern_submitted', `${user.full_name} raised "${item.title}".`, item); event.target.reset(); persist('Concern submitted.'); renderConcerns(); }
 
 function openDashboard() { if (!requirePermission(!isPublic(state.store), 'Login to view a dashboard.')) return; renderDashboard(); openDialog('dashboardModal'); }
@@ -898,7 +950,7 @@ function renderDashboard() { const user = currentUser(state.store); const events
   $('dashboardList').innerHTML = upcoming.slice(0, 8).map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.venue)} - ${escapeHtml(formatDateTime(item.start_time))}</p></div>`).join('') || empty('No upcoming events');
 }
 
-function openEventRequests() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can review event requests.')) return; renderEventRequests(); openDialog('eventRequestsModal'); }
+function openEventRequests() { if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return; renderEventRequests(); openDialog('eventRequestsModal'); }
 function renderEventRequests() {
   const eventCards = [...state.store.events]
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
@@ -912,9 +964,9 @@ function eventRequestHtml(item) {
   return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.approval_status}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
 }
 
-function openBlockedTimes() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
+function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
 function updateBlockTimeFields() { $('blockStart').disabled = $('blockAllDay').checked; $('blockEnd').disabled = $('blockAllDay').checked; }
-function addBlockedTime(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const date = $('blockDate').value; const allDay = $('blockAllDay').checked; const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value); const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value); if (new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error'); const item = { id: createId(), title: $('blockTitle').value.trim(), start_time: start, end_time: end, all_day: allDay, reason: $('blockReason').value.trim(), created_by: currentUser(state.store).id, created_at: new Date().toISOString() }; state.store.blockedTimes.push(item); log('blocked_time_created', `Added blocked period "${item.title}".`, item); event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes(); }
+function addBlockedTime(event) { event.preventDefault(); if (!canManageBlockedTimes(state.store)) return; const date = $('blockDate').value; const allDay = $('blockAllDay').checked; const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value); const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value); if (new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error'); const item = { id: createId(), title: $('blockTitle').value.trim(), start_time: start, end_time: end, all_day: allDay, reason: $('blockReason').value.trim(), created_by: currentUser(state.store).id, created_at: new Date().toISOString() }; state.store.blockedTimes.push(item); log('blocked_time_created', `Added blocked period "${item.title}".`, item); event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes(); }
 function renderBlockedTimes() {
   $('blockedTimesList').innerHTML = state.store.blockedTimes.map(blockedTimeHtml).join('') || empty('No blocked periods');
 }
@@ -923,8 +975,8 @@ function blockedTimeHtml(item) {
   return `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatTime(item.end_time))}</p><p>${escapeHtml(item.reason)}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
 }
 
-function openCategories() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
-function addCategory(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
+function openCategories() { if (!requirePermission(canManageCategories(state.store), 'This account cannot manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
+function addCategory(event) { event.preventDefault(); if (!canManageCategories(state.store)) return; const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
 function renderCategories() {
   $('categoriesList').innerHTML = state.store.categories.map(categoryHtml).join('');
 }
@@ -935,8 +987,8 @@ function categoryHtml(item) {
   return `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(item.color)}"></span>${escapeHtml(item.name)}</strong><p>${status}</p>${actionButton('category-toggle', item.id, toggleLabel, 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`;
 }
 
-function openOrganizations() { if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
-function addOrganization(event) { event.preventDefault(); if (!isSuperAdmin(state.store)) return; const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
+function openOrganizations() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
+function addOrganization(event) { event.preventDefault(); if (!canManageAccounts(state.store)) return; const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
 function renderOrganizations() {
   $('organizationsList').innerHTML = state.store.organizations.map(organizationHtml).join('');
 }
@@ -945,7 +997,7 @@ function organizationHtml(item) {
   return `<div class="activity-item"><strong>${escapeHtml(item.organization_name)}</strong><p>${escapeHtml(item.organization_type)}</p>${actionButton('organization-delete', item.id, 'Delete', 'danger-button')}</div>`;
 }
 
-function openUsers() { if (!requirePermission(isSuperAdmin(state.store), 'Only admins can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
+function openUsers() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
 function renderUsers() {
   const requests = state.store.accountRequests.filter((item) => item.status === 'pending');
   $('accountRequestsList').innerHTML = requests.map(accountRequestHtml).join('') || empty('No pending account requests');
@@ -958,11 +1010,66 @@ function accountRequestHtml(item) {
 
 function userHtml(user) {
   const organization = state.store.organizations.find((org) => org.id === user.organization_id);
-  return `<div class="activity-item"><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.role))}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div>`;
+  const permissions = user.permissions || {};
+  const presetOptions = Object.entries(ACCOUNT_PRESETS).map(([value, preset]) => `<option value="${escapeHtml(value)}"${user.account_preset === value ? ' selected' : ''}>${escapeHtml(preset.label)}</option>`).join('');
+  const toggles = ACCOUNT_PERMISSION_FIELDS.map(({ key, label }) => `<label class="permission-toggle"><input type="checkbox" data-account-permission="${escapeHtml(key)}" data-user-id="${escapeHtml(user.id)}"${permissions[key] !== false && permissions[key] ? ' checked' : ''}>${escapeHtml(label)}</label>`).join('');
+  return `<div class="activity-item account-card"><div class="account-card-head"><div><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.account_preset || user.role))}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div><label>Preset<select data-account-preset data-user-id="${escapeHtml(user.id)}">${presetOptions}</select></label></div><div class="permission-grid">${toggles}</div></div>`;
+}
+
+const ACCOUNT_PERMISSION_FIELDS = [
+  { key: 'enabled', label: 'Account enabled' },
+  { key: 'manageAccounts', label: 'Manage accounts' },
+  { key: 'approveEvents', label: 'Approve events' },
+  { key: 'editAllEvents', label: 'Edit all events' },
+  { key: 'deleteAllEvents', label: 'Delete all events' },
+  { key: 'manageBlockedTimes', label: 'Manage blocked times' },
+  { key: 'manageAnnouncements', label: 'Manage announcements' },
+  { key: 'updatePresidentStatus', label: 'Update CSC President status' },
+  { key: 'updateOfficeStatus', label: 'Update Incampus/Offcampus status' },
+  { key: 'manageCategories', label: 'Manage categories' }
+];
+
+async function handleUserPermissionChange(event) {
+  if (!canManageAccounts(state.store)) return;
+  const target = event.target;
+  const user = state.store.users.find((item) => item.id === target.dataset.userId);
+  if (!user) return;
+  const previousUser = {
+    account_preset: user.account_preset,
+    role: user.role,
+    permissions: { ...(user.permissions || {}) }
+  };
+
+  if (target.matches('[data-account-preset]')) {
+    applyAccountPreset(user, target.value);
+  } else if (target.matches('[data-account-permission]')) {
+    user.permissions = { ...user.permissions, [target.dataset.accountPermission]: target.checked };
+  } else {
+    return;
+  }
+
+  if (user.id === currentUser(state.store).id && (!user.permissions.enabled || !user.permissions.manageAccounts || user.role !== 'super_admin')) {
+    Object.assign(user, previousUser);
+    showToast('The active Manager account must stay enabled with Manage accounts access.', 'error');
+    renderUsers();
+    return;
+  }
+
+  user.updated_at = new Date().toISOString();
+  log('account_permissions_updated', `Updated access for ${user.full_name}.`, { user_id: user.id, account_preset: user.account_preset, permissions: user.permissions });
+  await persist('Account access updated.');
+  renderUsers();
+}
+
+function applyAccountPreset(user, presetName) {
+  const preset = ACCOUNT_PRESETS[presetName] || ACCOUNT_PRESETS.organization;
+  user.account_preset = ACCOUNT_PRESETS[presetName] ? presetName : 'organization';
+  user.role = preset.role;
+  user.permissions = { ...preset.permissions };
 }
 
 function openActivityLog() {
-  if (!requirePermission(isSuperAdmin(state.store), 'Only super admins can view logs.')) return;
+  if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can view logs.')) return;
   $('activityList').innerHTML = [...state.store.activityLogs].reverse().map(activityLogHtml).join('') || empty('No activity logs');
   openDialog('activityLogModal');
 }
@@ -977,18 +1084,18 @@ function handleListAction(event) {
   const { action, id } = button.dataset;
   const handlers = {
     'event-view': () => viewEventRequest(id),
-    'event-approve': () => reviewEventRequest(id, 'approved'),
-    'event-reject': () => reviewEventRequest(id, 'rejected'),
-    'announcement-delete': () => confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
-    'block-delete': () => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
-    'category-toggle': () => toggleCategory(id),
-    'category-delete': () => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
+    'event-approve': () => requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.') && reviewEventRequest(id, 'approved'),
+    'event-reject': () => requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.') && reviewEventRequest(id, 'rejected'),
+    'announcement-delete': () => requirePermission(canManageAnnouncements(state.store), 'This account cannot manage announcements.') && confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
+    'block-delete': () => requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.') && confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
+    'category-toggle': () => requirePermission(canManageCategories(state.store), 'This account cannot manage categories.') && toggleCategory(id),
+    'category-delete': () => requirePermission(canManageCategories(state.store), 'This account cannot manage categories.') && confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
     'organization-delete': () => confirmOrganizationDelete(id),
-    'account-approve': () => approveAccount(id),
-    'account-reject': () => rejectAccount(id),
-    'concern-review': () => reviewConcern(id),
-    'concern-resolve': () => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
-    'concern-reject': () => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
+    'account-approve': () => requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.') && approveAccount(id),
+    'account-reject': () => requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.') && rejectAccount(id),
+    'concern-review': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && reviewConcern(id),
+    'concern-resolve': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
+    'concern-reject': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
   };
   if (handlers[action]) handlers[action]();
 }
@@ -1015,6 +1122,7 @@ function toggleCategory(id) {
 }
 
 function confirmOrganizationDelete(id) {
+  if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage organizations.')) return;
   confirmAction('Delete this organization? Assigned users will become unassigned.', () => {
     state.store.users.forEach((user) => {
       if (user.organization_id === id) user.organization_id = null;
@@ -1164,6 +1272,11 @@ function fillSelect(id, options, selectedValue = '') {
   const select = $(id);
   select.innerHTML = options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
   select.value = selectedValue || '';
+}
+
+function setHidden(id, hidden) {
+  const element = $(id);
+  if (element) element.hidden = hidden;
 }
 
 function actionButton(action, id, label, className) {

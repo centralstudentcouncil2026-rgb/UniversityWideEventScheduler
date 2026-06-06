@@ -3,6 +3,7 @@ const EMPTY_COLLECTIONS = [
   'organizations',
   'categories',
   'events',
+  'activityStatuses',
   'blockedTimes',
   'announcements',
   'concerns',
@@ -30,9 +31,92 @@ export function normalizeStore(store = {}) {
   EMPTY_COLLECTIONS.forEach((name) => {
     if (!Array.isArray(normalized[name])) normalized[name] = [];
   });
-  normalized.users = normalized.users.map(({ password_hash: _passwordHash, ...user }) => user);
+  normalized.users = normalized.users.map(normalizeUser);
   normalized.events = normalized.events.map(normalizeEvent);
   return normalized;
+}
+
+export const ACCOUNT_PRESETS = {
+  manager: {
+    label: 'Manager',
+    role: 'super_admin',
+    permissions: {
+      enabled: true,
+      manageAccounts: true,
+      approveEvents: true,
+      editAllEvents: true,
+      deleteAllEvents: true,
+      manageBlockedTimes: true,
+      manageAnnouncements: true,
+      updatePresidentStatus: true,
+      updateOfficeStatus: true,
+      manageCategories: true
+    }
+  },
+  csc_president: {
+    label: 'CSC President',
+    role: 'super_admin',
+    permissions: {
+      enabled: true,
+      manageAccounts: false,
+      approveEvents: true,
+      editAllEvents: true,
+      deleteAllEvents: false,
+      manageBlockedTimes: false,
+      manageAnnouncements: true,
+      updatePresidentStatus: true,
+      updateOfficeStatus: false,
+      manageCategories: false
+    }
+  },
+  head_events: {
+    label: 'Head of Events',
+    role: 'super_admin',
+    permissions: {
+      enabled: true,
+      manageAccounts: false,
+      approveEvents: true,
+      editAllEvents: true,
+      deleteAllEvents: false,
+      manageBlockedTimes: true,
+      manageAnnouncements: true,
+      updatePresidentStatus: false,
+      updateOfficeStatus: true,
+      manageCategories: false
+    }
+  },
+  organization: {
+    label: 'Organization',
+    role: 'organization_manager',
+    permissions: {
+      enabled: true,
+      manageAccounts: false,
+      approveEvents: false,
+      editAllEvents: false,
+      deleteAllEvents: false,
+      manageBlockedTimes: false,
+      manageAnnouncements: false,
+      updatePresidentStatus: false,
+      updateOfficeStatus: false,
+      manageCategories: false
+    }
+  }
+};
+
+function normalizeUser(user = {}) {
+  const { password_hash: _passwordHash, ...safeUser } = user;
+  const preset = safeUser.account_preset || presetForRole(safeUser.role);
+  const presetConfig = ACCOUNT_PRESETS[preset] || ACCOUNT_PRESETS.organization;
+  return {
+    ...safeUser,
+    role: safeUser.role || presetConfig.role,
+    account_preset: preset,
+    permissions: { ...presetConfig.permissions, ...(safeUser.permissions || {}) }
+  };
+}
+
+function presetForRole(role) {
+  return role === 'super_admin' ? 'manager' : 'organization';
 }
 
 export function storeForPersistence(store) {

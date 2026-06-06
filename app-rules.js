@@ -19,22 +19,64 @@ export function isSuperAdmin(store) {
   return currentUser(store).role === 'super_admin';
 }
 
+export function userPermission(user, permission) {
+  if (!user || user.role === 'public_viewer') return false;
+  if (permission === 'enabled') return user.permissions?.enabled !== false;
+  return Boolean(user.permissions?.[permission]);
+}
+
+export function hasPermission(store, permission) {
+  return userPermission(currentUser(store), permission);
+}
+
+export function canManageAccounts(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'manageAccounts');
+}
+
+export function canApproveEvents(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'approveEvents');
+}
+
+export function canManageBlockedTimes(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'manageBlockedTimes');
+}
+
+export function canManageAnnouncements(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'manageAnnouncements');
+}
+
+export function canManageCategories(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'manageCategories');
+}
+
+export function canUpdatePresidentStatus(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'updatePresidentStatus');
+}
+
+export function canUpdateOfficeStatus(store) {
+  return isSuperAdmin(store) && hasPermission(store, 'updateOfficeStatus');
+}
+
 export function canCreateEvents(store) {
-  return isManager(store) || isSuperAdmin(store);
+  return userPermission(currentUser(store), 'enabled') && (isManager(store) || isSuperAdmin(store));
 }
 
 export function canViewPrivateEvent(store, event) {
-  return isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id);
+  return userPermission(currentUser(store), 'enabled') && (isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id));
 }
 
 export function canEditEvent(store, event) {
   if (!event) return canCreateEvents(store);
-  return isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id);
+  const user = currentUser(store);
+  if (!userPermission(user, 'enabled')) return false;
+  return (isSuperAdmin(store) && hasPermission(store, 'editAllEvents')) || (isManager(store) && user.organization_id === event.organization_id);
 }
 
 export function canDeleteEvent(store, event) {
   if (!event) return false;
-  return isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id);
+  const user = currentUser(store);
+  if (!userPermission(user, 'enabled')) return false;
+  return (isSuperAdmin(store) && hasPermission(store, 'deleteAllEvents')) || (isManager(store) && user.organization_id === event.organization_id);
 }
 
 export function isPublicEvent(event) {

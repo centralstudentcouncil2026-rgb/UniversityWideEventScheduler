@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260606-login-strict-v1';
-import { currentUser, isManager, isPublic } from './app-rules.js?v=20260606-delete-permissions-v1';
+import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260607-account-presets-v1';
+import { currentUser, isManager, isPublic, userPermission } from './app-rules.js?v=20260607-account-presets-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
@@ -13,12 +13,14 @@ function setMessage(text, type = 'error') {
 
 function roleAllowed(store) {
   const user = currentUser(store);
+  if (!userPermission(user, 'enabled')) return false;
   if (loginType === 'student') return isManager(store);
   if (loginType === 'admin') return !isPublic(store) && user.role !== 'organization_manager';
   return !isPublic(store);
 }
 
-function roleError() {
+function roleError(store) {
+  if (!userPermission(currentUser(store), 'enabled')) return 'This account is disabled. Contact the CONNECT manager.';
   return loginType === 'student'
     ? 'This login is for student organizations only.'
     : 'This login is for administrators only.';
@@ -39,7 +41,7 @@ if (form) form.addEventListener('submit', async (event) => {
 
     if (!roleAllowed(store)) {
       clearSession();
-      setMessage(roleError(), 'error');
+      setMessage(roleError(store), 'error');
       button.disabled = false;
       return;
     }
