@@ -146,15 +146,22 @@
   overflow: visible !important;
 }
 
+.fc .fc-timegrid-event-harness:has(.event-week-span-multi) {
+  left: 0 !important;
+  max-width: none !important;
+  right: 0 !important;
+  width: auto !important;
+}
+
 .fc .event-week-span-multi::before {
   background: var(--event-fill-color, currentColor);
   border-radius: 999px;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
   content: "";
   height: 5px;
-  left: calc(-7px + var(--week-line-lane-offset, 0px));
+  left: calc(-22px + var(--week-line-lane-offset, 0px));
   position: absolute;
-  right: calc(-7px - var(--week-line-lane-offset, 0px));
+  right: calc(-22px - var(--week-line-lane-offset, 0px));
   top: 0;
   z-index: 4;
 }
