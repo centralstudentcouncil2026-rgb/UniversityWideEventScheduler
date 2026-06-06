@@ -36,6 +36,7 @@ function initializePublicCalendar() {
     firstDay: 1,
     height: '100%',
     headerToolbar: false,
+    displayEventTime: false,
     dayMaxEvents: false,
     dayMaxEventRows: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
@@ -74,12 +75,20 @@ function initializePublicCalendar() {
 function publicEvents() {
   const approvedEvents = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
-  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event)), []);
+  const dateCounts = publicDateEventCounts(approvedEvents);
+  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts)), []);
 }
 
-function publicCalendarItems(event) {
+function publicDateEventCounts(events) {
+  return events.reduce((counts, event) => {
+    sortedEventOccurrences(event).forEach((occurrence) => counts.set(occurrence.date, (counts.get(occurrence.date) || 0) + 1));
+    return counts;
+  }, new Map());
+}
+
+function publicCalendarItems(event, dateCounts) {
   return consecutiveOccurrenceRanges(sortedEventOccurrences(event))
-    .map((range, index) => fullCalendarRangeItem(event, range, index));
+    .map((range, index) => fullCalendarRangeItem(event, range, index, dateCounts));
 }
 
 function sortedEventOccurrences(event) {
@@ -88,24 +97,36 @@ function sortedEventOccurrences(event) {
     .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.start_time) - new Date(b.start_time));
 }
 
-function fullCalendarRangeItem(event, range, index) {
+function fullCalendarRangeItem(event, range, index, dateCounts) {
   const color = eventPrimaryColor(event);
   const accentColor = eventAccentColor(event);
   const first = range[0];
   const last = range[range.length - 1];
   const isMultiDay = range.length > 1;
+  const densityClass = publicDensityClass(range, dateCounts);
 
   return {
     id: `${event.id}::public-range-${index}`,
-    title: `${formatCompactTime(first.start_time)} ${event.title} - ${event.organization_name}`,
+    title: `${formatCompactTime(first.start_time)} ${event.title}`,
     start: isMultiDay ? first.date : first.start_time,
     end: isMultiDay ? nextDate(last.date) : first.end_time,
     allDay: isMultiDay,
+    display: 'block',
     backgroundColor: color,
     borderColor: color,
-    classNames: isMultiDay ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event'] : ['public-single-day-event'],
-    extendedProps: { event, occurrence: first, panelDate: first.date, accentColor }
+    classNames: isMultiDay
+      ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event', densityClass]
+      : ['public-single-day-event', densityClass],
+    extendedProps: { event, occurrence: first, panelDate: first.date, accentColor, eventCount: dateCounts.get(first.date) || 1 }
   };
+}
+
+function publicDensityClass(range, dateCounts) {
+  const maxCount = Math.max(...range.map((occurrence) => dateCounts.get(occurrence.date) || 1));
+  if (maxCount >= 6) return 'public-density-max';
+  if (maxCount >= 4) return 'public-density-high';
+  if (maxCount >= 3) return 'public-density-medium';
+  return 'public-density-normal';
 }
 
 function applyPublicEventAccent(info) {

@@ -30,6 +30,76 @@
   z-index: 2;
 }
 
+.fc .public-single-day-event,
+.fc .public-multi-day-event {
+  min-height: 0 !important;
+}
+
+.fc .public-single-day-event .fc-event-main,
+.fc .public-multi-day-event .fc-event-main {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fc .public-single-day-event .fc-event-title,
+.fc .public-single-day-event .fc-event-time,
+.fc .public-multi-day-event .fc-event-title,
+.fc .public-multi-day-event .fc-event-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc .public-density-medium {
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+  margin-bottom: 1px !important;
+  padding: 1px 2px !important;
+}
+
+.fc .public-density-medium::before {
+  height: 3px;
+}
+
+.fc .public-density-medium .fc-event-main {
+  padding-top: 2px;
+}
+
+.fc .public-density-high {
+  border-radius: 5px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  margin-bottom: 0 !important;
+  min-height: 14px !important;
+  padding: 0 2px !important;
+}
+
+.fc .public-density-high::before {
+  height: 2px;
+}
+
+.fc .public-density-high .fc-event-main {
+  padding-top: 1px;
+}
+
+.fc .public-density-max {
+  border-radius: 4px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+  margin-bottom: 0 !important;
+  min-height: 12px !important;
+  padding: 0 2px !important;
+}
+
+.fc .public-density-max::before {
+  height: 0;
+}
+
+.fc .public-density-max .fc-event-main {
+  padding-top: 0;
+}
+
 .fc .event-month-span-single {
   border-radius: 999px !important;
   margin-left: 4px !important;
