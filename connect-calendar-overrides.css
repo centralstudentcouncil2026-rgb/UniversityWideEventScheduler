@@ -140,6 +140,12 @@
   padding: 0 !important;
 }
 
+.fc .fc-timegrid-col-events,
+.fc .fc-timegrid-event-harness:has(.event-week-span-multi),
+.fc .fc-timegrid-event-harness-inset:has(.event-week-span-multi) {
+  overflow: visible !important;
+}
+
 .fc .event-week-span-multi::before {
   background: var(--event-fill-color, currentColor);
   border-radius: 999px;
@@ -148,9 +154,9 @@
   height: 5px;
   left: calc(-7px + var(--week-line-lane-offset, 0px));
   position: absolute;
-  right: -7px;
+  right: calc(-7px - var(--week-line-lane-offset, 0px));
   top: 0;
-  z-index: 2;
+  z-index: 4;
 }
 
 .fc .event-week-span-multi::after {
@@ -163,7 +169,7 @@
   position: absolute;
   top: 0;
   width: var(--week-line-stem-width, 6px);
-  z-index: 1;
+  z-index: 3;
 }
 
 .fc .event-week-span-multi .fc-event-main {
@@ -208,13 +214,8 @@
   margin-right: 0 !important;
 }
 
-.fc .event-week-span-end::before {
-  right: calc(100% - 18px);
-}
-
 .fc .event-week-span-start.event-week-span-end::before {
   left: calc(12px + var(--week-line-lane-offset, 0px));
-  right: calc(100% - 18px);
 }
 
 .fc .event-week-density-medium::before {
