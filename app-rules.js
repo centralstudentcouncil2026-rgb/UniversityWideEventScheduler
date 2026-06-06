@@ -32,6 +32,11 @@ export function canEditEvent(store, event) {
   return isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id);
 }
 
+export function canDeleteEvent(store, event) {
+  if (!event) return false;
+  return isSuperAdmin(store) || (isManager(store) && currentUser(store).organization_id === event.organization_id);
+}
+
 export function isPublicEvent(event) {
   return event.privacy_level !== 'internal' && !['draft', 'cancelled', 'disabled'].includes(event.event_status);
 }

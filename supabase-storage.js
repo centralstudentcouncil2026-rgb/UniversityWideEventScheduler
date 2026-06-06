@@ -134,11 +134,6 @@ export async function deleteRecord(collection, id) {
     }
   }
 
-  if (collection === 'events') {
-    console.warn(`CONNECT event delete cleanup skipped for ${id}: ${errors.join('; ')}`);
-    return { skipped: true, collection, id, errors };
-  }
-
   throw new Error(`Supabase rejected delete for ${collection} ${id}: ${errors.join('; ')}`);
 }
 

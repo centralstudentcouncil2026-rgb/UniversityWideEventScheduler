@@ -1,10 +1,10 @@
 import { createId } from './app-data.js?v=20260605-cleanup-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260605-cleanup-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260606-delete-permissions-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
-  canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
+  canDeleteEvent, canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,
   eventOccurrences, findBlockingTime, findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260601-public-month-v2';
+} from './app-rules.js?v=20260606-delete-permissions-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -457,7 +457,7 @@ function openEventModal(range, record = null) {
   $('eventContactPerson').value = record?.contact_person || currentUser(state.store).full_name; $('eventContactInfo').value = record?.contact_info || '';
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
   $('eventPrivateNotes').value = record?.private_notes || ''; $('eventAdminNotes').value = record?.admin_notes || ''; $('eventRejectionReason').value = record?.rejection_reason || '';
-  $('eventOrganization').disabled = isManager(state.store); $('deleteEventButton').hidden = !record; $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
+  $('eventOrganization').disabled = isManager(state.store); $('deleteEventButton').hidden = !canDeleteEvent(state.store, record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
   openDialog('eventModal');
 }
 
@@ -616,7 +616,7 @@ function openDetails(props) {
     if (privateView) Object.assign(data, { Purpose: record.purpose, 'Contact Person': record.contact_person, 'Contact Info': record.contact_info, 'Private Notes': record.private_notes || 'None' });
     if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
-    $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canEditEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
+    $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canDeleteEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
     $('detailsApproveButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !isSuperAdmin(state.store) || record.approval_status === 'rejected';
   }
   openDialog('detailsModal');
@@ -693,7 +693,7 @@ function cancelEventFromModal() { const event = state.store.events.find((item) =
 function cancelEvent(event) { event.event_status = 'cancelled'; event.updated_at = new Date().toISOString(); log('event_cancelled', `${currentUser(state.store).full_name} cancelled "${event.title}".`, event); closeDialog('detailsModal'); persist('Event cancelled.'); }
 function deleteSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmDeleteEvent(event); }
 function deleteEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmDeleteEvent(event); }
-function confirmDeleteEvent(event) { if (!requirePermission(canEditEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
+function confirmDeleteEvent(event) { if (!requirePermission(canDeleteEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
 async function deleteEvent(event) {
   const index = state.store.events.findIndex((item) => item.id === event.id);
   if (index < 0) return;
@@ -714,7 +714,10 @@ async function deleteEvent(event) {
     renderAll();
     refreshCalendar();
 
-    await saveStore(state.store);
+    const result = await saveStore(state.store);
+    if (result?.deleteFailures?.length) {
+      console.warn('CONNECT event delete cleanup warning:', result.deleteFailures);
+    }
     renderAll();
     refreshCalendar();
     showToast('Event deleted.', 'success');

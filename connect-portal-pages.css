@@ -113,17 +113,19 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.84)),
     radial-gradient(circle at top left, rgba(250, 204, 21, 0.12), transparent 36%);
+  align-content: start;
   display: grid;
   gap: 12px;
-  align-content: start;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .public-shell .announcement-preview {
-  min-height: 220px;
+  min-height: 240px;
 }
 
 .portal-shell .announcement-preview {
-  min-height: 190px;
+  min-height: 220px;
 }
 
 .public-shell .announcement-preview #announcementPreview {
@@ -140,7 +142,7 @@
   border: 1px solid rgba(100, 116, 139, 0.24);
   border-radius: 16px;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
-  overflow: hidden;
+  overflow: visible;
   padding: 14px;
   position: relative;
 }
@@ -325,6 +327,11 @@
   order: -5;
 }
 
+.portal-shell .sidebar .sidebar-section:first-child,
+.public-shell .sidebar .sidebar-section:first-child {
+  margin-top: 0;
+}
+
 .public-shell .sidebar .public-login-card {
   padding: 10px;
 }
@@ -441,6 +448,27 @@
 }
 
 @media (max-width: 768px) {
+  .public-shell .app-shell,
+  .portal-shell .app-shell {
+    display: block;
+  }
+
+  .public-shell .sidebar,
+  .portal-shell .sidebar {
+    border-right: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 14px;
+  }
+
+  .calendar-panel {
+    padding: 10px;
+  }
+
+  #calendar {
+    border-radius: 14px;
+  }
+
   .public-actions-row {
     display: none;
   }
