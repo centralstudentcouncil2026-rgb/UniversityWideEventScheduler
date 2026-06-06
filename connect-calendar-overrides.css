@@ -126,6 +126,8 @@
 }
 
 .fc .event-week-span-multi {
+  --week-line-lane-offset: 0px;
+  --week-line-stem-width: 6px;
   background: transparent !important;
   border-left: 0 !important;
   border-radius: 0 !important;
@@ -144,7 +146,7 @@
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
   content: "";
   height: 5px;
-  left: -7px;
+  left: calc(-7px + var(--week-line-lane-offset, 0px));
   position: absolute;
   right: -7px;
   top: 0;
@@ -152,15 +154,15 @@
 }
 
 .fc .event-week-span-multi::after {
-  background: var(--event-fill-color, currentColor);
+  background: var(--event-accent-color, currentColor);
   border-radius: 999px;
   bottom: 4px;
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.14);
   content: "";
-  left: 12px;
+  left: calc(12px + var(--week-line-lane-offset, 0px));
   position: absolute;
   top: 0;
-  width: 6px;
+  width: var(--week-line-stem-width, 6px);
   z-index: 1;
 }
 
@@ -172,7 +174,7 @@
   display: inline-flex;
   height: auto !important;
   line-height: 1.1;
-  margin: 6px 6px 0 20px;
+  margin: 6px 6px 0 calc(20px + var(--week-line-lane-offset, 0px));
   max-width: calc(100% - 28px);
   min-height: 0 !important;
   overflow: hidden;
@@ -199,7 +201,7 @@
 }
 
 .fc .event-week-span-start::before {
-  left: 12px;
+  left: calc(12px + var(--week-line-lane-offset, 0px));
 }
 
 .fc .event-week-span-end {
@@ -211,12 +213,46 @@
 }
 
 .fc .event-week-span-start.event-week-span-end::before {
-  left: 12px;
+  left: calc(12px + var(--week-line-lane-offset, 0px));
   right: calc(100% - 18px);
 }
 
-.fc .event-week-span-custom::after {
-  width: 8px;
+.fc .event-week-density-medium::before {
+  height: 4px;
+}
+
+.fc .event-week-density-medium .fc-event-main {
+  font-size: 11px;
+  margin-left: calc(18px + var(--week-line-lane-offset, 0px));
+  padding: 2px 7px;
+}
+
+.fc .event-week-density-high::before {
+  height: 3px;
+}
+
+.fc .event-week-density-high::after {
+  bottom: 3px;
+}
+
+.fc .event-week-density-high .fc-event-main {
+  font-size: 10px;
+  margin-left: calc(16px + var(--week-line-lane-offset, 0px));
+  padding: 2px 6px;
+}
+
+.fc .event-week-density-max::before {
+  height: 2px;
+}
+
+.fc .event-week-density-max::after {
+  bottom: 2px;
+}
+
+.fc .event-week-density-max .fc-event-main {
+  font-size: 9px;
+  margin-left: calc(14px + var(--week-line-lane-offset, 0px));
+  padding: 1px 5px;
 }
 
 .fc .event-week-span-middle .fc-event-main-frame,

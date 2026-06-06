@@ -189,7 +189,7 @@ function initializeCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
     initialView: isPublic(state.store) ? 'dayGridMonth' : 'timeGridWeek', firstDay: 1, height: '100%', expandRows: true, nowIndicator: true,
     selectable: true, selectMirror: true, selectMinDistance: 3, longPressDelay: 220, selectLongPressDelay: 220,
-    eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: false, slotMinTime: '07:00:00',
+    eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: true, slotMinTime: '07:00:00',
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, dayMaxEvents: false, dayMaxEventRows: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info))); },
@@ -217,16 +217,18 @@ function refreshCalendar() {
 
 function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth') {
   const user = currentUser(state.store);
-  const events = state.store.events.filter((event) => {
+  const visibleEvents = state.store.events.filter((event) => {
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
-  }).filter(matchesFilters).flatMap((event) => {
+  }).filter(matchesFilters);
+  const weekLineLayout = !monthView && state.calendar?.view.type === 'timeGridWeek' ? buildWeekLineLayout(visibleEvents) : new Map();
+  const events = visibleEvents.flatMap((event) => {
     const eventColor = organizationColor(state.store, event);
     const accentColor = eventAccentColor(state.store, event);
     return monthView
       ? connectedMonthEvents(event, eventColor, accentColor)
-      : occurrenceCalendarEvents(event, eventColor, accentColor);
+      : occurrenceCalendarEvents(event, eventColor, accentColor, weekLineLayout);
   });
   const blocks = state.store.blockedTimes.map((block) => ({
     id: block.id,
@@ -245,8 +247,18 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
 function mountCalendarEvent(info) {
   const accentColor = info.event.extendedProps?.accentColor;
   const eventColor = info.event.extendedProps?.eventColor || info.event.backgroundColor;
+  const weekLineLane = info.event.extendedProps?.weekLineLane;
+  const weekLineCount = info.event.extendedProps?.weekLineCount;
   if (accentColor) info.el.style.setProperty('--event-accent-color', accentColor);
   if (eventColor) info.el.style.setProperty('--event-fill-color', eventColor);
+  if (Number.isFinite(weekLineLane) && Number.isFinite(weekLineCount)) {
+    const stemWidth = weekLineStemWidth(weekLineCount);
+    const laneStep = stemWidth + weekLineLaneGap(weekLineCount);
+    info.el.style.setProperty('--week-line-lane', weekLineLane);
+    info.el.style.setProperty('--week-line-count', weekLineCount);
+    info.el.style.setProperty('--week-line-stem-width', `${stemWidth}px`);
+    info.el.style.setProperty('--week-line-lane-offset', `${weekLineLane * laneStep}px`);
+  }
   deduplicateMonthSpanLabel(info);
 }
 
@@ -369,11 +381,12 @@ function snapWeekMinutes(value) { return Math.max(WEEK_SLOT_START_MINUTES, Math.
 function minutesTime(value) { return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
 function formatMinutes(value) { return formatInputTime(minutesTime(value)); }
 
-function occurrenceCalendarEvents(event, eventColor, accentColor) {
+function occurrenceCalendarEvents(event, eventColor, accentColor, weekLineLayout = new Map()) {
   const occurrences = eventOccurrences(event);
   const weekParts = state.calendar?.view.type === 'timeGridWeek' ? weekSpanParts(occurrences) : new Map();
   return occurrences.map((occurrence, index) => {
     const weekPart = weekParts.get(occurrence.id);
+    const weekLine = weekLineLayout.get(weekLineKey(event, occurrence));
     return {
       id: `${event.id}::${occurrence.id}`,
       title: `${event.title} - ${event.organization_name}${occurrences.length > 1 && !weekPart ? ` (${index + 1}/${occurrences.length})` : ''}`,
@@ -383,9 +396,17 @@ function occurrenceCalendarEvents(event, eventColor, accentColor) {
       borderColor: eventColor,
       editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event),
       classNames: weekPart
-        ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`, weekPart.customLength ? 'event-week-span-custom' : null].filter(Boolean)
+        ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`, weekPart.customLength ? 'event-week-span-custom' : null, weekLineDensityClass(weekLine?.count || 1)].filter(Boolean)
         : [],
-      extendedProps: { type: 'event', record: event, occurrence, accentColor, eventColor }
+      extendedProps: {
+        type: 'event',
+        record: event,
+        occurrence,
+        accentColor,
+        eventColor,
+        weekLineLane: weekLine?.lane || 0,
+        weekLineCount: weekLine?.count || 1
+      }
     };
   });
 }
@@ -427,6 +448,90 @@ function weekSpanParts(occurrences) {
     });
   });
   return parts;
+}
+
+function buildWeekLineLayout(events) {
+  const entries = [];
+  events.forEach((event) => {
+    const occurrences = eventOccurrences(event);
+    const parts = weekSpanParts(occurrences);
+    occurrences.forEach((occurrence) => {
+      if (!parts.has(occurrence.id)) return;
+      entries.push({
+        key: weekLineKey(event, occurrence),
+        date: occurrence.date,
+        start: new Date(occurrence.start_time).getTime(),
+        end: new Date(occurrence.end_time).getTime()
+      });
+    });
+  });
+
+  const byDate = entries.reduce((groups, entry) => {
+    if (!groups.has(entry.date)) groups.set(entry.date, []);
+    groups.get(entry.date).push(entry);
+    return groups;
+  }, new Map());
+  const layout = new Map();
+
+  byDate.forEach((dayEntries) => {
+    const clusters = overlappingWeekLineClusters(dayEntries);
+    clusters.forEach((cluster) => {
+      const lanes = [];
+      cluster.sort((a, b) => a.start - b.start || a.end - b.end).forEach((entry) => {
+        let lane = lanes.findIndex((laneEnd) => laneEnd <= entry.start);
+        if (lane < 0) {
+          lane = lanes.length;
+          lanes.push(entry.end);
+        } else {
+          lanes[lane] = entry.end;
+        }
+        entry.lane = lane;
+      });
+      const count = lanes.length;
+      cluster.forEach((entry) => layout.set(entry.key, { lane: entry.lane, count }));
+    });
+  });
+
+  return layout;
+}
+
+function overlappingWeekLineClusters(entries) {
+  const sorted = [...entries].sort((a, b) => a.start - b.start || a.end - b.end);
+  const clusters = [];
+  sorted.forEach((entry) => {
+    const current = clusters.at(-1);
+    if (!current || entry.start >= current.maxEnd) {
+      clusters.push({ maxEnd: entry.end, entries: [entry] });
+      return;
+    }
+    current.maxEnd = Math.max(current.maxEnd, entry.end);
+    current.entries.push(entry);
+  });
+  return clusters.map((cluster) => cluster.entries);
+}
+
+function weekLineKey(event, occurrence) {
+  return `${event.id}::${occurrence.id}`;
+}
+
+function weekLineDensityClass(count) {
+  if (count >= 8) return 'event-week-density-max';
+  if (count >= 5) return 'event-week-density-high';
+  if (count >= 3) return 'event-week-density-medium';
+  return 'event-week-density-normal';
+}
+
+function weekLineStemWidth(count) {
+  if (count >= 8) return 2;
+  if (count >= 5) return 3;
+  if (count >= 3) return 4;
+  return 6;
+}
+
+function weekLineLaneGap(count) {
+  if (count >= 8) return 2;
+  if (count >= 5) return 3;
+  return 4;
 }
 
 function matchesFilters(event) {
