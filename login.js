@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260607-streamline-v1';
-import { currentUser, isManager, isPublic, userPermission } from './app-rules.js?v=20260607-streamline-v1';
+import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260607-security-v1';
+import { currentUser, isManager, isPublic, userPermission } from './app-rules.js?v=20260607-security-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';

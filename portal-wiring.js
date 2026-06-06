@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260607-streamline-v1';
-import { currentUser } from './app-rules.js?v=20260607-streamline-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260607-security-v1';
+import { currentUser } from './app-rules.js?v=20260607-security-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');

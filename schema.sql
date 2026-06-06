@@ -6,6 +6,8 @@
 --   20260606071433_fix_connect_auth_user_defaults
 --   20260606071809_tighten_connect_rpc_grants
 --   20260606072919_fix_account_request_pgcrypto_schema
+--   harden_connect_store_permissions
+--   fix_connect_status_permission_array_append
 --
 -- The live backend uses Supabase Auth for login and a compact JSON scheduler
 -- state table for the browser-facing CONNECT store:
@@ -27,7 +29,9 @@
 -- accounts are created in Supabase Auth with pending profiles and pending
 -- account request entries in scheduler_state. Only an active super-admin can
 -- approve access requests. Authenticated save and delete calls require an
--- active CONNECT profile.
+-- active CONNECT profile and enforce CONNECT account permission toggles on
+-- the server. Public and organization reads are filtered by the RPC before
+-- they reach the browser.
 --
 -- The authoritative SQL is stored in the Supabase migration history for
 -- project lcmyqhyxtipzovmgbdtf.

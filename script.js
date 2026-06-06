@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-streamline-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-streamline-v1';
+import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-security-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-security-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260607-streamline-v1';
+} from './app-rules.js?v=20260607-security-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -146,7 +146,8 @@ function bindEvents() {
 }
 
 function on(id, event, handler, options) {
-  $(id).addEventListener(event, handler, options);
+  const element = $(id);
+  if (element) element.addEventListener(event, handler, options);
 }
 
 function bindClickActions(actions) {
@@ -922,8 +923,8 @@ function persistMovedCalendarItem(info) {
 }
 
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
-function renderAnnouncementPreview() { const first = activeAnnouncements(state.store)[0]; $('announcementPreview').innerHTML = first ? `<div class="notice ${first.priority}"><strong>${escapeHtml(first.title)}</strong><p>${escapeHtml(first.content)}</p></div>` : '<p class="empty-text">No active announcements.</p>'; }
-function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
+function renderAnnouncementPreview() { const first = activeAnnouncements(state.store)[0]; $('announcementPreview').innerHTML = first ? `<div class="notice ${classToken(first.priority)}"><strong>${escapeHtml(first.title)}</strong><p>${escapeHtml(first.content)}</p></div>` : '<p class="empty-text">No active announcements.</p>'; }
+function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
 function addAnnouncement(event) { event.preventDefault(); if (!canManageAnnouncements(state.store)) return; const item = { id: createId(), title: $('announcementTitle').value.trim(), content: $('announcementContent').value.trim(), priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${$('announcementExpiry').value}T23:59:59` }; state.store.announcements.push(item); log('announcement_posted', `Posted announcement "${item.title}".`, item); event.target.reset(); persist('Announcement posted.'); renderAnnouncements(); }
 
 function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
@@ -963,7 +964,7 @@ function updateAppStatus(key, label) {
 }
 
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }
-function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); const canRespond = canApproveEvents(state.store); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.status}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${canRespond ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
+function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); const canRespond = canApproveEvents(state.store); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.status)}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${canRespond ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
 function addConcern(event) { event.preventDefault(); if (!isManager(state.store)) return; const user = currentUser(state.store); const org = state.store.organizations.find((item) => item.id === user.organization_id); const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title: $('concernTitle').value.trim(), category: $('concernCategory').value, priority: $('concernPriority').value, description: $('concernDescription').value.trim(), status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.concerns.push(item); log('concern_submitted', `${user.full_name} raised "${item.title}".`, item); event.target.reset(); persist('Concern submitted.'); renderConcerns(); }
 
 function openDashboard() { if (!requirePermission(!isPublic(state.store), 'Login to view a dashboard.')) return; renderDashboard(); openDialog('dashboardModal'); }
@@ -983,7 +984,7 @@ function renderEventRequests() {
 function eventRequestHtml(item) {
   const conflictCount = Array.isArray(item.conflict_event_ids) ? item.conflict_event_ids.length : 0;
   const conflictText = conflictCount ? `Warning: ${conflictCount} schedule conflict(s)` : 'No schedule conflict warning';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.approval_status}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
 }
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
@@ -1006,7 +1007,7 @@ function renderCategories() {
 function categoryHtml(item) {
   const status = item.active ? 'Active' : 'Inactive';
   const toggleLabel = item.active ? 'Deactivate' : 'Activate';
-  return `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(item.color)}"></span>${escapeHtml(item.name)}</strong><p>${status}</p>${actionButton('category-toggle', item.id, toggleLabel, 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`;
+  return `<div class="activity-item"><strong><span class="color-swatch" style="background:${escapeHtml(safeCssColor(item.color))}"></span>${escapeHtml(item.name)}</strong><p>${status}</p>${actionButton('category-toggle', item.id, toggleLabel, 'secondary-button')}${actionButton('category-delete', item.id, 'Delete', 'danger-button')}</div>`;
 }
 
 function openOrganizations() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
@@ -1269,15 +1270,14 @@ async function registerAccount(event) {
   event.preventDefault();
   const username = $('registerUsername').value.trim().toLowerCase();
   try {
-    await requestAccount({ username, password: $('registerPassword').value, fullName: $('registerFullName').value.trim(), role: $('registerRole').value, organizationName: $('registerRole').value === 'organization_manager' ? $('registerOrganizationName').value.trim() : '' });
+    await requestAccount({ username, password: $('registerPassword').value, fullName: $('registerFullName').value.trim(), organizationName: $('registerOrganizationName').value.trim() });
     event.target.reset(); updateRegistrationFields(); closeDialog('registerModal');
     showToast('Account request submitted for admin approval.', 'success');
   } catch (error) { showToast(error.message, 'error'); }
 }
 function updateRegistrationFields() {
-  const needsOrganization = $('registerRole').value === 'organization_manager';
-  $('registerOrganizationWrap').hidden = !needsOrganization;
-  $('registerOrganizationName').required = needsOrganization;
+  $('registerOrganizationWrap').hidden = false;
+  $('registerOrganizationName').required = true;
 }
 async function approveAccount(id) {
   try { await decideAccountRequest(id, 'approved'); await reloadStore(); renderUsers(); showToast('Account request approved.', 'success'); }
@@ -1332,7 +1332,7 @@ function setHidden(id, hidden) {
 }
 
 function actionButton(action, id, label, className) {
-  return `<button type="button" class="${className}" data-action="${action}" data-id="${id}">${escapeHtml(label)}</button>`;
+  return `<button type="button" class="${escapeHtml(className)}" data-action="${escapeHtml(action)}" data-id="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
 }
 
 function empty(text) { return `<div class="activity-item"><strong>${escapeHtml(text)}</strong></div>`; }
@@ -1340,6 +1340,8 @@ function rows(data) { return Object.entries(data).map(([label, value]) => `<dt>$
 function cap(value) { return String(value || '').split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function roleLabel(value) { return cap(value); }
 function initials(value) { return String(value || 'PV').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join(''); }
+function classToken(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, ''); }
+function safeCssColor(value, fallback = '#64748B') { return isCssColor(value) ? value : fallback; }
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',

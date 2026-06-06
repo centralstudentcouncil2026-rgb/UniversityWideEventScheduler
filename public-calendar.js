@@ -1,5 +1,5 @@
-import { loadStore } from './supabase-storage.js?v=20260607-streamline-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-streamline-v1';
+import { loadStore } from './supabase-storage.js?v=20260607-security-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-security-v1';
 
 const $ = (id) => document.getElementById(id);
 const state = { store: null, calendar: null, selectedDate: '' };
@@ -149,7 +149,7 @@ function consecutiveOccurrenceRanges(occurrences) {
 
 function renderAnnouncements() {
   const announcements = activeAnnouncements(state.store).slice(0, 4);
-  $('announcementPreview').innerHTML = announcements.map((item) => `<div class="notice ${escapeHtml(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`).join('') || '<p class="empty-text">No active announcements.</p>';
+  $('announcementPreview').innerHTML = announcements.map((item) => `<div class="notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`).join('') || '<p class="empty-text">No active announcements.</p>';
 }
 
 function renderStatuses() {
@@ -255,6 +255,10 @@ function nextDate(dateString) {
 
 function hashText(value) {
   return String(value || '').split('').reduce((hash, char) => ((hash << 5) - hash) + char.charCodeAt(0), 0);
+}
+
+function classToken(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
 }
 
 function escapeHtml(value) {

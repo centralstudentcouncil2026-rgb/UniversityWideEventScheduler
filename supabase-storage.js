@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260607-streamline-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260607-security-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -32,7 +32,16 @@ async function cleanupRemovedEvents(store) {
 }
 
 function session() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    if (stored && localStorage.getItem(SESSION_KEY)) {
+      sessionStorage.setItem(SESSION_KEY, stored);
+      localStorage.removeItem(SESSION_KEY);
+    }
+    return JSON.parse(stored || 'null');
+  } catch {
+    return null;
+  }
 }
 
 function headers(authenticated = false) {
@@ -92,7 +101,8 @@ export async function authenticate(username, password) {
     method: 'POST',
     body: JSON.stringify({ email: `${username.trim().toLowerCase()}@core.local`, password })
   });
-  localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  localStorage.removeItem(SESSION_KEY);
   return payload;
 }
 
@@ -104,16 +114,17 @@ async function refreshSession() {
     body: JSON.stringify({ refresh_token: refreshToken }),
     skipRefresh: true
   });
-  localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  localStorage.removeItem(SESSION_KEY);
   return payload;
 }
 
-export async function requestAccount({ username, password, fullName, role, organizationName }) {
+export async function requestAccount({ username, password, fullName, organizationName }) {
   return rpc('create_scheduler_account', {
     p_username: username,
     p_password: password,
     p_full_name: fullName,
-    p_requested_role: role,
+    p_requested_role: 'organization_manager',
     p_organization_name: organizationName
   });
 }
@@ -145,5 +156,6 @@ export async function deleteRecord(collection, id) {
 }
 
 export function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_KEY);
 }

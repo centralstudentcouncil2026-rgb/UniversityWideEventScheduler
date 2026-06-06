@@ -18,12 +18,13 @@ Pushing a commit to `main` updates the public site automatically. The
 
 The backend uses Supabase Auth, a JSON scheduler state table, role-aware RPCs,
 and Row Level Security. Public viewers can read the approved calendar without
-an account. Organization and admin accounts require admin approval.
+an account. Organization accounts require Manager approval. Elevated accounts
+are assigned by the Manager from inside the Accounts panel.
 
 Public viewers do not need an account. They receive a month-only overview and
-can select a date to inspect its public events. New organization and admin
-accounts are submitted from the public registration form and remain unavailable
-until an admin approves them from the Accounts panel.
+can select a date to inspect its public events. New organization accounts are
+submitted from the public registration form and remain unavailable until the
+Manager approves them from the Accounts panel.
 
 Active organization accounts can post events directly. Admin-blocked periods
 prevent posting, while schedule overlaps remain visible warnings. Events marked
