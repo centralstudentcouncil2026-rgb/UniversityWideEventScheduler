@@ -29,33 +29,15 @@ export function hasPermission(store, permission) {
   return userPermission(currentUser(store), permission);
 }
 
-export function canManageAccounts(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'manageAccounts');
-}
+const superAdminPermission = (store, permission) => isSuperAdmin(store) && hasPermission(store, permission);
 
-export function canApproveEvents(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'approveEvents');
-}
-
-export function canManageBlockedTimes(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'manageBlockedTimes');
-}
-
-export function canManageAnnouncements(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'manageAnnouncements');
-}
-
-export function canManageCategories(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'manageCategories');
-}
-
-export function canUpdatePresidentStatus(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'updatePresidentStatus');
-}
-
-export function canUpdateOfficeStatus(store) {
-  return isSuperAdmin(store) && hasPermission(store, 'updateOfficeStatus');
-}
+export const canManageAccounts = (store) => superAdminPermission(store, 'manageAccounts');
+export const canApproveEvents = (store) => superAdminPermission(store, 'approveEvents');
+export const canManageBlockedTimes = (store) => superAdminPermission(store, 'manageBlockedTimes');
+export const canManageAnnouncements = (store) => superAdminPermission(store, 'manageAnnouncements');
+export const canManageCategories = (store) => superAdminPermission(store, 'manageCategories');
+export const canUpdatePresidentStatus = (store) => superAdminPermission(store, 'updatePresidentStatus');
+export const canUpdateOfficeStatus = (store) => superAdminPermission(store, 'updateOfficeStatus');
 
 export function canCreateEvents(store) {
   return userPermission(currentUser(store), 'enabled') && (isManager(store) || isSuperAdmin(store));

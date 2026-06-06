@@ -11,6 +11,22 @@ const EMPTY_COLLECTIONS = [
   'accountRequests'
 ];
 const INTERNAL_PRIVACY_MARKER = '[[privacy:internal]]';
+const ACCOUNT_PERMISSION_DEFAULTS = {
+  enabled: true,
+  manageAccounts: false,
+  approveEvents: false,
+  editAllEvents: false,
+  deleteAllEvents: false,
+  manageBlockedTimes: false,
+  manageAnnouncements: false,
+  updatePresidentStatus: false,
+  updateOfficeStatus: false,
+  manageCategories: false
+};
+
+function preset(label, role, permissions = {}) {
+  return { label, role, permissions: { ...ACCOUNT_PERMISSION_DEFAULTS, ...permissions } };
+}
 
 export function createId() {
   const cryptoApi = globalThis.crypto;
@@ -37,70 +53,31 @@ export function normalizeStore(store = {}) {
 }
 
 export const ACCOUNT_PRESETS = {
-  manager: {
-    label: 'Manager',
-    role: 'super_admin',
-    permissions: {
-      enabled: true,
-      manageAccounts: true,
-      approveEvents: true,
-      editAllEvents: true,
-      deleteAllEvents: true,
-      manageBlockedTimes: true,
-      manageAnnouncements: true,
-      updatePresidentStatus: true,
-      updateOfficeStatus: true,
-      manageCategories: true
-    }
-  },
-  csc_president: {
-    label: 'CSC President',
-    role: 'super_admin',
-    permissions: {
-      enabled: true,
-      manageAccounts: false,
-      approveEvents: true,
-      editAllEvents: true,
-      deleteAllEvents: false,
-      manageBlockedTimes: false,
-      manageAnnouncements: true,
-      updatePresidentStatus: true,
-      updateOfficeStatus: false,
-      manageCategories: false
-    }
-  },
-  head_events: {
-    label: 'Head of Events',
-    role: 'super_admin',
-    permissions: {
-      enabled: true,
-      manageAccounts: false,
-      approveEvents: true,
-      editAllEvents: true,
-      deleteAllEvents: false,
-      manageBlockedTimes: true,
-      manageAnnouncements: true,
-      updatePresidentStatus: false,
-      updateOfficeStatus: true,
-      manageCategories: false
-    }
-  },
-  organization: {
-    label: 'Organization',
-    role: 'organization_manager',
-    permissions: {
-      enabled: true,
-      manageAccounts: false,
-      approveEvents: false,
-      editAllEvents: false,
-      deleteAllEvents: false,
-      manageBlockedTimes: false,
-      manageAnnouncements: false,
-      updatePresidentStatus: false,
-      updateOfficeStatus: false,
-      manageCategories: false
-    }
-  }
+  manager: preset('Manager', 'super_admin', {
+    manageAccounts: true,
+    approveEvents: true,
+    editAllEvents: true,
+    deleteAllEvents: true,
+    manageBlockedTimes: true,
+    manageAnnouncements: true,
+    updatePresidentStatus: true,
+    updateOfficeStatus: true,
+    manageCategories: true
+  }),
+  csc_president: preset('CSC President', 'super_admin', {
+    approveEvents: true,
+    editAllEvents: true,
+    manageAnnouncements: true,
+    updatePresidentStatus: true
+  }),
+  head_events: preset('Head of Events', 'super_admin', {
+    approveEvents: true,
+    editAllEvents: true,
+    manageBlockedTimes: true,
+    manageAnnouncements: true,
+    updateOfficeStatus: true
+  }),
+  organization: preset('Organization', 'organization_manager')
 };
 
 function normalizeUser(user = {}) {

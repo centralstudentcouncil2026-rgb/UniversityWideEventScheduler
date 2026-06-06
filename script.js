@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-account-presets-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-account-presets-v1';
+import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-streamline-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-streamline-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260607-account-presets-v1';
+} from './app-rules.js?v=20260607-streamline-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -15,6 +15,17 @@ const WEEK_SLOT_END_MINUTES = 21 * 60;
 const WEEK_SNAP_MINUTES = 15;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
+const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
+const PORTAL_TOOL_VISIBILITY = {
+  eventRequestsButton: canApproveEvents,
+  blockedTimesButton: canManageBlockedTimes,
+  categoriesButton: canManageCategories,
+  organizationsButton: canManageAccounts,
+  usersButton: canManageAccounts,
+  activityLogButton: canManageAccounts,
+  updateOfficeStatusButton: canUpdateOfficeStatus,
+  updatePresidentStatusButton: canUpdatePresidentStatus
+};
 const state = {
   store: null,
   calendar: null,
@@ -59,68 +70,65 @@ async function init() {
 }
 
 function bindEvents() {
-  $('todayButton').addEventListener('click', () => state.calendar.today());
-  $('prevButton').addEventListener('click', () => state.calendar.prev());
-  $('nextButton').addEventListener('click', () => state.calendar.next());
-  $('viewSelector').addEventListener('change', (event) => changeView(event.target.value));
-  $('searchInput').addEventListener('input', debounce((event) => { state.search = event.target.value.trim().toLowerCase(); refreshCalendar(); }, 180));
-  $('searchToggle').addEventListener('click', () => { $('searchWrap').classList.toggle('open'); $('searchInput').focus(); });
-  $('profileButton').addEventListener('click', () => openDialog('loginModal'));
-  $('loginButton').addEventListener('click', () => openDialog('loginModal'));
-  $('logoutButton').addEventListener('click', logout);
-  $('loginForm').addEventListener('submit', login);
-  $('registerButton').addEventListener('click', () => openDialog('registerModal'));
-  $('registerForm').addEventListener('submit', registerAccount);
-  $('registerRole').addEventListener('change', updateRegistrationFields);
-  $('mobileMenuButton').addEventListener('click', openSidebar);
-  $('mobileScrim').addEventListener('click', closeSidebar);
-  $('createEventButton').addEventListener('click', () => openEventModal(defaultRange()));
-  $('eventForm').addEventListener('submit', submitEventForm);
-  $('eventScheduleType').addEventListener('change', updateScheduleType);
-  $('addOccurrenceButton').addEventListener('click', () => addOccurrenceRow());
-  $('applySharedTimesButton').addEventListener('click', applySharedTimes);
-  $('occurrenceList').addEventListener('click', handleOccurrenceListClick);
-  $('cancelEventButton').addEventListener('click', cancelEventFromModal);
-  $('detailsEditButton').addEventListener('click', editSelectedEvent);
-  $('detailsCancelButton').addEventListener('click', cancelSelectedEvent);
-  $('detailsDeleteButton').addEventListener('click', deleteSelectedEvent);
-  $('deleteEventButton').addEventListener('click', deleteEventFromModal);
-  $('detailsApproveButton').addEventListener('click', () => reviewSelectedEvent('approved'));
-  $('detailsRejectButton').addEventListener('click', () => reviewSelectedEvent('rejected'));
-  $('agreeRules').addEventListener('change', updateAgreementButton);
-  $('agreePrivacy').addEventListener('change', updateAgreementButton);
-  $('agreementSubmitButton').addEventListener('click', finishAgreement);
-  $('conflictContinueButton').addEventListener('click', continueAfterConflict);
-  $('filtersButton').addEventListener('click', () => openDialog('filtersModal'));
-  ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'].forEach((id) => $(id).addEventListener('input', updateFilters));
-  $('resetFiltersButton').addEventListener('click', resetFilters);
-  $('notificationsButton').addEventListener('click', openNotifications);
-  $('dashboardButton').addEventListener('click', openDashboard);
-  $('announcementsButton').addEventListener('click', openAnnouncements);
-  $('announcementForm').addEventListener('submit', addAnnouncement);
-  $('announcementsList').addEventListener('click', handleListAction);
-  $('concernsButton').addEventListener('click', openConcerns);
-  $('concernForm').addEventListener('submit', addConcern);
-  $('concernsList').addEventListener('click', handleListAction);
-  $('eventRequestsButton').addEventListener('click', openEventRequests);
-  $('eventRequestsList').addEventListener('click', handleListAction);
-  $('blockedTimesButton').addEventListener('click', openBlockedTimes);
-  $('blockedTimeForm').addEventListener('submit', addBlockedTime);
-  $('blockAllDay').addEventListener('change', updateBlockTimeFields);
-  $('blockedTimesList').addEventListener('click', handleListAction);
-  $('categoriesButton').addEventListener('click', openCategories);
-  $('categoryForm').addEventListener('submit', addCategory);
-  $('categoriesList').addEventListener('click', handleListAction);
-  $('organizationsButton').addEventListener('click', openOrganizations);
-  $('organizationForm').addEventListener('submit', addOrganization);
-  $('organizationsList').addEventListener('click', handleListAction);
-  $('usersButton').addEventListener('click', openUsers);
-  $('accountRequestsList').addEventListener('click', handleListAction);
-  $('usersList').addEventListener('change', handleUserPermissionChange);
-  $('activityLogButton').addEventListener('click', openActivityLog);
-  $('updateOfficeStatusButton').addEventListener('click', () => updateAppStatus('incampus_offcampus', 'Incampus & Offcampus'));
-  $('updatePresidentStatusButton').addEventListener('click', () => updateAppStatus('csc_president', 'CSC President'));
-  $('confirmYesButton').addEventListener('click', confirmPendingAction);
+  bindClickActions({
+    todayButton: () => state.calendar.today(),
+    prevButton: () => state.calendar.prev(),
+    nextButton: () => state.calendar.next(),
+    searchToggle: toggleSearch,
+    profileButton: () => openDialog('loginModal'),
+    loginButton: () => openDialog('loginModal'),
+    logoutButton: logout,
+    registerButton: () => openDialog('registerModal'),
+    mobileMenuButton: openSidebar,
+    mobileScrim: closeSidebar,
+    createEventButton: () => openEventModal(defaultRange()),
+    addOccurrenceButton: () => addOccurrenceRow(),
+    applySharedTimesButton: applySharedTimes,
+    cancelEventButton: cancelEventFromModal,
+    detailsEditButton: editSelectedEvent,
+    detailsCancelButton: cancelSelectedEvent,
+    detailsDeleteButton: deleteSelectedEvent,
+    deleteEventButton: deleteEventFromModal,
+    detailsApproveButton: () => reviewSelectedEvent('approved'),
+    detailsRejectButton: () => reviewSelectedEvent('rejected'),
+    agreementSubmitButton: finishAgreement,
+    conflictContinueButton: continueAfterConflict,
+    filtersButton: () => openDialog('filtersModal'),
+    resetFiltersButton: resetFilters,
+    notificationsButton: openNotifications,
+    dashboardButton: openDashboard,
+    announcementsButton: openAnnouncements,
+    concernsButton: openConcerns,
+    eventRequestsButton: openEventRequests,
+    blockedTimesButton: openBlockedTimes,
+    categoriesButton: openCategories,
+    organizationsButton: openOrganizations,
+    usersButton: openUsers,
+    activityLogButton: openActivityLog,
+    updateOfficeStatusButton: () => updateAppStatus('incampus_offcampus', 'Incampus & Offcampus'),
+    updatePresidentStatusButton: () => updateAppStatus('csc_president', 'CSC President'),
+    confirmYesButton: confirmPendingAction
+  });
+  bindSubmitActions({
+    loginForm: login,
+    registerForm: registerAccount,
+    eventForm: submitEventForm,
+    announcementForm: addAnnouncement,
+    concernForm: addConcern,
+    blockedTimeForm: addBlockedTime,
+    categoryForm: addCategory,
+    organizationForm: addOrganization
+  });
+  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'categoriesList', 'organizationsList', 'accountRequestsList']);
+  FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
+  ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
+  on('viewSelector', 'change', (event) => changeView(event.target.value));
+  on('searchInput', 'input', debounce((event) => { state.search = event.target.value.trim().toLowerCase(); refreshCalendar(); }, 180));
+  on('registerRole', 'change', updateRegistrationFields);
+  on('eventScheduleType', 'change', updateScheduleType);
+  on('occurrenceList', 'click', handleOccurrenceListClick);
+  on('blockAllDay', 'change', updateBlockTimeFields);
+  on('usersList', 'change', handleUserPermissionChange);
   const closePublicDialogButton = $('closePublicDayDialog');
   if (closePublicDialogButton) closePublicDialogButton.addEventListener('click', closePublicDayDialog);
   $('calendar').addEventListener('pointerdown', startWeekRectangleSelection, true);
@@ -135,6 +143,27 @@ function bindEvents() {
   document.addEventListener('keydown', handlePublicDialogKeyDown);
   window.addEventListener('resize', debounce(handleResize, 160));
   window.addEventListener('orientationchange', () => setTimeout(handleResize, 260));
+}
+
+function on(id, event, handler, options) {
+  $(id).addEventListener(event, handler, options);
+}
+
+function bindClickActions(actions) {
+  Object.entries(actions).forEach(([id, handler]) => on(id, 'click', handler));
+}
+
+function bindSubmitActions(actions) {
+  Object.entries(actions).forEach(([id, handler]) => on(id, 'submit', handler));
+}
+
+function bindDelegatedLists(ids) {
+  ids.forEach((id) => on(id, 'click', handleListAction));
+}
+
+function toggleSearch() {
+  $('searchWrap').classList.toggle('open');
+  $('searchInput').focus();
 }
 
 async function persist(message = '') {
@@ -175,14 +204,7 @@ function renderRole() {
   document.body.classList.toggle('is-public', isPublic(state.store));
   $('profileName').textContent = user.full_name;
   $('profileInitials').textContent = initials(user.full_name);
-  setHidden('eventRequestsButton', !canApproveEvents(state.store));
-  setHidden('blockedTimesButton', !canManageBlockedTimes(state.store));
-  setHidden('categoriesButton', !canManageCategories(state.store));
-  setHidden('organizationsButton', !canManageAccounts(state.store));
-  setHidden('usersButton', !canManageAccounts(state.store));
-  setHidden('activityLogButton', !canManageAccounts(state.store));
-  setHidden('updateOfficeStatusButton', !canUpdateOfficeStatus(state.store));
-  setHidden('updatePresidentStatusButton', !canUpdatePresidentStatus(state.store));
+  Object.entries(PORTAL_TOOL_VISIBILITY).forEach(([id, allowed]) => setHidden(id, !allowed(state.store)));
   if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
   if (!isPublic(state.store)) closePublicDayDialog();
 }
@@ -1082,23 +1104,41 @@ function handleListAction(event) {
   const button = event.target.closest('[data-action]');
   if (!button) return;
   const { action, id } = button.dataset;
-  const handlers = {
-    'event-view': () => viewEventRequest(id),
-    'event-approve': () => requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.') && reviewEventRequest(id, 'approved'),
-    'event-reject': () => requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.') && reviewEventRequest(id, 'rejected'),
-    'announcement-delete': () => requirePermission(canManageAnnouncements(state.store), 'This account cannot manage announcements.') && confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
-    'block-delete': () => requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.') && confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
-    'category-toggle': () => requirePermission(canManageCategories(state.store), 'This account cannot manage categories.') && toggleCategory(id),
-    'category-delete': () => requirePermission(canManageCategories(state.store), 'This account cannot manage categories.') && confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
-    'organization-delete': () => confirmOrganizationDelete(id),
-    'account-approve': () => requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.') && approveAccount(id),
-    'account-reject': () => requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.') && rejectAccount(id),
-    'concern-review': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && reviewConcern(id),
-    'concern-resolve': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
-    'concern-reject': () => requirePermission(canApproveEvents(state.store), 'This account cannot respond to concerns.') && updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
-  };
-  if (handlers[action]) handlers[action]();
+  const handler = LIST_ACTIONS[action];
+  const permission = LIST_ACTION_PERMISSIONS[action];
+  if (!handler || (permission && !requirePermission(permission.allowed(), permission.message))) return;
+  handler(id);
 }
+
+const LIST_ACTION_PERMISSIONS = {
+  'event-approve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot review event requests.' },
+  'event-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot review event requests.' },
+  'announcement-delete': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
+  'block-delete': { allowed: () => canManageBlockedTimes(state.store), message: 'This account cannot manage blocked times.' },
+  'category-toggle': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
+  'category-delete': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
+  'account-approve': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'account-reject': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'concern-review': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
+  'concern-resolve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
+  'concern-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' }
+};
+
+const LIST_ACTIONS = {
+  'event-view': viewEventRequest,
+  'event-approve': (id) => reviewEventRequest(id, 'approved'),
+  'event-reject': (id) => reviewEventRequest(id, 'rejected'),
+  'announcement-delete': (id) => confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
+  'block-delete': (id) => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
+  'category-toggle': toggleCategory,
+  'category-delete': (id) => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
+  'organization-delete': confirmOrganizationDelete,
+  'account-approve': approveAccount,
+  'account-reject': rejectAccount,
+  'concern-review': reviewConcern,
+  'concern-resolve': (id) => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
+  'concern-reject': (id) => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
+};
 
 function viewEventRequest(id) {
   const item = state.store.events.find((event) => event.id === id);
@@ -1182,8 +1222,20 @@ function renderCollection(collection) {
 function confirmAction(message, action) { state.confirmAction = action; $('confirmMessage').textContent = message; openDialog('confirmModal'); }
 function confirmPendingAction() { const action = state.confirmAction; state.confirmAction = null; closeDialog('confirmModal'); action?.(); }
 
-function updateFilters() { state.filters = { organization: $('filterOrganization').value, venue: $('filterVenue').value.trim(), category: $('filterCategory').value, eventType: $('filterEventType').value.trim(), date: $('filterDate').value, month: $('filterMonth').value, approval: $('filterApproval').value, eventStatus: $('filterEventStatus').value }; refreshCalendar(); }
-function resetFilters() { state.filters = { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' }; ['filterVenue', 'filterEventType', 'filterDate', 'filterMonth'].forEach((id) => $(id).value = ''); renderFilterOptions(); $('filterApproval').value = ''; $('filterEventStatus').value = ''; refreshCalendar(); }
+function updateFilters() {
+  state.filters = Object.fromEntries(FILTER_IDS.map((id) => [filterKey(id), $(id).value.trim()]));
+  refreshCalendar();
+}
+
+function resetFilters() {
+  FILTER_IDS.forEach((id) => { $(id).value = ''; });
+  updateFilters();
+  renderFilterOptions();
+}
+
+function filterKey(id) {
+  return id.replace(/^filter/, '').replace(/^\w/, (letter) => letter.toLowerCase());
+}
 
 function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : 'Select a calendar date to see its public events.'; }
 function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
