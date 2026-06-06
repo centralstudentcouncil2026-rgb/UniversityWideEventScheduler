@@ -2,6 +2,7 @@ import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-s
 import { currentUser, isManager, isPublic } from './app-rules.js?v=20260606-delete-permissions-v1';
 
 const loginType = document.body.dataset.loginType;
+const portalHref = document.body.dataset.portalHref || 'portal.html';
 const form = document.getElementById('pageLoginForm');
 const message = document.getElementById('loginMessage');
 
@@ -44,7 +45,7 @@ if (form) form.addEventListener('submit', async (event) => {
     }
 
     setMessage('Login successful. Opening CONNECT portal...', 'success');
-    window.location.href = 'portal.html';
+    window.location.href = portalHref;
   } catch (error) {
     clearSession();
     setMessage(loginErrorMessage(error), 'error');

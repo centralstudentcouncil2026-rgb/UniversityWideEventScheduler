@@ -540,7 +540,9 @@ button {
 }
 
 body.is-public .view-selector {
-  display: none;
+  display: inline-flex;
+  margin-left: 0;
+  min-width: 112px;
 }
 
 .public-day-panel {
@@ -718,12 +720,13 @@ body.is-public .view-selector {
 }
 
 .fc .event-week-span-multi {
+  background: transparent;
   border-radius: 0;
   box-shadow: none;
-  margin-left: -3px;
-  margin-right: -3px;
-  padding-left: 5px;
-  padding-right: 5px;
+  margin-left: -2px;
+  margin-right: -2px;
+  overflow: visible;
+  padding: 0;
 }
 
 .fc .event-week-span-start {

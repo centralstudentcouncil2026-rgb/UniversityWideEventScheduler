@@ -4,17 +4,19 @@ window.SUPABASE_CONFIG = Object.freeze({
 });
 
 (() => {
+  const assetBase = new URL('.', document.currentScript?.src || window.location.href);
   const stylesheets = [
     'csc-live-theme.css?v=20260605-accent-horizontal-v1',
-    'connect-calendar-overrides.css?v=20260605-accent-horizontal-v1',
+    'connect-calendar-overrides.css?v=20260606-week-lines-v3',
     'connect-portal-pages.css?v=20260606-sidebar-polish-v1'
   ];
 
   stylesheets.forEach((href) => {
-    if (document.querySelector(`link[href="${href}"]`)) return;
+    const resolvedHref = new URL(href, assetBase).href;
+    if (document.querySelector(`link[href="${href}"], link[href="${resolvedHref}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = href;
+    link.href = resolvedHref;
     document.head.appendChild(link);
   });
 })();
@@ -51,6 +53,7 @@ window.SUPABASE_CONFIG = Object.freeze({
   function normalizeCalendarEventColors() {
     document.querySelectorAll('.fc-event').forEach((eventElement) => {
       if (eventElement.classList.contains('event-super-admin-block') || eventElement.classList.contains('event-blocked')) return;
+      if (eventElement.classList.contains('event-week-span-multi')) return;
 
       const organizationColor = eventElement.style.backgroundColor || eventElement.style.borderColor;
       if (!organizationColor) return;

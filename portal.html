@@ -7,9 +7,9 @@
   <title>CONNECT | Portal</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260605-mobile-layout-v1">
+  <link rel="stylesheet" href="style.css?v=20260606-connected-spans-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260605-accent-horizontal-v1">
-  <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260605-accent-horizontal-v1">
+  <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260606-week-lines-v3">
   <link rel="stylesheet" href="connect-portal-pages.css?v=20260606-sidebar-polish-v1">
 </head>
 <body class="portal-shell">
@@ -77,7 +77,7 @@
   </div>
   <div class="toast-region" id="toastRegion" aria-live="polite"></div>
 
-  <dialog class="modal" id="loginModal"><form class="modal-card" id="loginForm"><div class="modal-header"><div><h3>Account Login</h3><p>Use the separate login pages for CONNECT access.</p></div><button type="button" class="icon-button" data-close="loginModal">&times;</button></div><label class="stack-label">Username<input id="loginUsername" required autocomplete="username"></label><label class="stack-label">Password<input id="loginPassword" type="password" required autocomplete="current-password"></label><div class="modal-actions"><a class="primary-button header-link" href="student-login.html">Student Login</a><a class="secondary-button header-link" href="admin-login.html">Admin Login</a></div></form></dialog>
+  <dialog class="modal" id="loginModal"><form class="modal-card" id="loginForm"><div class="modal-header"><div><h3>Account Access</h3><p>This portal was opened from a role-specific CONNECT access link.</p></div><button type="button" class="icon-button" data-close="loginModal">&times;</button></div><div class="activity-item"><strong>Use your assigned CONNECT link to switch accounts.</strong><p>Sign out first, then open either the student organization login link or the admin login link shared with your role.</p></div><div class="modal-actions"><button class="secondary-button" type="button" data-close="loginModal">Close</button><button class="primary-button" type="button" id="modalLogoutButton">Sign Out</button></div></form></dialog>
 
   <dialog class="modal" id="registerModal"><form class="modal-card" id="registerForm"><div class="modal-header"><div><h3>Request an Account</h3><p>An admin must approve your request before you can log in.</p></div><button type="button" class="icon-button" data-close="registerModal">&times;</button></div><div class="form-grid"><label>Full Name<input id="registerFullName" required></label><label>Username<input id="registerUsername" required autocomplete="username"></label><label>Password<input id="registerPassword" type="password" minlength="8" required autocomplete="new-password"></label><label>Account Type<select id="registerRole"><option value="organization_manager">Organization</option><option value="super_admin">Admin</option></select></label><label class="full-span" id="registerOrganizationWrap">Organization Name<input id="registerOrganizationName" required></label></div><div class="modal-actions"><button class="primary-button">Submit for Approval</button></div></form></dialog>
 
@@ -134,7 +134,7 @@
 
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
-  <script src="supabaseClient.js?v=20260606-connect-project-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260606-delete-rpc-v1"></script>
+  <script src="supabaseClient.js?v=20260606-connect-project-v2"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260607-access-links-v1"></script>
 </body>
 </html>

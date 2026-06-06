@@ -12,6 +12,13 @@ document.addEventListener('click', (event) => {
     window.location.href = 'index.html';
   }
 
+  if (target.id === 'modalLogoutButton') {
+    event.preventDefault();
+    event.stopPropagation();
+    clearSession();
+    window.location.href = 'index.html';
+  }
+
   if (target.id === 'profileButton') {
     event.preventDefault();
     event.stopPropagation();

@@ -36,6 +36,9 @@ function initializePublicCalendar() {
     firstDay: 1,
     height: '100%',
     headerToolbar: false,
+    dayMaxEvents: false,
+    dayMaxEventRows: false,
+    views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
     events: publicEvents(),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
     dateClick: (info) => openPublicDayDialog(info.dateStr, info.dayEl),
@@ -49,6 +52,7 @@ function initializePublicCalendar() {
   const todayButton = $('todayButton');
   const prevButton = $('prevButton');
   const nextButton = $('nextButton');
+  const viewSelector = $('publicViewSelector');
   const closeButton = $('closePublicDayDialog');
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
@@ -56,6 +60,7 @@ function initializePublicCalendar() {
   if (todayButton) todayButton.addEventListener('click', () => state.calendar.today());
   if (prevButton) prevButton.addEventListener('click', () => state.calendar.prev());
   if (nextButton) nextButton.addEventListener('click', () => state.calendar.next());
+  if (viewSelector) viewSelector.addEventListener('change', (event) => state.calendar.changeView(event.target.value));
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', () => $('sidebar') && $('sidebar').classList.add('open'));
   if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));

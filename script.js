@@ -189,10 +189,10 @@ function initializeCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
     initialView: isPublic(state.store) ? 'dayGridMonth' : 'timeGridWeek', firstDay: 1, height: '100%', expandRows: true, nowIndicator: true,
     selectable: true, selectMirror: true, selectMinDistance: 3, longPressDelay: 220, selectLongPressDelay: 220,
-    eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotMinTime: '07:00:00',
-    slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, headerToolbar: false,
+    eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: false, slotMinTime: '07:00:00',
+    slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, dayMaxEvents: false, dayMaxEventRows: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
-    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isMonthFetch(info))); },
+    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info))); },
     datesSet: (info) => { cancelWeekRectangleSelection(); $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
@@ -244,7 +244,9 @@ function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth'
 
 function mountCalendarEvent(info) {
   const accentColor = info.event.extendedProps?.accentColor;
+  const eventColor = info.event.extendedProps?.eventColor || info.event.backgroundColor;
   if (accentColor) info.el.style.setProperty('--event-accent-color', accentColor);
+  if (eventColor) info.el.style.setProperty('--event-fill-color', eventColor);
   deduplicateMonthSpanLabel(info);
 }
 
@@ -255,7 +257,11 @@ function deduplicateMonthSpanLabel(info) {
   else monthSpanLabels.add(recordId);
 }
 
-function isMonthFetch(info) { const days = (info.end - info.start) / 86400000; return days > 7 && days < 60; }
+function isConnectedGridFetch(info) {
+  const viewType = info.view?.type || state.calendar?.view?.type;
+  if (viewType === 'dayGridMonth' || viewType === 'multiMonthYear') return true;
+  return ((info.end - info.start) / 86400000) > 7;
+}
 
 const ORGANIZATION_COLOR_FALLBACKS = ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2', '#BE185D', '#4F46E5', '#0D9488', '#B45309'];
 function organizationColor(store, event) {
@@ -376,8 +382,10 @@ function occurrenceCalendarEvents(event, eventColor, accentColor) {
       backgroundColor: eventColor,
       borderColor: eventColor,
       editable: state.calendar?.view.type !== 'multiMonthYear' && canEditEvent(state.store, event),
-      classNames: weekPart ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`] : [],
-      extendedProps: { type: 'event', record: event, occurrence, accentColor }
+      classNames: weekPart
+        ? ['event-week-span', 'event-week-span-multi', `event-week-span-${weekPart.position}`, weekPart.customLength ? 'event-week-span-custom' : null].filter(Boolean)
+        : [],
+      extendedProps: { type: 'event', record: event, occurrence, accentColor, eventColor }
     };
   });
 }
@@ -408,21 +416,17 @@ function groupConsecutiveOccurrences(occurrences) {
 
 function weekSpanParts(occurrences) {
   const parts = new Map();
-  groupConsecutiveSharedTimeOccurrences(occurrences).forEach((group) => {
+  groupConsecutiveOccurrences(occurrences).forEach((group) => {
     if (group.length < 2) return;
-    group.forEach((occurrence, index) => parts.set(occurrence.id, { position: index === 0 ? 'start' : index === group.length - 1 ? 'end' : 'middle' }));
+    group.forEach((occurrence, index) => {
+      const sharedTimes = group.every((item) => timeInput(item.start_time) === timeInput(occurrence.start_time) && timeInput(item.end_time) === timeInput(occurrence.end_time));
+      parts.set(occurrence.id, {
+        position: index === 0 ? 'start' : index === group.length - 1 ? 'end' : 'middle',
+        customLength: !sharedTimes
+      });
+    });
   });
   return parts;
-}
-
-function groupConsecutiveSharedTimeOccurrences(occurrences) {
-  return [...occurrences].sort((a, b) => a.date.localeCompare(b.date)).reduce((groups, occurrence) => {
-    const current = groups.at(-1);
-    const previous = current?.at(-1);
-    if (!previous || nextDateInput(previous.date) !== occurrence.date || timeInput(previous.start_time) !== timeInput(occurrence.start_time) || timeInput(previous.end_time) !== timeInput(occurrence.end_time)) groups.push([occurrence]);
-    else current.push(occurrence);
-    return groups;
-  }, []);
 }
 
 function matchesFilters(event) {
@@ -568,11 +572,7 @@ function submitEventForm(event) {
   const conflicts = findVenueConflicts(state.store, candidate);
   candidate.conflict_event_ids = conflicts.map((item) => item.id);
   state.pendingEvent = candidate;
-  if (conflicts.length) {
-    log('event_conflict_warning', `"${candidate.title}" has schedule conflicts.`, { event_id: candidate.id, conflict_ids: candidate.conflict_event_ids });
-    state.pendingConflictContinuation = () => openAgreementOrPersist(candidate);
-    return showConflict('Schedule Conflict Warning', 'Another organization has an event during this time. You may continue posting, but review the schedule and venue first.', conflicts, true);
-  }
+  if (conflicts.length) log('event_conflict_warning', `"${candidate.title}" has schedule conflicts.`, { event_id: candidate.id, conflict_ids: candidate.conflict_event_ids });
   openAgreementOrPersist(candidate);
 }
 

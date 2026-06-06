@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="CONNECT student organization login">
   <title>CONNECT | Student Organization Login</title>
-  <link rel="stylesheet" href="style.css?v=20260606-connected-spans-v1">
-  <link rel="stylesheet" href="csc-live-theme.css?v=20260605-accent-horizontal-v1">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260606-sidebar-polish-v1">
+  <link rel="stylesheet" href="../style.css?v=20260606-connected-spans-v1">
+  <link rel="stylesheet" href="../csc-live-theme.css?v=20260605-accent-horizontal-v1">
+  <link rel="stylesheet" href="../connect-portal-pages.css?v=20260606-sidebar-polish-v1">
 </head>
-<body class="auth-active auth-screen login-page" data-login-type="student" data-portal-href="portal.html">
+<body class="auth-active auth-screen login-page" data-login-type="student" data-portal-href="../portal.html">
   <header class="auth-brand">
-    <img class="brand-logo" src="assets/csc-logo.png" alt="CSC logo">
+    <img class="brand-logo" src="../assets/csc-logo.png" alt="CSC logo">
     <div>
       <h1>CONNECT</h1>
       <p>Centralized Organization Network for News, Events, Communication, & Timely Updates</p>
@@ -22,7 +22,7 @@
     <section class="auth-card login-card">
       <span class="login-kind-badge">Student Organization Portal</span>
       <h2>Student Organization Login</h2>
-      <p>Use this page only for approved student organization accounts. Admin accounts must use the separate admin login page.</p>
+      <p>Use this page only for approved student organization accounts.</p>
 
       <form class="auth-form" id="pageLoginForm">
         <label>Username
@@ -36,14 +36,14 @@
 
       <p class="login-message" id="loginMessage" aria-live="polite"></p>
       <div class="login-footer-links">
-        <a href="index.html">Back to public calendar</a>
+        <a href="../public/">Back to public calendar</a>
       </div>
     </section>
   </main>
 
   <p class="auth-footnote">Only approved student organization accounts can enter from this login page.</p>
 
-  <script src="supabaseClient.js?v=20260606-connect-project-v2"></script>
-  <script type="module" src="login.js?v=20260607-access-links-v1"></script>
+  <script src="../supabaseClient.js?v=20260606-connect-project-v2"></script>
+  <script type="module" src="../login.js?v=20260607-access-links-v1"></script>
 </body>
 </html>
