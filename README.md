@@ -42,3 +42,16 @@ Open `http://127.0.0.1:5173/index.html`.
 `schema.sql` documents the relational Auth schema applied to project
 `xtagvyyopokrhvvnseom`. The authoritative migration is recorded in that fresh
 project's Supabase migration history.
+
+## Supabase MCP For Codex
+
+Use this MCP target for CONNECT project work in Codex:
+
+```bash
+codex mcp add supabase --url https://mcp.supabase.com/mcp?project_ref=lcmyqhyxtipzovmgbdtf
+codex mcp login supabase
+```
+
+Then run `/mcp` inside Codex to verify authentication. The deployed frontend
+currently points at `xtagvyyopokrhvvnseom.supabase.co`, so verify the intended
+backend target before applying migrations or changing live data.

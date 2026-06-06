@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
-import { currentUser, isManager, isPublic } from './app-rules.js?v=20260601-public-month-v2';
+import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260606-login-strict-v1';
+import { currentUser, isManager, isPublic } from './app-rules.js?v=20260606-delete-permissions-v1';
 
 const loginType = document.body.dataset.loginType;
 const form = document.getElementById('pageLoginForm');
@@ -34,7 +34,7 @@ if (form) form.addEventListener('submit', async (event) => {
 
   try {
     await authenticate(username, password);
-    const { store } = await loadStore();
+    const store = await loadAuthenticatedStore();
 
     if (!roleAllowed(store)) {
       clearSession();
@@ -47,7 +47,15 @@ if (form) form.addEventListener('submit', async (event) => {
     window.location.href = 'portal.html';
   } catch (error) {
     clearSession();
-    setMessage(error.message || 'Login failed. Please check your username and password.', 'error');
+    setMessage(loginErrorMessage(error), 'error');
     button.disabled = false;
   }
 });
+
+function loginErrorMessage(error) {
+  const messageText = String(error?.message || '');
+  if (/invalid login credentials/i.test(messageText)) return 'Login failed. Please check your username and password.';
+  if (/jwt expired|session expired/i.test(messageText)) return 'Your session expired. Please log in again.';
+  if (/failed to fetch|network|supabase is unavailable/i.test(messageText)) return 'Could not reach Supabase. Check your connection and try again.';
+  return messageText || 'Login failed. Please try again.';
+}

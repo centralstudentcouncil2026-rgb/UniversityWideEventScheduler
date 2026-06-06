@@ -71,6 +71,13 @@ export async function loadStore() {
   }
 }
 
+export async function loadAuthenticatedStore() {
+  if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
+  const store = normalizeStore(await rpc('get_scheduler_store', {}, true));
+  rememberEventIds(store);
+  return store;
+}
+
 export async function saveStore(store) {
   await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
   const deleteFailures = await cleanupRemovedEvents(store);

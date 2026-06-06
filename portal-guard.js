@@ -1,7 +1,7 @@
-import { loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
-import { currentUser, isPublic } from './app-rules.js?v=20260601-public-month-v2';
+import { loadAuthenticatedStore } from './supabase-storage.js?v=20260606-login-strict-v1';
+import { currentUser, isPublic } from './app-rules.js?v=20260606-delete-permissions-v1';
 
-const { store } = await loadStore();
+const store = await loadAuthenticatedStore();
 const user = currentUser(store);
 
 if (isPublic(store)) {

@@ -1,5 +1,5 @@
 import { createId } from './app-data.js?v=20260605-cleanup-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260606-delete-permissions-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260606-login-strict-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canCreateEvents,
   canDeleteEvent, canEditEvent, canViewPrivateEvent, categoryById, currentUser, findApprovedVenueConflict,

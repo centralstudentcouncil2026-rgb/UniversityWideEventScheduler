@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260605-cleanup-v1';
-import { currentUser } from './app-rules.js?v=20260601-public-month-v2';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260606-login-strict-v1';
+import { currentUser } from './app-rules.js?v=20260606-delete-permissions-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');
@@ -22,7 +22,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else queueMicrotask(hydratePortalExtras);
 
 async function hydratePortalExtras() {
-  const { store } = await loadStore();
+  const store = window.CONNECT_BOOTSTRAP_STORE || (await loadStore()).store;
   const user = currentUser(store);
   const office = findStatus(store, 'incampus_offcampus');
   const president = findStatus(store, 'csc_president');
