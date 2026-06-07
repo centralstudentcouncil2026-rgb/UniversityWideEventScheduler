@@ -34,7 +34,7 @@ function initializePublicCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
     initialView: 'dayGridMonth',
     firstDay: 1,
-    height: '100%',
+    height: publicCalendarHeight(),
     headerToolbar: false,
     displayEventTime: false,
     dayMaxEvents: false,
@@ -90,7 +90,22 @@ function bindPublicCalendarResizeObserver() {
 function handlePublicResize() {
   closePublicDayDialog();
   closePublicSidebar();
+  applyPublicCalendarHeight();
   schedulePublicCalendarResize(120);
+}
+
+function publicCalendarHeight() {
+  return isMobilePublicViewport() ? 'auto' : '100%';
+}
+
+function isMobilePublicViewport() {
+  return window.innerWidth <= 900 || (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+}
+
+function applyPublicCalendarHeight() {
+  if (!state.calendar) return;
+  const height = publicCalendarHeight();
+  if (state.calendar.getOption('height') !== height) state.calendar.setOption('height', height);
 }
 
 function openPublicSidebar() {

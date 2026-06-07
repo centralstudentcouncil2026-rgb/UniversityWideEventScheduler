@@ -449,6 +449,11 @@
 }
 
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  body.public-shell {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .public-shell .app-shell,
   .portal-shell .app-shell {
     display: grid;
@@ -461,6 +466,14 @@
     min-height: 100svh;
     min-height: 100dvh;
     overflow: hidden;
+  }
+
+  .public-shell .app-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .public-shell .topbar,
@@ -609,13 +622,28 @@
     padding: 10px;
   }
 
+  .public-shell .calendar-panel {
+    min-height: 620px;
+    overflow: visible;
+  }
+
   #calendar {
     border-radius: 14px;
     min-height: 0;
   }
+
+  .public-shell #calendar {
+    height: auto;
+    min-height: 620px;
+  }
 }
 
 @media (max-width: 768px) {
+  body.public-shell {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .public-shell .app-shell,
   .portal-shell .app-shell {
     display: grid;
@@ -628,6 +656,14 @@
     min-height: 100svh;
     min-height: 100dvh;
     overflow: hidden;
+  }
+
+  .public-shell .app-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .public-shell .sidebar,
@@ -648,9 +684,19 @@
     padding: 10px;
   }
 
+  .public-shell .calendar-panel {
+    min-height: 620px;
+    overflow: visible;
+  }
+
   #calendar {
     border-radius: 14px;
     min-height: 0;
+  }
+
+  .public-shell #calendar {
+    height: auto;
+    min-height: 620px;
   }
 
   .public-actions-row {

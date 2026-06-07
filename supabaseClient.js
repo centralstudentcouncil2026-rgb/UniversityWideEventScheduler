@@ -6,9 +6,9 @@ window.SUPABASE_CONFIG = Object.freeze({
 (() => {
   const assetBase = new URL('.', document.currentScript?.src || window.location.href);
   const stylesheets = [
-    'csc-live-theme.css?v=20260607-ui-polish-v1',
-    'connect-calendar-overrides.css?v=20260607-ui-polish-v1',
-    'connect-portal-pages.css?v=20260607-ui-polish-v1'
+    'csc-live-theme.css?v=20260607-public-mobile-v1',
+    'connect-calendar-overrides.css?v=20260607-public-mobile-v1',
+    'connect-portal-pages.css?v=20260607-public-mobile-v1'
   ];
 
   stylesheets.forEach((href) => {
