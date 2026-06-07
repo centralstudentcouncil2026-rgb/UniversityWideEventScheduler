@@ -15,6 +15,7 @@
     radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.24), transparent 30%),
     radial-gradient(circle at 88% 84%, rgba(37, 99, 235, 0.18), transparent 34%),
     linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(239, 246, 255, 0.92));
+  grid-template-rows: max-content minmax(0, 1fr);
 }
 
 .brand-copy {
@@ -450,7 +451,16 @@
 @media (max-width: 768px) {
   .public-shell .app-shell,
   .portal-shell .app-shell {
-    display: block;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: max-content minmax(0, 1fr);
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: hidden;
   }
 
   .public-shell .sidebar,
@@ -462,11 +472,13 @@
   }
 
   .calendar-panel {
+    min-height: 0;
     padding: 10px;
   }
 
   #calendar {
     border-radius: 14px;
+    min-height: 0;
   }
 
   .public-actions-row {

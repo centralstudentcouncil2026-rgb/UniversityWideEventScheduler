@@ -1467,8 +1467,15 @@ body.is-super-admin .check-row.super-admin-only {
   }
 
   .app-shell {
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: hidden;
   }
 
   .auth-layout {
@@ -1606,6 +1613,14 @@ body.is-super-admin .check-row.super-admin-only {
   .calendar-panel {
     grid-column: 1;
     grid-row: 2;
+    min-height: 0;
+  }
+
+  #calendar,
+  .fc,
+  .fc .fc-view-harness,
+  .fc .fc-view-harness-active {
+    min-height: 0;
   }
 
   .fc .fc-toolbar-title {

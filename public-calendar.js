@@ -2,7 +2,7 @@ import { loadStore } from './supabase-storage.js?v=20260607-security-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-security-v1';
 
 const $ = (id) => document.getElementById(id);
-const state = { store: null, calendar: null, selectedDate: '' };
+const state = { store: null, calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -67,9 +67,35 @@ function initializePublicCalendar() {
   if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));
   document.addEventListener('pointerdown', handlePublicDialogPointerDown);
   document.addEventListener('keydown', handlePublicDialogKeyDown);
-  window.addEventListener('resize', closePublicDayDialog);
+  window.addEventListener('resize', handlePublicResize, { passive: true });
+  window.addEventListener('orientationchange', () => schedulePublicCalendarResize(260), { passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', handlePublicResize, { passive: true });
 
   state.calendar.render();
+  bindPublicCalendarResizeObserver();
+  schedulePublicCalendarResize(0);
+}
+
+function bindPublicCalendarResizeObserver() {
+  if (!window.ResizeObserver || state.resizeObserver) return;
+  const panel = $('calendar') && $('calendar').parentElement;
+  if (!panel) return;
+  state.resizeObserver = new ResizeObserver(() => schedulePublicCalendarResize(60));
+  state.resizeObserver.observe(panel);
+}
+
+function handlePublicResize() {
+  closePublicDayDialog();
+  schedulePublicCalendarResize(120);
+}
+
+function schedulePublicCalendarResize(delay = 0) {
+  clearTimeout(state.resizeTimer);
+  state.resizeTimer = setTimeout(() => {
+    if (!state.calendar) return;
+    state.calendar.updateSize();
+    requestAnimationFrame(() => state.calendar && state.calendar.updateSize());
+  }, delay);
 }
 
 function publicEvents() {

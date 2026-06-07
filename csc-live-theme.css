@@ -366,11 +366,13 @@ body::before {
   }
 
   .calendar-panel {
+    min-height: 0;
     padding: 10px;
   }
 
   #calendar {
     border-radius: 14px;
+    min-height: 0;
   }
 
   .sidebar {

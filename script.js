@@ -34,6 +34,8 @@ const state = {
   selectedDetails: null,
   confirmAction: null,
   weekSelection: null,
+  resizeObserver: null,
+  resizeTimer: 0,
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
   search: ''
@@ -141,8 +143,10 @@ function bindEvents() {
   });
   document.addEventListener('pointerdown', handlePublicDialogPointerDown);
   document.addEventListener('keydown', handlePublicDialogKeyDown);
-  window.addEventListener('resize', debounce(handleResize, 160));
-  window.addEventListener('orientationchange', () => setTimeout(handleResize, 260));
+  const resizeCalendar = debounce(handleResize, 120);
+  window.addEventListener('resize', resizeCalendar, { passive: true });
+  window.addEventListener('orientationchange', () => { handleResize(); setTimeout(handleResize, 260); setTimeout(handleResize, 700); }, { passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCalendar, { passive: true });
 }
 
 function on(id, event, handler, options) {
@@ -261,6 +265,8 @@ function initializeCalendar() {
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
   state.calendar.render();
+  bindCalendarResizeObserver();
+  scheduleCalendarResize(0);
 }
 
 function refreshCalendar() {
@@ -1240,7 +1246,28 @@ function filterKey(id) {
 
 function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : 'Select a calendar date to see its public events.'; }
 function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
-function handleResize() { if (!state.calendar) return; if (!MOBILE_VIEWS.has(state.calendar.view.type)) state.calendar.changeView('timeGridWeek'); state.calendar.updateSize(); }
+function bindCalendarResizeObserver() {
+  if (!window.ResizeObserver || state.resizeObserver) return;
+  const panel = $('calendar') && $('calendar').parentElement;
+  if (!panel) return;
+  state.resizeObserver = new ResizeObserver(() => scheduleCalendarResize(60));
+  state.resizeObserver.observe(panel);
+}
+function scheduleCalendarResize(delay = 0) {
+  clearTimeout(state.resizeTimer);
+  state.resizeTimer = setTimeout(() => {
+    if (!state.calendar) return;
+    state.calendar.updateSize();
+    requestAnimationFrame(() => state.calendar && state.calendar.updateSize());
+  }, delay);
+}
+function handleResize() {
+  if (!state.calendar) return;
+  closePublicDayDialog();
+  closeSidebar();
+  if (!MOBILE_VIEWS.has(state.calendar.view.type)) state.calendar.changeView('timeGridWeek');
+  scheduleCalendarResize(0);
+}
 function openSidebar() { $('sidebar').classList.add('open'); $('mobileScrim').classList.add('open'); }
 function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileScrim').classList.remove('open'); }
 
