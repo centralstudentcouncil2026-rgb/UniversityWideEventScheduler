@@ -16,6 +16,33 @@ const WEEK_SNAP_MINUTES = 15;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
+const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
+const TEXT_LIMITS = {
+  username: 32,
+  fullName: 120,
+  organizationName: 140,
+  organizationType: 80,
+  categoryName: 80,
+  eventTitle: 160,
+  eventType: 80,
+  venue: 140,
+  contactPerson: 120,
+  contactInfo: 160,
+  publicDescription: 1000,
+  purpose: 1000,
+  privateNotes: 1000,
+  adminNotes: 1000,
+  rejectionReason: 500,
+  announcementTitle: 120,
+  announcementContent: 1000,
+  concernTitle: 120,
+  concernDescription: 1200,
+  concernResponse: 1000,
+  blockTitle: 120,
+  blockReason: 500,
+  statusLabel: 80,
+  search: 120
+};
 const PORTAL_TOOL_VISIBILITY = {
   eventRequestsButton: canApproveEvents,
   blockedTimesButton: canManageBlockedTimes,
@@ -125,7 +152,7 @@ function bindEvents() {
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
   on('viewSelector', 'change', (event) => changeView(event.target.value));
-  on('searchInput', 'input', debounce((event) => { state.search = event.target.value.trim().toLowerCase(); refreshCalendar(); }, 180));
+  on('searchInput', 'input', debounce((event) => { state.search = cleanSingleLine(event.target.value).slice(0, TEXT_LIMITS.search).toLowerCase(); refreshCalendar(); }, 180));
   on('registerRole', 'change', updateRegistrationFields);
   on('eventScheduleType', 'change', updateScheduleType);
   on('occurrenceList', 'click', handleOccurrenceListClick);
@@ -164,6 +191,30 @@ function bindSubmitActions(actions) {
 
 function bindDelegatedLists(ids) {
   ids.forEach((id) => on(id, 'click', handleListAction));
+}
+
+function cleanSingleLine(value) {
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function cleanMultiline(value) {
+  return String(value || '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function textLimitError(value, max, label) {
+  return value.length > max ? `${label} must be ${max} characters or fewer.` : '';
+}
+
+function firstTextLimitError(items) {
+  return items.map(([value, max, label]) => textLimitError(value, max, label)).find(Boolean) || '';
+}
+
+function normalizedName(value) {
+  return cleanSingleLine(value).toLowerCase();
 }
 
 function toggleSearch() {
@@ -636,12 +687,12 @@ function readEventForm() {
   const schedule_type = $('eventScheduleType').value;
   const occurrences = schedule_type === 'multi_day' ? readOccurrenceRows() : [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso($('eventDate').value, $('eventEnd').value) }];
   return syncEventRange({
-    ...existing, id: existing?.id || createId(), title: $('eventTitle').value.trim(), event_type: $('eventType').value.trim(),
+    ...existing, id: existing?.id || createId(), title: cleanSingleLine($('eventTitle').value), event_type: cleanSingleLine($('eventType').value),
     organization_id: org?.id || '', organization_name: org?.organization_name || '', category_id: $('eventCategory').value,
-    venue: $('eventVenue').value.trim(), schedule_type, occurrences,
-    expected_attendees: Number($('eventAttendees').value), public_description: $('eventPublicDescription').value.trim(), purpose: $('eventPurpose').value.trim(),
-    contact_person: $('eventContactPerson').value.trim(), contact_info: $('eventContactInfo').value.trim(), private_notes: $('eventPrivateNotes').value.trim(),
-    admin_notes: isSuperAdmin(state.store) ? $('eventAdminNotes').value.trim() : existing?.admin_notes || '', rejection_reason: canApproveEvents(state.store) ? $('eventRejectionReason').value.trim() : existing?.rejection_reason || '',
+    venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
+    expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
+    contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: cleanMultiline($('eventPrivateNotes').value),
+    admin_notes: isSuperAdmin(state.store) ? cleanMultiline($('eventAdminNotes').value) : existing?.admin_notes || '', rejection_reason: canApproveEvents(state.store) ? cleanMultiline($('eventRejectionReason').value) : existing?.rejection_reason || '',
     event_status: $('eventStatus').value, privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
     created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
@@ -743,10 +794,24 @@ function submitEventForm(event) {
 
 function validateEvent(event) {
   if (!event.title || !event.event_type || !event.organization_id || !event.category_id || !event.venue) return 'Complete title, type, organization, category, and venue.';
+  const textError = firstTextLimitError([
+    [event.title, TEXT_LIMITS.eventTitle, 'Event title'],
+    [event.event_type, TEXT_LIMITS.eventType, 'Event type'],
+    [event.venue, TEXT_LIMITS.venue, 'Venue'],
+    [event.public_description, TEXT_LIMITS.publicDescription, 'Public description'],
+    [event.purpose, TEXT_LIMITS.purpose, 'Purpose'],
+    [event.contact_person, TEXT_LIMITS.contactPerson, 'Contact person'],
+    [event.contact_info, TEXT_LIMITS.contactInfo, 'Contact details'],
+    [event.private_notes || '', TEXT_LIMITS.privateNotes, 'Private notes'],
+    [event.admin_notes || '', TEXT_LIMITS.adminNotes, 'Admin notes'],
+    [event.rejection_reason || '', TEXT_LIMITS.rejectionReason, 'Rejection reason']
+  ]);
+  if (textError) return textError;
   if (!event.occurrences.length) return 'Add at least one event day.';
+  if (event.occurrences.some((item) => !item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date))) return 'Each event day needs a valid date.';
   if (event.occurrences.some((item) => !item.start_time || !item.end_time || new Date(item.start_time) >= new Date(item.end_time))) return 'Each event day needs an end time later than its start time.';
   if (new Set(event.occurrences.map((item) => item.date)).size !== event.occurrences.length) return 'Use one schedule row per date.';
-  if (!event.expected_attendees || event.expected_attendees < 1) return 'Expected attendees must be greater than zero.';
+  if (!Number.isInteger(event.expected_attendees) || event.expected_attendees < 1 || event.expected_attendees > 99999) return 'Expected attendees must be between 1 and 99999.';
   if (!event.public_description || !event.purpose || !event.contact_person || !event.contact_info) return 'Complete description, purpose, and contact details.';
   if (isManager(state.store) && event.organization_id !== currentUser(state.store).organization_id) return 'Organization managers can only manage their assigned organization.';
   return '';
@@ -932,7 +997,24 @@ function persistMovedCalendarItem(info) {
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
 function renderAnnouncementPreview() { const first = activeAnnouncements(state.store)[0]; $('announcementPreview').innerHTML = first ? `<div class="notice ${classToken(first.priority)}"><strong>${escapeHtml(first.title)}</strong><p>${escapeHtml(first.content)}</p></div>` : '<p class="empty-text">No active announcements.</p>'; }
 function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
-function addAnnouncement(event) { event.preventDefault(); if (!canManageAnnouncements(state.store)) return; const item = { id: createId(), title: $('announcementTitle').value.trim(), content: $('announcementContent').value.trim(), priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${$('announcementExpiry').value}T23:59:59` }; state.store.announcements.push(item); log('announcement_posted', `Posted announcement "${item.title}".`, item); event.target.reset(); persist('Announcement posted.'); renderAnnouncements(); }
+function addAnnouncement(event) {
+  event.preventDefault();
+  if (!canManageAnnouncements(state.store)) return;
+  const title = cleanSingleLine($('announcementTitle').value);
+  const content = cleanMultiline($('announcementContent').value);
+  const expiry = $('announcementExpiry').value;
+  if (!title || !content || !expiry) return showToast('Complete announcement title, content, and expiry date.', 'error');
+  const textError = firstTextLimitError([
+    [title, TEXT_LIMITS.announcementTitle, 'Announcement title'],
+    [content, TEXT_LIMITS.announcementContent, 'Announcement content']
+  ]);
+  if (textError) return showToast(textError, 'error');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) return showToast('Use a valid announcement expiry date.', 'error');
+  const item = { id: createId(), title, content, priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${expiry}T23:59:59` };
+  state.store.announcements.push(item);
+  log('announcement_posted', `Posted announcement "${item.title}".`, item);
+  event.target.reset(); persist('Announcement posted.'); renderAnnouncements();
+}
 
 function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
 function renderNotifications() {
@@ -955,8 +1037,10 @@ function updateAppStatus(key, label) {
   const existing = findStatus(key);
   const next = prompt(`${label} status:`, existing?.status_label || existing?.status || 'Active');
   if (next === null) return;
-  const statusLabelValue = next.trim();
+  const statusLabelValue = cleanSingleLine(next);
   if (!statusLabelValue) return showToast('Status cannot be empty.', 'error');
+  const textError = textLimitError(statusLabelValue, TEXT_LIMITS.statusLabel, 'Status');
+  if (textError) return showToast(textError, 'error');
   if (!Array.isArray(state.store.activityStatuses)) state.store.activityStatuses = [];
   const item = existing || { id: key, key, created_at: new Date().toISOString() };
   Object.assign(item, {
@@ -972,7 +1056,25 @@ function updateAppStatus(key, label) {
 
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }
 function renderConcerns() { const user = currentUser(state.store); const list = isSuperAdmin(state.store) ? state.store.concerns : state.store.concerns.filter((item) => item.organization_id === user.organization_id); const canRespond = canApproveEvents(state.store); $('concernsList').innerHTML = list.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.status)}">${escapeHtml(cap(item.status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.category)} - ${escapeHtml(cap(item.priority))}</p><p>${escapeHtml(item.description)}</p><p>Submitted: ${escapeHtml(formatDateTime(item.created_at))}</p><p>Admin response: ${escapeHtml(item.admin_response || 'Pending')}</p>${canRespond ? `${actionButton('concern-review', item.id, 'Respond', 'secondary-button')}${actionButton('concern-resolve', item.id, 'Resolve', 'primary-button')}${actionButton('concern-reject', item.id, 'Reject', 'danger-button')}` : ''}</div>`).join('') || empty('No concerns'); }
-function addConcern(event) { event.preventDefault(); if (!isManager(state.store)) return; const user = currentUser(state.store); const org = state.store.organizations.find((item) => item.id === user.organization_id); if (!org) return showToast('This account is not assigned to an organization.', 'error'); const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title: $('concernTitle').value.trim(), category: $('concernCategory').value, priority: $('concernPriority').value, description: $('concernDescription').value.trim(), status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.concerns.push(item); log('concern_submitted', `${user.full_name} raised "${item.title}".`, item); event.target.reset(); persist('Concern submitted.'); renderConcerns(); }
+function addConcern(event) {
+  event.preventDefault();
+  if (!isManager(state.store)) return;
+  const user = currentUser(state.store);
+  const org = state.store.organizations.find((item) => item.id === user.organization_id);
+  if (!org) return showToast('This account is not assigned to an organization.', 'error');
+  const title = cleanSingleLine($('concernTitle').value);
+  const description = cleanMultiline($('concernDescription').value);
+  if (!title || !description) return showToast('Complete concern title and description.', 'error');
+  const textError = firstTextLimitError([
+    [title, TEXT_LIMITS.concernTitle, 'Concern title'],
+    [description, TEXT_LIMITS.concernDescription, 'Concern description']
+  ]);
+  if (textError) return showToast(textError, 'error');
+  const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title, category: $('concernCategory').value, priority: $('concernPriority').value, description, status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  state.store.concerns.push(item);
+  log('concern_submitted', `${user.full_name} raised "${item.title}".`, item);
+  event.target.reset(); persist('Concern submitted.'); renderConcerns();
+}
 
 function openDashboard() { if (!requirePermission(!isPublic(state.store), 'Login to view a dashboard.')) return; renderDashboard(); openDialog('dashboardModal'); }
 function renderDashboard() { const user = currentUser(state.store); const events = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id); const upcoming = events.filter((item) => new Date(item.start_time) >= new Date() && eventIsActive(item)); const metrics = isSuperAdmin(state.store) ? [['All posted events', events.length], ['Upcoming programs', upcoming.length], ['Blocked periods', state.store.blockedTimes.length], ['Announcements', activeAnnouncements(state.store).length], ['Open concerns', state.store.concerns.filter((item) => !['resolved', 'rejected'].includes(item.status)).length], ['Conflict warnings', events.filter((item) => item.conflict_event_ids?.length).length], ['Organizations', state.store.organizations.length]] : [['Upcoming events', upcoming.length], ['Submitted events', events.length], ['Postponed / cancelled', events.filter((item) => ['postponed', 'cancelled'].includes(item.event_status)).length], ['Raised concerns', state.store.concerns.filter((item) => item.organization_id === user.organization_id).length], ['Announcements', activeAnnouncements(state.store).length], ['Blocked periods', state.store.blockedTimes.length]];
@@ -996,7 +1098,29 @@ function eventRequestHtml(item) {
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
 function updateBlockTimeFields() { $('blockStart').disabled = $('blockAllDay').checked; $('blockEnd').disabled = $('blockAllDay').checked; }
-function addBlockedTime(event) { event.preventDefault(); if (!canManageBlockedTimes(state.store)) return; const date = $('blockDate').value; const allDay = $('blockAllDay').checked; const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value); const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value); if (new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error'); const item = { id: createId(), title: $('blockTitle').value.trim(), start_time: start, end_time: end, all_day: allDay, reason: $('blockReason').value.trim(), created_by: currentUser(state.store).id, created_at: new Date().toISOString() }; state.store.blockedTimes.push(item); log('blocked_time_created', `Added blocked period "${item.title}".`, item); event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes(); }
+function addBlockedTime(event) {
+  event.preventDefault();
+  if (!canManageBlockedTimes(state.store)) return;
+  const title = cleanSingleLine($('blockTitle').value);
+  const reason = cleanMultiline($('blockReason').value);
+  const date = $('blockDate').value;
+  const allDay = $('blockAllDay').checked;
+  if (!title || !reason || !date) return showToast('Complete blocked-period title, date, and reason.', 'error');
+  const textError = firstTextLimitError([
+    [title, TEXT_LIMITS.blockTitle, 'Blocked-period title'],
+    [reason, TEXT_LIMITS.blockReason, 'Blocked-period reason']
+  ]);
+  if (textError) return showToast(textError, 'error');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return showToast('Use a valid blocked-period date.', 'error');
+  if (!allDay && (!$('blockStart').value || !$('blockEnd').value)) return showToast('Choose start and end times for a partial-day block.', 'error');
+  const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value);
+  const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value);
+  if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
+  const item = { id: createId(), title, start_time: start, end_time: end, all_day: allDay, reason, created_by: currentUser(state.store).id, created_at: new Date().toISOString() };
+  state.store.blockedTimes.push(item);
+  log('blocked_time_created', `Added blocked period "${item.title}".`, item);
+  event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes();
+}
 function renderBlockedTimes() {
   $('blockedTimesList').innerHTML = state.store.blockedTimes.map(blockedTimeHtml).join('') || empty('No blocked periods');
 }
@@ -1006,7 +1130,19 @@ function blockedTimeHtml(item) {
 }
 
 function openCategories() { if (!requirePermission(canManageCategories(state.store), 'This account cannot manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
-function addCategory(event) { event.preventDefault(); if (!canManageCategories(state.store)) return; const item = { id: createId(), name: $('categoryName').value.trim(), color: $('categoryColor').value, active: true }; state.store.categories.push(item); log('category_created', `Created category "${item.name}".`, item); event.target.reset(); persist('Category added.'); renderCategories(); }
+function addCategory(event) {
+  event.preventDefault();
+  if (!canManageCategories(state.store)) return;
+  const name = cleanSingleLine($('categoryName').value);
+  if (!name) return showToast('Category name is required.', 'error');
+  const textError = textLimitError(name, TEXT_LIMITS.categoryName, 'Category name');
+  if (textError) return showToast(textError, 'error');
+  if (state.store.categories.some((item) => normalizedName(item.name) === normalizedName(name))) return showToast('A category with this name already exists.', 'error');
+  const item = { id: createId(), name, color: safeCssColor($('categoryColor').value, '#2563EB'), active: true };
+  state.store.categories.push(item);
+  log('category_created', `Created category "${item.name}".`, item);
+  event.target.reset(); persist('Category added.'); renderCategories();
+}
 function renderCategories() {
   $('categoriesList').innerHTML = state.store.categories.map(categoryHtml).join('');
 }
@@ -1018,7 +1154,23 @@ function categoryHtml(item) {
 }
 
 function openOrganizations() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage organizations.')) return; renderOrganizations(); openDialog('organizationsModal'); }
-function addOrganization(event) { event.preventDefault(); if (!canManageAccounts(state.store)) return; const item = { id: createId(), organization_name: $('organizationName').value.trim(), organization_type: $('organizationType').value.trim(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; state.store.organizations.push(item); log('organization_created', `Created organization "${item.organization_name}".`, item); event.target.reset(); persist('Organization added.'); renderOrganizations(); }
+function addOrganization(event) {
+  event.preventDefault();
+  if (!canManageAccounts(state.store)) return;
+  const organization_name = cleanSingleLine($('organizationName').value);
+  const organization_type = cleanSingleLine($('organizationType').value);
+  if (!organization_name || !organization_type) return showToast('Organization name and type are required.', 'error');
+  const textError = firstTextLimitError([
+    [organization_name, TEXT_LIMITS.organizationName, 'Organization name'],
+    [organization_type, TEXT_LIMITS.organizationType, 'Organization type']
+  ]);
+  if (textError) return showToast(textError, 'error');
+  if (state.store.organizations.some((item) => normalizedName(item.organization_name) === normalizedName(organization_name))) return showToast('An organization with this name already exists.', 'error');
+  const item = { id: createId(), organization_name, organization_type, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  state.store.organizations.push(item);
+  log('organization_created', `Created organization "${item.organization_name}".`, item);
+  event.target.reset(); persist('Organization added.'); renderOrganizations();
+}
 function renderOrganizations() {
   $('organizationsList').innerHTML = state.store.organizations.map(organizationHtml).join('');
 }
@@ -1184,7 +1336,10 @@ function reviewConcern(id) {
   if (!item) return;
   const response = prompt('Admin response:', item.admin_response || '');
   if (response === null) return;
-  item.admin_response = response.trim();
+  const adminResponse = cleanMultiline(response);
+  const textError = textLimitError(adminResponse, TEXT_LIMITS.concernResponse, 'Concern response');
+  if (textError) return showToast(textError, 'error');
+  item.admin_response = adminResponse;
   updateConcernStatus(
     id,
     'in_review',
@@ -1231,7 +1386,7 @@ function confirmAction(message, action) { state.confirmAction = action; $('confi
 function confirmPendingAction() { const action = state.confirmAction; state.confirmAction = null; closeDialog('confirmModal'); action?.(); }
 
 function updateFilters() {
-  state.filters = Object.fromEntries(FILTER_IDS.map((id) => [filterKey(id), $(id).value.trim()]));
+  state.filters = Object.fromEntries(FILTER_IDS.map((id) => [filterKey(id), cleanSingleLine($(id).value)]));
   refreshCalendar();
 }
 
@@ -1274,7 +1429,8 @@ function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileScrim'
 
 async function login(event) {
   event.preventDefault();
-  const username = $('loginUsername').value.trim().toLowerCase();
+  const username = cleanSingleLine($('loginUsername').value).toLowerCase();
+  if (!USERNAME_PATTERN.test(username)) return showToast('Use a valid username.', 'error');
   try {
     await authenticate(username, $('loginPassword').value);
     await reloadStore();
@@ -1296,9 +1452,20 @@ async function logout() {
 }
 async function registerAccount(event) {
   event.preventDefault();
-  const username = $('registerUsername').value.trim().toLowerCase();
+  const username = cleanSingleLine($('registerUsername').value).toLowerCase();
+  const password = $('registerPassword').value;
+  const fullName = cleanSingleLine($('registerFullName').value);
+  const organizationName = cleanSingleLine($('registerOrganizationName').value);
+  if (!USERNAME_PATTERN.test(username)) return showToast('Username can use 3-32 letters, numbers, dots, hyphens, or underscores.', 'error');
+  if (password.length < 10 || password.length > 128) return showToast('Password must be 10 to 128 characters.', 'error');
+  if (!fullName || !organizationName) return showToast('Full name and organization name are required.', 'error');
+  const textError = firstTextLimitError([
+    [fullName, TEXT_LIMITS.fullName, 'Full name'],
+    [organizationName, TEXT_LIMITS.organizationName, 'Organization name']
+  ]);
+  if (textError) return showToast(textError, 'error');
   try {
-    await requestAccount({ username, password: $('registerPassword').value, fullName: $('registerFullName').value.trim(), organizationName: $('registerOrganizationName').value.trim() });
+    await requestAccount({ username, password, fullName, organizationName });
     event.target.reset(); updateRegistrationFields(); closeDialog('registerModal');
     showToast('Account request submitted for admin approval.', 'success');
   } catch (error) { showToast(error.message, 'error'); }

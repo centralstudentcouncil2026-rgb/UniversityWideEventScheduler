@@ -5,6 +5,11 @@ const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
 const form = document.getElementById('pageLoginForm');
 const message = document.getElementById('loginMessage');
+const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
+
+function cleanUsername(value) {
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
 
 function setMessage(text, type = 'error') {
   message.textContent = text;
@@ -28,9 +33,14 @@ function roleError(store) {
 
 if (form) form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const username = document.getElementById('loginUsername').value.trim().toLowerCase();
+  const username = cleanUsername(document.getElementById('loginUsername').value);
   const password = document.getElementById('loginPassword').value;
   const button = form.querySelector('button[type="submit"]');
+
+  if (!USERNAME_PATTERN.test(username) || !password) {
+    setMessage('Enter a valid username and password.', 'error');
+    return;
+  }
 
   button.disabled = true;
   setMessage('Checking your account...', 'success');
