@@ -66,8 +66,8 @@ function initializePublicCalendar() {
     schedulePublicCalendarResize(0);
   });
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
-  if (menuButton) menuButton.addEventListener('click', () => $('sidebar') && $('sidebar').classList.add('open'));
-  if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));
+  if (menuButton) menuButton.addEventListener('click', openPublicSidebar);
+  if (scrim) scrim.addEventListener('click', closePublicSidebar);
   document.addEventListener('pointerdown', handlePublicDialogPointerDown);
   document.addEventListener('keydown', handlePublicDialogKeyDown);
   window.addEventListener('resize', handlePublicResize, { passive: true });
@@ -89,7 +89,18 @@ function bindPublicCalendarResizeObserver() {
 
 function handlePublicResize() {
   closePublicDayDialog();
+  closePublicSidebar();
   schedulePublicCalendarResize(120);
+}
+
+function openPublicSidebar() {
+  $('sidebar')?.classList.add('open');
+  $('mobileScrim')?.classList.add('open');
+}
+
+function closePublicSidebar() {
+  $('sidebar')?.classList.remove('open');
+  $('mobileScrim')?.classList.remove('open');
 }
 
 function schedulePublicCalendarResize(delay = 0) {

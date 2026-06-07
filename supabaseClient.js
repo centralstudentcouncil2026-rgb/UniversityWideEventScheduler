@@ -6,14 +6,14 @@ window.SUPABASE_CONFIG = Object.freeze({
 (() => {
   const assetBase = new URL('.', document.currentScript?.src || window.location.href);
   const stylesheets = [
-    'csc-live-theme.css?v=20260607-mobile-tablet-v1',
-    'connect-calendar-overrides.css?v=20260607-mobile-tablet-v1',
-    'connect-portal-pages.css?v=20260607-mobile-tablet-v1'
+    'csc-live-theme.css?v=20260607-mobile-drawer-v1',
+    'connect-calendar-overrides.css?v=20260607-mobile-drawer-v1',
+    'connect-portal-pages.css?v=20260607-mobile-drawer-v1'
   ];
 
   stylesheets.forEach((href) => {
     const resolvedHref = new URL(href, assetBase).href;
-    if (document.querySelector(`link[href="${href}"], link[href="${resolvedHref}"]`)) return;
+    if ([...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => link.href === resolvedHref || link.getAttribute('href') === href)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = resolvedHref;

@@ -479,8 +479,20 @@
     display: inline-flex;
   }
 
+  .public-shell #mobileMenuButton,
+  .portal-shell #mobileMenuButton {
+    align-self: center;
+    border-color: var(--aup-border);
+    color: var(--aup-blue);
+    flex-direction: column;
+    flex-shrink: 0;
+    height: 44px;
+    width: 44px;
+  }
+
   .public-shell .brand-area,
   .portal-shell .brand-area {
+    align-items: center;
     min-width: 0;
   }
 
@@ -540,10 +552,16 @@
     border-right: 0;
     bottom: 0;
     box-shadow: var(--shadow);
+    display: block;
     left: 0;
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
     max-height: none;
     max-width: min(88vw, 330px);
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 14px;
     padding-top: 16px;
     position: fixed;
@@ -606,8 +624,13 @@
   .public-shell .sidebar,
   .portal-shell .sidebar {
     border-right: 0;
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
     max-height: none;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 14px;
   }
 
