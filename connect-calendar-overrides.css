@@ -131,6 +131,40 @@
   margin-right: 4px !important;
 }
 
+.fc .event-year-span {
+  border-radius: 4px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+  margin-bottom: 1px !important;
+  min-height: 10px !important;
+  padding: 1px 2px !important;
+}
+
+.fc .event-year-span::before {
+  display: none !important;
+}
+
+.fc .event-year-span .fc-event-main {
+  padding-top: 0 !important;
+}
+
+.fc .event-year-span.event-month-span-multi {
+  margin-left: -2px !important;
+  margin-right: -2px !important;
+}
+
+.fc .event-year-span.event-month-span-multi.fc-event-start {
+  border-bottom-left-radius: 4px !important;
+  border-top-left-radius: 4px !important;
+  margin-left: 2px !important;
+}
+
+.fc .event-year-span.event-month-span-multi.fc-event-end {
+  border-bottom-right-radius: 4px !important;
+  border-top-right-radius: 4px !important;
+  margin-right: 2px !important;
+}
+
 .fc .event-week-span-multi {
   --week-line-lane-offset: 0px;
   --week-line-stem-width: 6px;
@@ -194,7 +228,7 @@
   position: absolute;
   top: 0;
   width: var(--week-line-stem-width, 6px);
-  z-index: 3;
+  z-index: 6;
 }
 
 .fc .event-week-span-multi .fc-event-main {
@@ -212,7 +246,7 @@
   padding: 3px 9px;
   position: relative;
   white-space: nowrap;
-  z-index: 3;
+  z-index: 7;
 }
 
 .fc .event-week-span-multi .fc-event-main-frame {

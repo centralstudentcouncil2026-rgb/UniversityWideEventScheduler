@@ -5,7 +5,7 @@ import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rule
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
-const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0 };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -60,6 +60,12 @@ async function refreshPublicStore() {
 
 function publicStoreHasContent(store) {
   return Boolean(store?.events?.length || store?.announcements?.length || store?.activityStatuses?.length);
+}
+
+function publicConnectedViewType(info) {
+  const days = (info.end - info.start) / 86400000;
+  if (days > 45) return 'multiMonthYear';
+  return info.view?.type || state.calendar?.view?.type;
 }
 
 function publicStoreSignature(store) {
@@ -120,8 +126,8 @@ function initializePublicCalendar() {
     dayMaxEvents: false,
     dayMaxEventRows: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
-    events: (_info, success) => success(publicEvents()),
-    datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
+    events: (info, success) => success(publicEvents(publicConnectedViewType(info))),
+    datesSet: (info) => { state.spanLabels.clear(); $('calendarTitle').textContent = info.view.title; },
     dateClick: (info) => openPublicDayDialog(info.dateStr, info.dayEl),
     eventClick: (info) => {
       const panelDate = info.event.extendedProps && info.event.extendedProps.panelDate ? info.event.extendedProps.panelDate : info.event.startStr;
@@ -207,11 +213,11 @@ function schedulePublicCalendarResize(delay = 0) {
   }, delay);
 }
 
-function publicEvents() {
+function publicEvents(viewType = state.calendar?.view.type) {
   const approvedEvents = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
   const dateCounts = publicDateEventCounts(approvedEvents);
-  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts)), []);
+  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts, viewType)), []);
 }
 
 function publicDateEventCounts(events) {
@@ -221,9 +227,9 @@ function publicDateEventCounts(events) {
   }, new Map());
 }
 
-function publicCalendarItems(event, dateCounts) {
+function publicCalendarItems(event, dateCounts, viewType = state.calendar?.view.type) {
   return consecutiveOccurrenceRanges(sortedEventOccurrences(event))
-    .map((range, index) => fullCalendarRangeItem(event, range, index, dateCounts));
+    .map((range, index) => fullCalendarRangeItem(event, range, index, dateCounts, viewType));
 }
 
 function sortedEventOccurrences(event) {
@@ -232,7 +238,7 @@ function sortedEventOccurrences(event) {
     .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.start_time) - new Date(b.start_time));
 }
 
-function fullCalendarRangeItem(event, range, index, dateCounts) {
+function fullCalendarRangeItem(event, range, index, dateCounts, viewType = state.calendar?.view.type) {
   const color = eventPrimaryColor(event);
   const accentColor = eventAccentColor(event);
   const first = range[0];
@@ -250,9 +256,9 @@ function fullCalendarRangeItem(event, range, index, dateCounts) {
     backgroundColor: color,
     borderColor: color,
     classNames: isMultiDay
-      ? ['event-month-span', 'event-month-span-multi', 'public-multi-day-event', densityClass]
+      ? ['event-month-span', viewType === 'multiMonthYear' ? 'event-year-span' : null, 'event-month-span-multi', 'public-multi-day-event', densityClass].filter(Boolean)
       : ['public-single-day-event', densityClass],
-    extendedProps: { event, occurrence: first, panelDate: first.date, accentColor, eventCount: dateCounts.get(first.date) || 1 }
+    extendedProps: { event, occurrence: first, panelDate: first.date, spanKey: `${event.id}::public-range-${index}`, accentColor, eventCount: dateCounts.get(first.date) || 1 }
   };
 }
 
@@ -267,6 +273,10 @@ function publicDensityClass(range, dateCounts) {
 function applyPublicEventAccent(info) {
   const accentColor = info.event.extendedProps && info.event.extendedProps.accentColor;
   if (accentColor) info.el.style.setProperty('--event-accent-color', accentColor);
+  if (!info.el.classList.contains('event-month-span-multi')) return;
+  const spanKey = info.event.extendedProps?.spanKey || info.event.id;
+  if (state.spanLabels.has(spanKey)) info.el.classList.add('event-month-span-continuation');
+  else state.spanLabels.add(spanKey);
 }
 
 function consecutiveOccurrenceRanges(occurrences) {

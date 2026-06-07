@@ -58,6 +58,7 @@ const state = {
   calendar: null,
   pendingEvent: null,
   pendingConflictContinuation: null,
+  pendingCalendarDate: '',
   selectedDetails: null,
   confirmAction: null,
   weekSelection: null,
@@ -226,6 +227,10 @@ async function persist(message = '') {
   try {
     await saveStore(state.store);
     renderAll();
+    if (state.pendingCalendarDate && state.calendar) {
+      state.calendar.gotoDate(state.pendingCalendarDate);
+      state.pendingCalendarDate = '';
+    }
     refreshCalendar();
     if (message) showToast(message, 'success');
     return true;
@@ -301,7 +306,7 @@ function initializeCalendar() {
     eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: true, slotMinTime: '07:00:00',
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, dayMaxEvents: false, dayMaxEventRows: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
-    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info))); },
+    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info), connectedGridViewType(info))); },
     datesSet: (info) => { cancelWeekRectangleSelection(); $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
@@ -326,19 +331,19 @@ function refreshCalendar() {
   if (state.selectedPublicDate) renderPublicDayDialog();
 }
 
-function calendarEvents(monthView = state.calendar?.view.type === 'dayGridMonth') {
+function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.calendar?.view.type) {
   const user = currentUser(state.store);
   const visibleEvents = state.store.events.filter((event) => {
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters);
-  const weekLineLayout = !monthView && state.calendar?.view.type === 'timeGridWeek' ? buildWeekLineLayout(visibleEvents) : new Map();
+  const weekLineLayout = state.calendar?.view.type === 'timeGridWeek' ? buildWeekLineLayout(visibleEvents) : new Map();
   const events = visibleEvents.flatMap((event) => {
     const eventColor = organizationColor(state.store, event);
     const accentColor = eventAccentColor(state.store, event);
     return monthView
-      ? connectedMonthEvents(event, eventColor, accentColor)
+      ? connectedMonthEvents(event, eventColor, accentColor, viewType)
       : occurrenceCalendarEvents(event, eventColor, accentColor, weekLineLayout);
   });
   const blocks = state.store.blockedTimes.map((block) => ({
@@ -375,15 +380,26 @@ function mountCalendarEvent(info) {
 
 function deduplicateMonthSpanLabel(info) {
   if (!info.el.classList.contains('event-month-span-multi')) return;
-  const recordId = info.event.extendedProps.record?.id || info.event.id;
-  if (monthSpanLabels.has(recordId)) info.el.classList.add('event-month-span-continuation');
-  else monthSpanLabels.add(recordId);
+  const spanKey = info.event.extendedProps.monthSpanKey || info.event.extendedProps.record?.id || info.event.id;
+  if (monthSpanLabels.has(spanKey)) info.el.classList.add('event-month-span-continuation');
+  else monthSpanLabels.add(spanKey);
 }
 
 function isConnectedGridFetch(info) {
   const viewType = info.view?.type || state.calendar?.view?.type;
   if (viewType === 'dayGridMonth' || viewType === 'multiMonthYear') return true;
   return ((info.end - info.start) / 86400000) > 7;
+}
+
+function connectedGridViewType(info) {
+  const days = (info.end - info.start) / 86400000;
+  if (days > 45) return 'multiMonthYear';
+  return info.view?.type || state.calendar?.view?.type;
+}
+
+function isConnectedCalendarView() {
+  const viewType = state.calendar?.view?.type;
+  return viewType === 'dayGridMonth' || viewType === 'multiMonthYear';
 }
 
 const ORGANIZATION_COLOR_FALLBACKS = ['#2563EB', '#16A34A', '#DC2626', '#9333EA', '#EA580C', '#0891B2', '#BE185D', '#4F46E5', '#0D9488', '#B45309'];
@@ -522,7 +538,7 @@ function occurrenceCalendarEvents(event, eventColor, accentColor, weekLineLayout
   });
 }
 
-function connectedMonthEvents(event, eventColor, accentColor) {
+function connectedMonthEvents(event, eventColor, accentColor, viewType = state.calendar?.view.type) {
   return groupConsecutiveOccurrences(eventOccurrences(event)).map((group, index) => ({
     id: `${event.id}::month-span-${index}`,
     title: `${event.title} - ${event.organization_name}`,
@@ -532,8 +548,8 @@ function connectedMonthEvents(event, eventColor, accentColor) {
     backgroundColor: eventColor,
     borderColor: eventColor,
     editable: false,
-    classNames: ['event-month-span', group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'],
-    extendedProps: { type: 'event', record: event, occurrences: group, accentColor }
+    classNames: ['event-month-span', viewType === 'multiMonthYear' ? 'event-year-span' : null, group.length > 1 ? 'event-month-span-multi' : 'event-month-span-single'].filter(Boolean),
+    extendedProps: { type: 'event', record: event, occurrences: group, monthSpanKey: `${event.id}::month-span-${index}`, accentColor }
   }));
 }
 
@@ -566,41 +582,47 @@ function buildWeekLineLayout(events) {
   events.forEach((event) => {
     const occurrences = eventOccurrences(event);
     const parts = weekSpanParts(occurrences);
-    occurrences.forEach((occurrence) => {
-      if (!parts.has(occurrence.id)) return;
-      entries.push({
-        key: weekLineKey(event, occurrence),
-        date: occurrence.date,
-        start: new Date(occurrence.start_time).getTime(),
-        end: new Date(occurrence.end_time).getTime()
+    groupConsecutiveOccurrences(occurrences).forEach((group, groupIndex) => {
+      if (group.length < 2) return;
+      group.forEach((occurrence) => {
+        if (!parts.has(occurrence.id)) return;
+        entries.push({
+          key: weekLineKey(event, occurrence),
+          spanKey: `${event.id}::week-span-${groupIndex}`,
+          date: occurrence.date,
+          start: new Date(occurrence.start_time).getTime(),
+          end: new Date(occurrence.end_time).getTime()
+        });
       });
     });
   });
 
-  const byDate = entries.reduce((groups, entry) => {
-    if (!groups.has(entry.date)) groups.set(entry.date, []);
-    groups.get(entry.date).push(entry);
-    return groups;
-  }, new Map());
+  const clusters = overlappingWeekLineClusters(entries);
   const layout = new Map();
 
-  byDate.forEach((dayEntries) => {
-    const clusters = overlappingWeekLineClusters(dayEntries);
-    clusters.forEach((cluster) => {
-      const lanes = [];
-      cluster.sort((a, b) => a.start - b.start || a.end - b.end).forEach((entry) => {
-        let lane = lanes.findIndex((laneEnd) => laneEnd <= entry.start);
-        if (lane < 0) {
-          lane = lanes.length;
-          lanes.push(entry.end);
-        } else {
-          lanes[lane] = entry.end;
-        }
+  clusters.forEach((cluster) => {
+    const spanLanes = new Map();
+    const lanes = [];
+    cluster.sort((a, b) => a.start - b.start || a.end - b.end).forEach((entry) => {
+      if (spanLanes.has(entry.spanKey)) {
+        const lane = spanLanes.get(entry.spanKey);
+        lanes[lane] = Math.max(lanes[lane] || 0, entry.end);
         entry.lane = lane;
-      });
-      const count = lanes.length;
-      cluster.forEach((entry) => layout.set(entry.key, { lane: entry.lane, count }));
+        return;
+      }
+
+      let lane = lanes.findIndex((laneEnd) => laneEnd <= entry.start);
+      if (lane < 0) {
+        lane = lanes.length;
+        lanes.push(entry.end);
+      } else {
+        lanes[lane] = entry.end;
+      }
+      spanLanes.set(entry.spanKey, lane);
+      entry.lane = lane;
     });
+    const count = lanes.length;
+    cluster.forEach((entry) => layout.set(entry.key, { lane: entry.lane, count }));
   });
 
   return layout;
@@ -830,6 +852,7 @@ function saveEvent(candidate) {
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
   log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
+  state.pendingCalendarDate = candidate.occurrences[0]?.date || dateInput(candidate.start_time);
   closeDialog('eventModal'); state.pendingEvent = null; persist('Event saved.');
 }
 
