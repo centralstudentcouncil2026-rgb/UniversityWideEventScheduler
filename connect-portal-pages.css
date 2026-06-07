@@ -469,6 +469,8 @@
   }
 
   .public-shell .app-shell {
+    align-content: start;
+    grid-template-rows: max-content auto;
     height: auto;
     min-height: 100vh;
     min-height: 100svh;
@@ -623,7 +625,8 @@
   }
 
   .public-shell .calendar-panel {
-    min-height: 620px;
+    align-self: start;
+    min-height: 0;
     overflow: visible;
   }
 
@@ -634,71 +637,11 @@
 
   .public-shell #calendar {
     height: auto;
-    min-height: 620px;
+    min-height: 0;
   }
 }
 
 @media (max-width: 768px) {
-  body.public-shell {
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-
-  .public-shell .app-shell,
-  .portal-shell .app-shell {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: max-content minmax(0, 1fr);
-    height: 100vh;
-    height: 100svh;
-    height: 100dvh;
-    min-height: 100vh;
-    min-height: 100svh;
-    min-height: 100dvh;
-    overflow: hidden;
-  }
-
-  .public-shell .app-shell {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100svh;
-    min-height: 100dvh;
-    overflow: visible;
-  }
-
-  .public-shell .sidebar,
-  .portal-shell .sidebar {
-    border-right: 0;
-    height: 100vh;
-    height: 100svh;
-    height: 100dvh;
-    max-height: none;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 14px;
-  }
-
-  .calendar-panel {
-    min-height: 0;
-    padding: 10px;
-  }
-
-  .public-shell .calendar-panel {
-    min-height: 620px;
-    overflow: visible;
-  }
-
-  #calendar {
-    border-radius: 14px;
-    min-height: 0;
-  }
-
-  .public-shell #calendar {
-    height: auto;
-    min-height: 620px;
-  }
-
   .public-actions-row {
     display: none;
   }
