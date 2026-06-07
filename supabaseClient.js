@@ -5,10 +5,11 @@ window.SUPABASE_CONFIG = Object.freeze({
 
 (() => {
   const assetBase = new URL('.', document.currentScript?.src || window.location.href);
+  const assetVersion = '20260607-performance-v1';
   const stylesheets = [
-    'csc-live-theme.css?v=20260607-visual-clean-v1',
-    'connect-calendar-overrides.css?v=20260607-visual-clean-v1',
-    'connect-portal-pages.css?v=20260607-visual-clean-v1'
+    `csc-live-theme.css?v=${assetVersion}`,
+    `connect-calendar-overrides.css?v=${assetVersion}`,
+    `connect-portal-pages.css?v=${assetVersion}`
   ];
 
   stylesheets.forEach((href) => {

@@ -60,5 +60,5 @@ function loginErrorMessage(error) {
   if (/invalid login credentials/i.test(messageText)) return 'Login failed. Please check your username and password.';
   if (/jwt expired|session expired/i.test(messageText)) return 'Your session expired. Please log in again.';
   if (/failed to fetch|network|supabase is unavailable/i.test(messageText)) return 'Could not reach Supabase. Check your connection and try again.';
-  return messageText || 'Login failed. Please try again.';
+  return 'Login failed. Please try again.';
 }

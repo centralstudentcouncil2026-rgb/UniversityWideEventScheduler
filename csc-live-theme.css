@@ -29,7 +29,7 @@ body::before {
     radial-gradient(circle at top left, rgba(250, 204, 21, 0.32), transparent 34%),
     radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.22), transparent 38%),
     linear-gradient(rgba(248, 250, 252, 0.76), rgba(248, 250, 252, 0.86)),
-    url('assets/csc-logo.png') center 54% / min(46vw, 420px) no-repeat;
+    url('assets/csc-logo.png?v=20260607-performance-v1') center 54% / min(46vw, 420px) no-repeat;
   content: '';
   inset: 0;
   opacity: 0.9;

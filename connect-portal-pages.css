@@ -121,6 +121,24 @@
   scrollbar-gutter: stable;
 }
 
+.calendar-panel.is-loading::after {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+  color: var(--aup-navy);
+  content: attr(data-loading-label);
+  font-size: 13px;
+  font-weight: 700;
+  left: 50%;
+  padding: 8px 13px;
+  pointer-events: none;
+  position: absolute;
+  top: 18px;
+  transform: translateX(-50%);
+  z-index: 8;
+}
+
 .public-shell .announcement-preview {
   min-height: 240px;
 }
@@ -222,7 +240,7 @@
   background:
     linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(29, 78, 216, 0.82)),
     radial-gradient(circle at 20% 18%, rgba(250, 204, 21, 0.42), transparent 28%),
-    url('assets/csc-logo.png') center / min(52vw, 520px) no-repeat,
+    url('assets/csc-logo.png?v=20260607-performance-v1') center / min(52vw, 520px) no-repeat,
     #0f172a;
   justify-content: center;
 }

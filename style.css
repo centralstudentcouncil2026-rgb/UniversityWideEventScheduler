@@ -86,7 +86,7 @@ button {
 
 .auth-screen::before,
 .calendar-panel::before {
-  background: url("assets/csc-logo.png") center / contain no-repeat;
+  background: url("assets/csc-logo.png?v=20260607-performance-v1") center / contain no-repeat;
   content: "";
   opacity: 0.045;
   pointer-events: none;

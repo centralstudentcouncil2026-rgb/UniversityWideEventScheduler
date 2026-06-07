@@ -80,6 +80,15 @@ export async function loadStore() {
   }
 }
 
+export async function loadPublicStore() {
+  try {
+    const store = normalizeStore(await rpc('get_scheduler_store'));
+    return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
+  } catch (error) {
+    return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
+  }
+}
+
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
   const store = normalizeStore(await rpc('get_scheduler_store', {}, true));

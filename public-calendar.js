@@ -1,27 +1,81 @@
-import { loadStore } from './supabase-storage.js?v=20260607-security-v1';
+import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260607-security-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260607-performance-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-security-v1';
 
 const $ = (id) => document.getElementById(id);
-const state = { store: null, calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null };
+const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
+const PUBLIC_SLOW_LOAD_MS = 6500;
+const state = { store: null, calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0 };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
-async function initPublicCalendar() {
+function initPublicCalendar() {
   try {
-    state.store = await loadPublicStore();
+    state.store = cachedPublicStore() || emptyPublicStore();
     renderAnnouncements();
     renderStatuses();
     initializePublicCalendar();
+    refreshPublicStore();
   } catch (error) {
     console.error('CONNECT public calendar failed to load:', error);
     showCalendarError();
   }
 }
 
-async function loadPublicStore() {
-  const result = await loadStore();
-  if (result.notice) console.info(result.notice);
-  return result.store;
+async function refreshPublicStore() {
+  setPublicLoading(true);
+  state.loadTimer = setTimeout(() => setPublicLoading(true, 'Still loading calendar data...'), PUBLIC_SLOW_LOAD_MS);
+
+  try {
+    const result = await loadPublicStore();
+    if (result.noticeType === 'error') {
+      if (!publicStoreHasContent(state.store)) state.store = result.store;
+      if (result.notice) console.warn(result.notice);
+      return;
+    }
+
+    state.store = result.store;
+    cachePublicStore(result.store);
+    renderAnnouncements();
+    renderStatuses();
+    state.calendar?.refetchEvents();
+    if (state.selectedDate) openPublicDayDialog(state.selectedDate, null);
+    if (result.notice) console.info(result.notice);
+  } catch (error) {
+    console.error('CONNECT public calendar data refresh failed:', error);
+  } finally {
+    clearTimeout(state.loadTimer);
+    setPublicLoading(false);
+    schedulePublicCalendarResize(0);
+  }
+}
+
+function publicStoreHasContent(store) {
+  return Boolean(store?.events?.length || store?.announcements?.length || store?.activityStatuses?.length);
+}
+
+function cachedPublicStore() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(PUBLIC_STORE_CACHE_KEY) || 'null');
+    return cached && cached.store ? normalizeStore(cached.store) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cachePublicStore(store) {
+  try {
+    localStorage.setItem(PUBLIC_STORE_CACHE_KEY, JSON.stringify({ storedAt: new Date().toISOString(), store }));
+  } catch {
+    // The public cache is an optimization only. Ignore storage quota/private-mode failures.
+  }
+}
+
+function setPublicLoading(isLoading, label = 'Loading calendar...') {
+  const panel = $('calendar')?.parentElement;
+  if (!panel) return;
+  panel.classList.toggle('is-loading', isLoading);
+  panel.dataset.loadingLabel = isLoading ? label : '';
 }
 
 function showCalendarError() {
