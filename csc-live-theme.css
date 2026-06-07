@@ -205,34 +205,6 @@ body::before {
   display: none;
 }
 
-.fc .event-week-span-multi {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 72%, #facc15 165%) !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: #ffffff !important;
-  margin-left: -4px !important;
-  margin-right: -4px !important;
-}
-
-.fc .event-week-span-start {
-  border-bottom-left-radius: 14px !important;
-  border-top-left-radius: 14px !important;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2) !important;
-  margin-left: 0 !important;
-}
-
-.fc .event-week-span-end {
-  border-bottom-right-radius: 14px !important;
-  border-top-right-radius: 14px !important;
-  margin-right: 0 !important;
-}
-
-.fc .event-week-span-middle .fc-event-main-frame,
-.fc .event-week-span-end .fc-event-main-frame {
-  visibility: hidden;
-}
-
 .fc .fc-event-title,
 .fc .fc-event-time {
   font-weight: 800;

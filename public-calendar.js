@@ -58,10 +58,13 @@ function initializePublicCalendar() {
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
 
-  if (todayButton) todayButton.addEventListener('click', () => state.calendar.today());
-  if (prevButton) prevButton.addEventListener('click', () => state.calendar.prev());
-  if (nextButton) nextButton.addEventListener('click', () => state.calendar.next());
-  if (viewSelector) viewSelector.addEventListener('change', (event) => state.calendar.changeView(event.target.value));
+  if (todayButton) todayButton.addEventListener('click', () => { state.calendar.today(); schedulePublicCalendarResize(0); });
+  if (prevButton) prevButton.addEventListener('click', () => { state.calendar.prev(); schedulePublicCalendarResize(0); });
+  if (nextButton) nextButton.addEventListener('click', () => { state.calendar.next(); schedulePublicCalendarResize(0); });
+  if (viewSelector) viewSelector.addEventListener('change', (event) => {
+    state.calendar.changeView(event.target.value);
+    schedulePublicCalendarResize(0);
+  });
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', () => $('sidebar') && $('sidebar').classList.add('open'));
   if (scrim) scrim.addEventListener('click', () => $('sidebar') && $('sidebar').classList.remove('open'));

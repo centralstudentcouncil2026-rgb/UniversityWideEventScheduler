@@ -448,6 +448,146 @@
   }
 }
 
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .public-shell .app-shell,
+  .portal-shell .app-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: max-content minmax(0, 1fr);
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .public-shell .topbar,
+  .portal-shell .topbar {
+    align-items: center;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: 1fr auto;
+    padding: 8px 10px 6px;
+  }
+
+  .public-shell .mobile-only,
+  .portal-shell .mobile-only,
+  .public-shell .mobile-search-button,
+  .portal-shell .mobile-search-button {
+    display: inline-flex;
+  }
+
+  .public-shell .brand-area,
+  .portal-shell .brand-area {
+    min-width: 0;
+  }
+
+  .public-shell .brand-logo,
+  .portal-shell .brand-logo {
+    height: 40px;
+    width: 40px;
+  }
+
+  .public-shell .brand-area p,
+  .portal-shell .brand-area p,
+  .public-shell #todayButton,
+  .portal-shell #todayButton,
+  .portal-shell .print-button {
+    display: none;
+  }
+
+  .public-shell .calendar-nav,
+  .portal-shell .calendar-nav {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    order: 3;
+  }
+
+  .public-shell .calendar-nav h2,
+  .portal-shell .calendar-nav h2 {
+    font-size: 18px;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .portal-shell .toolbar-actions {
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .portal-shell .search-wrap {
+    min-width: 44px;
+    order: 5;
+  }
+
+  .portal-shell .search-wrap input {
+    display: none;
+    position: absolute;
+    right: 10px;
+    top: 62px;
+    width: calc(100vw - 20px);
+    z-index: 35;
+  }
+
+  .portal-shell .search-wrap.open input {
+    display: block;
+  }
+
+  .public-shell .sidebar,
+  .portal-shell .sidebar {
+    border-right: 0;
+    bottom: 0;
+    box-shadow: var(--shadow);
+    left: 0;
+    max-height: none;
+    max-width: min(88vw, 330px);
+    overflow: visible;
+    padding: 14px;
+    padding-top: 16px;
+    position: fixed;
+    top: 0;
+    transform: translateX(-102%);
+    transition: transform 180ms ease;
+    width: 330px;
+    z-index: 60;
+  }
+
+  .public-shell .sidebar.open,
+  .portal-shell .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .public-shell .mobile-scrim,
+  .portal-shell .mobile-scrim {
+    background: rgba(0, 33, 71, 0.36);
+    bottom: 0;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 55;
+  }
+
+  .public-shell .mobile-scrim.open,
+  .portal-shell .mobile-scrim.open {
+    display: block;
+  }
+
+  .calendar-panel {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 0;
+    padding: 10px;
+  }
+
+  #calendar {
+    border-radius: 14px;
+    min-height: 0;
+  }
+}
+
 @media (max-width: 768px) {
   .public-shell .app-shell,
   .portal-shell .app-shell {

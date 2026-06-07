@@ -129,6 +129,10 @@
   --week-line-lane-offset: 0px;
   --week-line-stem-width: 6px;
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-color: transparent !important;
   border-left: 0 !important;
   border-radius: 0 !important;
   border-right: 0 !important;
@@ -138,6 +142,14 @@
   margin-right: -2px !important;
   overflow: visible !important;
   padding: 0 !important;
+}
+
+.fc .event-week-span-multi.fc-event,
+.fc .event-week-span-multi .fc-event-main-frame,
+.fc .event-week-span-multi .fc-event-resizer {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 .fc .fc-timegrid-col-events,
