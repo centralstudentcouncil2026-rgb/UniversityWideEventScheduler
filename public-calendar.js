@@ -5,13 +5,14 @@ import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rule
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
-const state = { store: null, calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0 };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0 };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
 function initPublicCalendar() {
   try {
     state.store = cachedPublicStore() || emptyPublicStore();
+    state.eventSignature = publicStoreSignature(state.store);
     renderAnnouncements();
     renderStatuses();
     initializePublicCalendar();
@@ -23,7 +24,8 @@ function initPublicCalendar() {
 }
 
 async function refreshPublicStore() {
-  setPublicLoading(true);
+  const showBlockingLoader = !publicStoreHasContent(state.store);
+  setPublicLoading(showBlockingLoader);
   state.loadTimer = setTimeout(() => setPublicLoading(true, 'Still loading calendar data...'), PUBLIC_SLOW_LOAD_MS);
 
   try {
@@ -34,11 +36,17 @@ async function refreshPublicStore() {
       return;
     }
 
+    const nextSignature = publicStoreSignature(result.store);
+    const calendarChanged = nextSignature !== state.eventSignature;
     state.store = result.store;
+    state.eventSignature = nextSignature;
     cachePublicStore(result.store);
     renderAnnouncements();
     renderStatuses();
-    state.calendar?.refetchEvents();
+    if (calendarChanged) {
+      if (typeof state.calendar?.batchRendering === 'function') state.calendar.batchRendering(() => state.calendar.refetchEvents());
+      else state.calendar?.refetchEvents();
+    }
     if (state.selectedDate) openPublicDayDialog(state.selectedDate, null);
     if (result.notice) console.info(result.notice);
   } catch (error) {
@@ -52,6 +60,24 @@ async function refreshPublicStore() {
 
 function publicStoreHasContent(store) {
   return Boolean(store?.events?.length || store?.announcements?.length || store?.activityStatuses?.length);
+}
+
+function publicStoreSignature(store) {
+  const events = Array.isArray(store?.events) ? store.events : [];
+  return events
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .map((event) => [
+      event.id,
+      event.title,
+      event.organization_id,
+      event.category_id,
+      event.venue,
+      event.privacy_level,
+      event.event_status,
+      ...sortedEventOccurrences(event).map((occurrence) => `${occurrence.date}:${occurrence.start_time}:${occurrence.end_time}`)
+    ].join('|'))
+    .sort()
+    .join('||');
 }
 
 function cachedPublicStore() {
