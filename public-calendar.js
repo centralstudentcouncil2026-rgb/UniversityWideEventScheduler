@@ -94,7 +94,7 @@ function initializePublicCalendar() {
     dayMaxEvents: false,
     dayMaxEventRows: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
-    events: publicEvents(),
+    events: (_info, success) => success(publicEvents()),
     datesSet: (info) => { $('calendarTitle').textContent = info.view.title; },
     dateClick: (info) => openPublicDayDialog(info.dateStr, info.dayEl),
     eventClick: (info) => {
