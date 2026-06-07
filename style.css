@@ -249,6 +249,13 @@ button {
   min-width: 0;
 }
 
+.period-controls {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .calendar-nav h2 {
   color: var(--aup-navy);
   font-size: 22px;
@@ -1532,14 +1539,20 @@ body.is-super-admin .check-row.super-admin-only {
 
   .calendar-nav {
     grid-column: 1 / -1;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    justify-content: stretch;
     order: 3;
   }
 
   .calendar-nav h2 {
     font-size: 18px;
     margin-left: 0;
-    text-align: center;
+    text-align: right;
+  }
+
+  .period-controls {
+    gap: 8px;
   }
 
   .toolbar-actions {
@@ -1781,12 +1794,11 @@ body.is-super-admin .check-row.super-admin-only {
   }
 
   .calendar-nav {
-    flex-wrap: wrap;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 6px;
   }
 
   .calendar-nav h2 {
-    flex: 1;
     order: 0;
   }
 

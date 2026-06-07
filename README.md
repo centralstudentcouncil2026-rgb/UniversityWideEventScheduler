@@ -1,6 +1,6 @@
-# CORE: University-Wide Event Scheduler
+# CONNECT: University-Wide Event Scheduler
 
-CORE is a static university organization calendar connected to a fresh
+CONNECT is a static university organization calendar connected to a fresh
 Supabase backend. It does not use the original scheduler Supabase project.
 
 ## Deployment
@@ -29,6 +29,47 @@ Manager approves them from the Accounts panel.
 Active organization accounts can post events directly. Admin-blocked periods
 prevent posting, while schedule overlaps remain visible warnings. Events marked
 internal remain visible only to the posting organization and admins.
+
+## User Manual
+
+### Public Calendar
+
+- Open the public site to view approved public events without logging in.
+- Use the Month or Year view to scan university-wide activity.
+- Select a calendar date to inspect the public events scheduled for that day.
+- Open the menu on phone or tablet to view announcements and posted status cards.
+
+### Organization Portal
+
+- Sign in through the organization access link.
+- Post university events from the sidebar.
+- Create single-day or multi-day events, including per-day custom times.
+- Edit or remove events created by the signed-in organization.
+- View approved public events from other organizations and CSC.
+- Raise concerns for admin review.
+
+### Admin Portal
+
+- Sign in through the admin access link.
+- Review, approve, reject, edit, or remove calendar events.
+- Manage blocked dates and times that prevent event posting.
+- Manage announcements, categories, organizations, accounts, and activity logs.
+- Use account presets and toggles to control each account's available tools.
+- Update CSC President and Incampus/Offcampus status cards when authorized.
+
+### Calendar Behavior
+
+- Week and day views keep overlapping events visible.
+- Multi-day week events use connected horizontal and vertical line styling.
+- Month and year views keep multi-day events visually connected.
+- Public events show only public-safe details.
+- Internal events remain visible only to the posting organization and admins.
+
+### Mobile and Tablet Use
+
+- The same public, organization, and admin sites adapt to phone, tablet, and desktop sizes.
+- On touch devices, the sidebar becomes a drawer opened by the menu button.
+- Rotate the device freely; the calendar resizes after viewport and orientation changes.
 
 ## Run Locally
 
