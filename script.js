@@ -1528,7 +1528,7 @@ function changeView(view) {
 
 function returnToCurrentWeek() {
   state.portalViewMode = 'today';
-  state.calendar.changeView('timeGridWeek');
+  state.calendar.changeView('dayGridMonth');
   state.calendar.today();
 }
 
