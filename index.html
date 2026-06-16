@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=20260616-calendar-controls-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-mobile-select-center-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-org-filter-select-v1">
 </head>
 <body class="public-shell is-public">
   <div class="app-shell">
@@ -84,13 +84,19 @@
         </div>
         <button type="button" class="icon-button" id="closePublicFilterModal" aria-label="Close organization filter">&times;</button>
       </div>
-      <div class="public-filter-options" id="publicOrganizationOptions"></div>
+      <label class="public-filter-field">Organization
+        <select id="publicOrganizationSelect" class="view-selector"></select>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" id="clearPublicOrganizationFilter">Show All</button>
+        <button type="button" class="primary-button" id="applyPublicOrganizationFilter">Apply</button>
+      </div>
     </article>
   </dialog>
 
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="public-calendar.js?v=20260616-calendar-controls-v1"></script>
+  <script type="module" src="public-calendar.js?v=20260616-org-filter-select-v1"></script>
 </body>
 </html>

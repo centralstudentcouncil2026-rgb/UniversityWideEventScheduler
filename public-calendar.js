@@ -156,6 +156,8 @@ function initializePublicCalendar() {
   const viewSelector = $('publicViewSelector');
   const filterButton = $('publicFilterButton');
   const filterCloseButton = $('closePublicFilterModal');
+  const filterApplyButton = $('applyPublicOrganizationFilter');
+  const filterClearButton = $('clearPublicOrganizationFilter');
   const closeButton = $('closePublicDayDialog');
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
@@ -167,6 +169,8 @@ function initializePublicCalendar() {
   });
   if (filterButton) filterButton.addEventListener('click', openOrganizationFilter);
   if (filterCloseButton) filterCloseButton.addEventListener('click', closeOrganizationFilter);
+  if (filterApplyButton) filterApplyButton.addEventListener('click', applyOrganizationFilter);
+  if (filterClearButton) filterClearButton.addEventListener('click', clearOrganizationFilter);
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', openPublicSidebar);
   if (scrim) scrim.addEventListener('click', closePublicSidebar);
@@ -281,20 +285,21 @@ function renderOrganizationFilter() {
   const button = $('publicFilterButton');
   if (summary) summary.textContent = selected ? `Showing schedules from ${selected.name}.` : 'Showing all organization schedules.';
   if (button) button.textContent = selected ? selected.name : 'Organizations';
-  const list = $('publicOrganizationOptions');
-  if (!list) return;
-  list.innerHTML = [
-    organizationFilterButton('', 'All organizations'),
-    ...options.map((item) => organizationFilterButton(item.id, item.name))
+  const select = $('publicOrganizationSelect');
+  if (!select) return;
+  select.innerHTML = [
+    '<option value="">All organizations</option>',
+    ...options.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`)
   ].join('');
-  list.querySelectorAll('[data-organization-filter]').forEach((button) => {
-    button.addEventListener('click', () => selectOrganizationFilter(button.dataset.organizationFilter || ''));
-  });
+  select.value = state.selectedOrganizationId;
 }
 
-function organizationFilterButton(id, label) {
-  const selected = state.selectedOrganizationId === id;
-  return `<button type="button" class="public-filter-option${selected ? ' selected' : ''}" data-organization-filter="${escapeHtml(id)}"><span>${escapeHtml(label)}</span>${selected ? '<strong>Selected</strong>' : ''}</button>`;
+function applyOrganizationFilter() {
+  selectOrganizationFilter($('publicOrganizationSelect')?.value || '');
+}
+
+function clearOrganizationFilter() {
+  selectOrganizationFilter('');
 }
 
 function selectOrganizationFilter(id) {
