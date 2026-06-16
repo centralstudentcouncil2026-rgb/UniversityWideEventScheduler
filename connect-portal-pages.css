@@ -489,38 +489,10 @@
   margin: 4px 0 0;
 }
 
-.public-filter-button {
-  max-width: 180px;
+.public-organization-select {
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.public-filter-modal {
-  background: #fff;
-  max-width: min(520px, calc(100vw - 32px));
-  padding: 18px;
-}
-
-.public-filter-modal::backdrop {
-  background: rgba(0, 33, 71, 0.42);
-}
-
-.public-filter-modal .modal-header {
-  margin-bottom: 14px;
-}
-
-.public-filter-field {
-  color: #0f172a;
-  display: grid;
-  font-size: 13px;
-  font-weight: 800;
-  gap: 8px;
-}
-
-.public-filter-field .view-selector {
-  max-width: none;
-  width: 100%;
 }
 
 @media (max-width: 1024px) {
@@ -666,9 +638,8 @@
     gap: 8px;
   }
 
-  .public-filter-button {
+  .public-organization-select {
     max-width: 130px;
-    padding-inline: 10px;
   }
 
   .public-shell .period-controls {
@@ -789,11 +760,11 @@
     width: 40px;
   }
 
-  .public-shell .public-filter-button {
+  .public-shell .public-organization-select {
     order: 1;
   }
 
-  .public-shell .public-filter-button,
+  .public-shell .public-organization-select,
   .public-shell .view-selector {
     min-width: 0;
     width: auto;
@@ -809,7 +780,7 @@
     text-align-last: center;
   }
 
-  .public-shell .public-filter-button {
+  .public-shell .public-organization-select {
     max-width: 142px;
   }
 }
@@ -825,14 +796,14 @@
     width: 38px;
   }
 
-  .public-shell .public-filter-button,
+  .public-shell .public-organization-select,
   .public-shell .view-selector {
     font-size: 13px;
     padding-left: 9px;
     padding-right: 20px;
   }
 
-  .public-shell .public-filter-button {
+  .public-shell .public-organization-select {
     max-width: 124px;
   }
 

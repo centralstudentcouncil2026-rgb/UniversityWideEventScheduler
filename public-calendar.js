@@ -154,10 +154,7 @@ function initializePublicCalendar() {
   const prevButton = $('prevButton');
   const nextButton = $('nextButton');
   const viewSelector = $('publicViewSelector');
-  const filterButton = $('publicFilterButton');
-  const filterCloseButton = $('closePublicFilterModal');
-  const filterApplyButton = $('applyPublicOrganizationFilter');
-  const filterClearButton = $('clearPublicOrganizationFilter');
+  const organizationSelect = $('publicOrganizationSelect');
   const closeButton = $('closePublicDayDialog');
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
@@ -170,10 +167,9 @@ function initializePublicCalendar() {
   if (viewSelector) viewSelector.addEventListener('change', (event) => {
     changePublicView(event.target.value);
   });
-  if (filterButton) filterButton.addEventListener('click', openOrganizationFilter);
-  if (filterCloseButton) filterCloseButton.addEventListener('click', closeOrganizationFilter);
-  if (filterApplyButton) filterApplyButton.addEventListener('click', applyOrganizationFilter);
-  if (filterClearButton) filterClearButton.addEventListener('click', clearOrganizationFilter);
+  if (organizationSelect) organizationSelect.addEventListener('change', (event) => {
+    selectOrganizationFilter(event.target.value);
+  });
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', openPublicSidebar);
   if (scrim) scrim.addEventListener('click', closePublicSidebar);
@@ -275,24 +271,9 @@ function matchesSelectedOrganization(event) {
   return event.organization_id === state.selectedOrganizationId || organizationKey(event.organization_name) === state.selectedOrganizationId;
 }
 
-function openOrganizationFilter() {
-  renderOrganizationFilter();
-  $('publicFilterModal')?.showModal();
-}
-
-function closeOrganizationFilter() {
-  const dialog = $('publicFilterModal');
-  if (dialog?.open) dialog.close();
-}
-
 function renderOrganizationFilter() {
   const options = publicOrganizations();
   if (state.selectedOrganizationId && !options.some((item) => item.id === state.selectedOrganizationId)) state.selectedOrganizationId = '';
-  const selected = options.find((item) => item.id === state.selectedOrganizationId);
-  const summary = $('publicFilterSummary');
-  const button = $('publicFilterButton');
-  if (summary) summary.textContent = selected ? `Showing schedules from ${selected.name}.` : 'Showing all organization schedules.';
-  if (button) button.textContent = selected ? selected.name : 'Organizations';
   const select = $('publicOrganizationSelect');
   if (!select) return;
   select.innerHTML = [
@@ -302,17 +283,8 @@ function renderOrganizationFilter() {
   select.value = state.selectedOrganizationId;
 }
 
-function applyOrganizationFilter() {
-  selectOrganizationFilter($('publicOrganizationSelect')?.value || '');
-}
-
-function clearOrganizationFilter() {
-  selectOrganizationFilter('');
-}
-
 function selectOrganizationFilter(id) {
   state.selectedOrganizationId = id;
-  closeOrganizationFilter();
   renderOrganizationFilter();
   closePublicDayDialog();
   state.calendar?.refetchEvents();
