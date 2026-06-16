@@ -5,6 +5,10 @@ import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rule
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
+const DEFAULT_ANNOUNCEMENT = {
+  title: 'CONNECT is ready for scheduling',
+  content: 'Student organizations may now coordinate university-wide events through CONNECT.'
+};
 const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
@@ -293,8 +297,19 @@ function consecutiveOccurrenceRanges(occurrences) {
 }
 
 function renderAnnouncements() {
-  const announcements = activeAnnouncements(state.store).slice(0, 4);
-  $('announcementPreview').innerHTML = announcements.map((item) => `<div class="notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`).join('') || '<p class="empty-text">No active announcements.</p>';
+  const announcements = activeAnnouncements(state.store).filter((item) => !isDefaultAnnouncement(item)).slice(0, 4);
+  $('announcementPreview').innerHTML = announcements.map(announcementHtml).join('') || announcementHtml(DEFAULT_ANNOUNCEMENT);
+}
+
+function isDefaultAnnouncement(item) {
+  const title = String(item?.title || '').trim().toLowerCase();
+  const content = String(item?.content || '').trim().toLowerCase();
+  return title === DEFAULT_ANNOUNCEMENT.title.toLowerCase()
+    && content === DEFAULT_ANNOUNCEMENT.content.toLowerCase();
+}
+
+function announcementHtml(item) {
+  return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`;
 }
 
 function renderStatuses() {

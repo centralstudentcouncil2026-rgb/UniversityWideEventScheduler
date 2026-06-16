@@ -25,6 +25,10 @@ const APP_STATUS_OPTIONS = [
   'Available later',
   'Online consultation only'
 ];
+const DEFAULT_ANNOUNCEMENT = {
+  title: 'CONNECT is ready for scheduling',
+  content: 'Student organizations may now coordinate university-wide events through CONNECT.'
+};
 const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
 const TEXT_LIMITS = {
   username: 32,
@@ -1027,7 +1031,14 @@ function persistMovedCalendarItem(info) {
 }
 
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
-function renderAnnouncementPreview() { const first = activeAnnouncements(state.store)[0]; $('announcementPreview').innerHTML = first ? `<div class="notice ${classToken(first.priority)}"><strong>${escapeHtml(first.title)}</strong><p>${escapeHtml(first.content)}</p></div>` : '<p class="empty-text">No active announcements.</p>'; }
+function renderAnnouncementPreview() { const first = activeAnnouncements(state.store).find((item) => !isDefaultAnnouncement(item)); $('announcementPreview').innerHTML = first ? announcementPreviewHtml(first) : announcementPreviewHtml(DEFAULT_ANNOUNCEMENT); }
+function isDefaultAnnouncement(item) {
+  const title = String(item?.title || '').trim().toLowerCase();
+  const content = String(item?.content || '').trim().toLowerCase();
+  return title === DEFAULT_ANNOUNCEMENT.title.toLowerCase()
+    && content === DEFAULT_ANNOUNCEMENT.content.toLowerCase();
+}
+function announcementPreviewHtml(item) { return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }
 function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
 function addAnnouncement(event) {
   event.preventDefault();
