@@ -74,7 +74,7 @@ const state = {
   weekSelection: null,
   resizeObserver: null,
   resizeTimer: 0,
-  portalViewMode: 'timeGridWeek',
+  portalViewMode: 'today',
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
   search: ''
@@ -333,7 +333,7 @@ function statusLabel(status) {
 
 function initializeCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
-    initialView: isPublic(state.store) ? 'dayGridMonth' : 'timeGridWeek', firstDay: 0, height: '100%', expandRows: true, nowIndicator: true,
+    initialView: 'dayGridMonth', firstDay: 0, height: '100%', expandRows: true, nowIndicator: true,
     selectable: true, selectMirror: true, selectMinDistance: 3, longPressDelay: 220, selectLongPressDelay: 220,
     eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: true, slotMinTime: '07:00:00',
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, dayMaxEvents: false, dayMaxEventRows: false, fixedWeekCount: false, showNonCurrentDates: false, headerToolbar: false,
