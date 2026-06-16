@@ -16,6 +16,15 @@ const WEEK_SNAP_MINUTES = 15;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
+const APP_STATUS_OPTIONS = [
+  'Available in office',
+  'Not available',
+  'On break',
+  'In a meeting',
+  'Out for university activity',
+  'Available later',
+  'Online consultation only'
+];
 const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
 const TEXT_LIMITS = {
   username: 32,
@@ -1058,10 +1067,15 @@ function updateAppStatus(key, label) {
   const allowed = key === 'csc_president' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
   if (!requirePermission(allowed, `This account cannot update ${label} status.`)) return;
   const existing = findStatus(key);
-  const next = prompt(`${label} status:`, existing?.status_label || existing?.status || 'Active');
+  const currentLabel = existing?.status_label || existing?.status || APP_STATUS_OPTIONS[0];
+  const optionText = APP_STATUS_OPTIONS.map((item, index) => `${index + 1}. ${item}`).join('\n');
+  const next = prompt(`${label} status:\n${optionText}\n\nEnter a number or exact status:`, currentLabel);
   if (next === null) return;
-  const statusLabelValue = cleanSingleLine(next);
-  if (!statusLabelValue) return showToast('Status cannot be empty.', 'error');
+  const choice = cleanSingleLine(next);
+  const numberedChoice = APP_STATUS_OPTIONS[Number(choice) - 1];
+  const exactChoice = APP_STATUS_OPTIONS.find((item) => item.toLowerCase() === choice.toLowerCase());
+  const statusLabelValue = numberedChoice || exactChoice;
+  if (!statusLabelValue) return showToast('Choose one of the listed status options.', 'error');
   const textError = textLimitError(statusLabelValue, TEXT_LIMITS.statusLabel, 'Status');
   if (textError) return showToast(textError, 'error');
   if (!Array.isArray(state.store.activityStatuses)) state.store.activityStatuses = [];

@@ -140,7 +140,7 @@
 }
 
 .public-shell .announcement-preview {
-  min-height: 240px;
+  min-height: 0;
 }
 
 .portal-shell .announcement-preview {
@@ -187,6 +187,10 @@
 .portal-shell .announcement-preview .notice {
   border-left: 0 !important;
   padding-left: 0 !important;
+}
+
+.public-shell .announcement-preview .notice p {
+  margin-bottom: 0;
 }
 
 .status-card strong,
