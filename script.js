@@ -339,7 +339,7 @@ function initializeCalendar() {
       cancelWeekRectangleSelection();
       $('calendarTitle').textContent = info.view.title;
       const selector = $('viewSelector');
-      if (selector) selector.value = state.portalViewMode === 'multiMonthYear' ? 'multiMonthYear' : 'today';
+      if (selector) selector.value = ['dayGridMonth', 'multiMonthYear'].includes(state.portalViewMode) ? state.portalViewMode : 'today';
       updateAvailability();
     },
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
@@ -1514,13 +1514,16 @@ function changeView(view) {
   } else if (view === 'multiMonthYear') {
     state.portalViewMode = 'multiMonthYear';
     state.calendar.changeView('multiMonthYear');
+  } else if (view === 'dayGridMonth') {
+    state.portalViewMode = 'dayGridMonth';
+    state.calendar.changeView('dayGridMonth');
   } else {
     state.portalViewMode = 'today';
     state.calendar.changeView('timeGridWeek');
     state.calendar.today();
   }
   const selector = $('viewSelector');
-  if (selector) selector.value = state.portalViewMode === 'multiMonthYear' ? 'multiMonthYear' : 'today';
+  if (selector) selector.value = ['dayGridMonth', 'multiMonthYear'].includes(state.portalViewMode) ? state.portalViewMode : 'today';
   setTimeout(() => state.calendar.updateSize(), 0);
 }
 function bindCalendarResizeObserver() {

@@ -927,9 +927,9 @@
 }
 
 .portal-shell #viewSelector {
-  flex: 0 1 112px;
-  max-width: 112px;
-  min-width: 86px;
+  flex: 0 1 118px;
+  max-width: 118px;
+  min-width: 92px;
   text-align: center;
   text-align-last: center;
 }
@@ -956,7 +956,7 @@
   }
 
   .portal-shell #viewSelector {
-    min-width: 76px;
+    min-width: 82px;
   }
 }
 
@@ -975,8 +975,8 @@
   }
 
   .portal-shell #viewSelector {
-    flex-basis: 82px;
-    max-width: 82px;
+    flex-basis: 88px;
+    max-width: 88px;
   }
 
   .portal-shell .period-controls {
@@ -1010,8 +1010,8 @@
   }
 
   .portal-shell #viewSelector {
-    flex-basis: 70px;
-    max-width: 70px;
+    flex-basis: 76px;
+    max-width: 76px;
   }
 
   .portal-shell .period-controls {
@@ -1078,6 +1078,37 @@
 .portal-shell .sidebar-section > .text-button {
   min-height: 42px;
   padding-block: 8px;
+}
+
+.portal-shell .modal-actions,
+.public-shell .modal-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.portal-shell .modal-actions button,
+.public-shell .modal-actions button {
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: max-content;
+  white-space: normal;
+  width: auto;
+}
+
+.portal-shell .modal-actions.split-actions {
+  justify-content: space-between;
+}
+
+.portal-shell .modal-actions.split-actions > div {
+  align-items: center;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 }
 
 .portal-shell .notification-bell {
@@ -1150,14 +1181,14 @@
 
   .portal-shell .modal-actions,
   .public-shell .modal-actions {
-    align-items: stretch;
-    display: grid;
-    grid-template-columns: 1fr;
+    align-items: center;
+    justify-content: flex-end;
   }
 
   .portal-shell .modal-actions button,
   .public-shell .modal-actions button {
-    width: 100%;
+    min-width: 0;
+    width: auto;
   }
 
   .portal-shell .activity-item button,
