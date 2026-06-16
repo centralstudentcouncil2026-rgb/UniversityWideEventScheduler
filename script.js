@@ -298,9 +298,6 @@ function renderRole() {
 }
 
 function renderFormOptions() {
-  const user = currentUser(state.store);
-  const organizations = isManager(state.store) ? state.store.organizations.filter((org) => org.id === user.organization_id) : state.store.organizations;
-  fillSelect('eventOrganization', organizations.map((org) => [org.id, org.organization_name]));
   fillSelect('eventCategory', state.store.categories.filter((item) => item.active).map((item) => [item.id, item.name]));
 }
 
