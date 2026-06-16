@@ -920,17 +920,14 @@
   min-width: 0;
 }
 
-.portal-shell .header-create-button {
-  flex: 0 0 auto;
-  min-height: 44px;
-  padding-inline: 14px;
-  white-space: nowrap;
-}
-
 .portal-shell .header-organization-filter {
   flex: 1 1 180px;
   max-width: 220px;
   min-width: 124px;
+}
+
+.portal-shell .floating-create-button {
+  display: none;
 }
 
 .portal-shell #viewSelector {
@@ -960,25 +957,6 @@
   .portal-shell .header-organization-filter {
     max-width: 40vw;
     min-width: 0;
-  }
-
-  .portal-shell .header-create-button {
-    align-items: center;
-    border-radius: 999px;
-    display: inline-flex;
-    font-size: 0;
-    height: 40px;
-    justify-content: center;
-    min-height: 40px;
-    min-width: 40px;
-    padding: 0;
-    width: 40px;
-  }
-
-  .portal-shell .header-create-button::before {
-    content: "+";
-    font-size: 24px;
-    line-height: 1;
   }
 
   .portal-shell #viewSelector {
@@ -1035,13 +1013,6 @@
     padding-right: 18px;
   }
 
-  .portal-shell .header-create-button {
-    height: 36px;
-    min-height: 36px;
-    min-width: 36px;
-    width: 36px;
-  }
-
   .portal-shell #viewSelector {
     flex-basis: 76px;
     max-width: 76px;
@@ -1061,6 +1032,46 @@
     min-height: 36px;
     min-width: 42px;
     padding: 0 6px;
+  }
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .portal-shell #createEventButton {
+    display: none !important;
+  }
+
+  .portal-shell .calendar-panel {
+    position: relative;
+  }
+
+  .portal-shell .floating-create-button {
+    align-items: center;
+    border-radius: 999px;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.2);
+    display: inline-flex;
+    font-size: 28px;
+    height: 46px;
+    justify-content: center;
+    line-height: 1;
+    min-height: 46px;
+    min-width: 46px;
+    padding: 0;
+    position: absolute;
+    right: 16px;
+    top: 12px;
+    width: 46px;
+    z-index: 12;
+  }
+}
+
+@media (max-width: 520px) {
+  .portal-shell .floating-create-button {
+    height: 42px;
+    min-height: 42px;
+    min-width: 42px;
+    right: 12px;
+    top: 8px;
+    width: 42px;
   }
 }
 

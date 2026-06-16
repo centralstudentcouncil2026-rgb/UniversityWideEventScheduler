@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=20260616-calendar-controls-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-admin-header-controls-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-create-schedule-overlay-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -24,7 +24,6 @@
         <div class="brand-copy"><h1>CSC S.Y.N.C.</h1><p>Systemized Year-round Network Calendar</p></div>
       </div>
       <nav class="calendar-nav" aria-label="Calendar navigation">
-        <button class="create-button restricted-only header-create-button" id="createEventButton" type="button"><span>Create Schedule</span></button>
         <select id="headerOrganizationFilter" class="view-selector header-organization-filter" aria-label="Organization filter"></select>
         <select id="viewSelector" class="view-selector" aria-label="Calendar view">
           <option value="today">Today</option>
@@ -42,6 +41,7 @@
     <aside class="sidebar" id="sidebar">
       <section class="sidebar-section admin-action-panel">
         <span class="section-label">Scheduling Actions</span>
+        <button class="create-button restricted-only" id="createEventButton" type="button">Create Schedule</button>
         <button class="secondary-button super-admin-only" id="blockedTimesButton">Block Calendar Dates &amp; Time</button>
         <button class="secondary-button super-admin-only" id="chooseActivityStatusButton">Choose Activity Status</button>
       </section>
@@ -67,6 +67,7 @@
       </section>
     </aside>
     <main class="calendar-panel">
+      <button class="create-button restricted-only floating-create-button" id="mobileCreateEventButton" type="button" aria-label="Create Schedule">+</button>
       <div class="calendar-panel-header">
         <h2 id="calendarTitle">Calendar</h2>
       </div>
