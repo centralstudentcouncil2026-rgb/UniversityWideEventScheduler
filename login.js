@@ -6,6 +6,7 @@ const portalHref = document.body.dataset.portalHref || 'portal.html';
 const form = document.getElementById('pageLoginForm');
 const message = document.getElementById('loginMessage');
 const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
+const MOBILE_ANNOUNCEMENT_LOGIN_FLAG = 'connect_show_mobile_announcements_after_login';
 
 function cleanUsername(value) {
   return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -57,6 +58,7 @@ if (form) form.addEventListener('submit', async (event) => {
     }
 
     setMessage('Login successful. Opening CONNECT portal...', 'success');
+    sessionStorage.setItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG, '1');
     window.location.href = portalHref;
   } catch (error) {
     clearSession();

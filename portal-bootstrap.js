@@ -7,7 +7,7 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260616-announcement-fallback-v1');
+  await import('./script.js?v=20260616-announcement-highlight-v1');
   await import('./portal-wiring.js?v=20260607-security-v1');
 } else {
   window.location.replace('index.html');

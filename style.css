@@ -981,6 +981,29 @@ body.is-super-admin .check-row.super-admin-only {
   margin: 4px 0;
 }
 
+#announcementsModal .modal-card {
+  border-top: 6px solid #D97706;
+}
+
+#announcementsModal .modal-header h3 {
+  color: #7F1D1D;
+}
+
+#announcementsModal .activity-item.notice {
+  background: #FFFBEB;
+  border: 1px solid rgba(217, 119, 6, 0.26);
+  border-left-width: 6px;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(120, 53, 15, 0.08);
+  margin: 10px 0;
+  padding: 14px;
+}
+
+#announcementsModal .activity-item.notice strong {
+  color: #7F1D1D;
+  font-size: 16px;
+}
+
 .dashboard-grid {
   display: grid;
   gap: 12px;

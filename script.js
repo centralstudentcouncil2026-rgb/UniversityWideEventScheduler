@@ -29,6 +29,7 @@ const DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
+const MOBILE_ANNOUNCEMENT_LOGIN_FLAG = 'connect_show_mobile_announcements_after_login';
 const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
 const TEXT_LIMITS = {
   username: 32,
@@ -102,6 +103,7 @@ async function init() {
     renderAll();
     initializeCalendar();
     refreshCalendar();
+    scheduleMobileAnnouncementPopup();
     if (notice) showToast(notice, noticeType);
   } catch (error) {
     console.error('CONNECT portal failed to initialize:', error);
@@ -1031,15 +1033,21 @@ function persistMovedCalendarItem(info) {
 }
 
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
-function renderAnnouncementPreview() { const first = activeAnnouncements(state.store).find((item) => !isDefaultAnnouncement(item)); $('announcementPreview').innerHTML = first ? announcementPreviewHtml(first) : announcementPreviewHtml(DEFAULT_ANNOUNCEMENT); }
+function renderAnnouncementPreview() { const first = visibleAnnouncements()[0]; $('announcementPreview').innerHTML = first ? announcementPreviewHtml(first) : announcementPreviewHtml(DEFAULT_ANNOUNCEMENT); }
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
   return title === DEFAULT_ANNOUNCEMENT.title.toLowerCase()
     && content === DEFAULT_ANNOUNCEMENT.content.toLowerCase();
 }
+function visibleAnnouncements() { return activeAnnouncements(state.store).filter((item) => !isDefaultAnnouncement(item)); }
 function announcementPreviewHtml(item) { return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }
-function renderAnnouncements() { $('announcementsList').innerHTML = activeAnnouncements(state.store).map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('') || empty('No active announcements'); }
+function renderAnnouncements() {
+  const announcements = visibleAnnouncements();
+  $('announcementsList').innerHTML = announcements.length
+    ? announcements.map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('')
+    : `<div class="activity-item notice normal"><strong>${escapeHtml(DEFAULT_ANNOUNCEMENT.title)}</strong><p>${escapeHtml(DEFAULT_ANNOUNCEMENT.content)}</p></div>`;
+}
 function addAnnouncement(event) {
   event.preventDefault();
   if (!canManageAnnouncements(state.store)) return;
@@ -1490,6 +1498,7 @@ async function login(event) {
     }
     event.target.reset(); closeDialog('loginModal');
     showToast(`Logged in as ${user.full_name}.`, 'success');
+    scheduleMobileAnnouncementPopup(true);
   } catch (error) { showToast(error.message, 'error'); }
 }
 async function logout() {
@@ -1543,6 +1552,21 @@ function openDialog(id) {
 function closeDialog(id) {
   const dialog = $(id);
   if (dialog && dialog.open) dialog.close();
+}
+
+function scheduleMobileAnnouncementPopup(force = false) {
+  if (!state.store || isPublic(state.store) || window.innerWidth > MOBILE_BREAKPOINT) return;
+  const loginRedirectForce = sessionStorage.getItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG) === '1';
+  sessionStorage.removeItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG);
+  const user = currentUser(state.store);
+  const storageKey = `connect_mobile_announcements_seen_${user.id || 'user'}`;
+  if (!force && !loginRedirectForce && sessionStorage.getItem(storageKey)) return;
+  sessionStorage.setItem(storageKey, '1');
+  window.setTimeout(() => {
+    if (window.innerWidth > MOBILE_BREAKPOINT || document.querySelector('dialog[open]')) return;
+    renderAnnouncements();
+    openDialog('announcementsModal');
+  }, 450);
 }
 
 function requirePermission(ok, message) {
