@@ -19,6 +19,16 @@ export const SCHEDULE_CATEGORIES = [
   ['meeting', 'Meeting', '#7C3AED'],
   ['others', 'Others', '#64748B']
 ];
+export const ACCOUNT_TYPES = ['CSC', 'OIC'];
+export const ACTIVITY_STATUS_OPTIONS = [
+  'Available in Office',
+  'Not Available',
+  'On Break',
+  'In a Meeting',
+  'Out for University Activity',
+  'Available After an Hour',
+  'Online Consultation Only'
+];
 const ACCOUNT_PERMISSION_DEFAULTS = {
   enabled: true,
   manageAccounts: false,
@@ -59,6 +69,7 @@ export function normalizeStore(store = {}) {
   normalized.categories = normalizeCategories(normalized.categories);
   normalized.events = normalized.events.map(normalizeEvent);
   normalized.blockedTimes = normalized.blockedTimes.map(normalizeBlockedTime);
+  normalized.activityStatuses = normalized.activityStatuses.map(normalizeActivityStatus).filter(Boolean);
   return normalized;
 }
 
@@ -98,8 +109,13 @@ function normalizeUser(user = {}) {
     ...safeUser,
     role: safeUser.role || presetConfig.role,
     account_preset: preset,
+    account_type: ACCOUNT_TYPES.includes(safeUser.account_type) ? safeUser.account_type : defaultAccountType(preset),
     permissions: { ...presetConfig.permissions, ...(safeUser.permissions || {}) }
   };
+}
+
+function defaultAccountType(preset) {
+  return preset === 'head_events' || preset === 'organization' ? 'OIC' : 'CSC';
 }
 
 function presetForRole(role) {
@@ -122,6 +138,7 @@ function normalizeCategories(categories = []) {
 export function storeForPersistence(store) {
   validateSchedulesForPersistence(store);
   validateBlockedTimesForPersistence(store);
+  validateActivityStatusesForPersistence(store);
   return {
     ...store,
     events: store.events.map((event) => ({
@@ -139,6 +156,14 @@ function validateBlockedTimesForPersistence(store) {
     if (!block.start_time || !block.end_time || new Date(block.end_time) <= new Date(block.start_time)) throw new Error('Blocked-period end date and time must be later than start date and time.');
     if (String(block.reason || '').length > 500) throw new Error('Blocked-period reason is too long.');
     if (!block.created_by || !block.created_at) throw new Error('Blocked period requires creator and created date.');
+  });
+}
+
+function validateActivityStatusesForPersistence(store) {
+  (store.activityStatuses || []).forEach((status) => {
+    if (!status.account_id || !ACCOUNT_TYPES.includes(status.account_type)) throw new Error('Activity status requires an account and account type.');
+    if (!ACTIVITY_STATUS_OPTIONS.includes(status.activity_status)) throw new Error('Choose one of the allowed activity status options.');
+    if (!status.updated_at) throw new Error('Activity status requires an updated date.');
   });
 }
 
@@ -191,6 +216,32 @@ function normalizeBlockedTime(block = {}) {
     start_time: start,
     end_time: end
   };
+}
+
+function normalizeActivityStatus(status = {}) {
+  const accountType = normalizeActivityAccountType(status.account_type || status.type || status.key || status.id);
+  const activityStatus = normalizeActivityStatusLabel(status.activity_status || status.status_label || status.status);
+  if (!accountType && !activityStatus) return null;
+  return {
+    ...status,
+    id: status.id || accountType?.toLowerCase() || createId(),
+    account_id: status.account_id || status.updated_by_id || status.user_id || status.key || status.id || 'unknown',
+    account_type: accountType || 'CSC',
+    activity_status: activityStatus || ACTIVITY_STATUS_OPTIONS[0],
+    updated_at: status.updated_at || status.created_at || new Date().toISOString()
+  };
+}
+
+function normalizeActivityAccountType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'oic' || normalized === 'incampus_offcampus' || normalized.includes('office')) return 'OIC';
+  if (normalized === 'csc' || normalized === 'csc_president' || normalized.includes('president')) return 'CSC';
+  return ACCOUNT_TYPES.find((type) => type.toLowerCase() === normalized) || '';
+}
+
+function normalizeActivityStatusLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ACTIVITY_STATUS_OPTIONS.find((option) => option.toLowerCase() === normalized) || '';
 }
 
 function occurrenceFromRange(start_time, end_time, id = createId()) {

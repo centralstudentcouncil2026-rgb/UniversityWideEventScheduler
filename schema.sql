@@ -136,3 +136,54 @@ set block_type = case
   else 'multi_day'
 end
 where block_type is null;
+
+alter table if exists public.profiles add column if not exists account_type text;
+do $$
+begin
+  if to_regclass('public.profiles') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conname = 'profiles_account_type_allowed'
+         and conrelid = 'public.profiles'::regclass
+     ) then
+    alter table public.profiles
+      add constraint profiles_account_type_allowed check (account_type in ('CSC', 'OIC'));
+  end if;
+end $$;
+
+update public.profiles
+set account_type = case
+  when account_type is not null then account_type
+  when role = 'organization_manager' then 'OIC'
+  else 'CSC'
+end
+where account_type is null;
+
+create table if not exists public.activity_statuses (
+  account_id uuid primary key references auth.users(id) on update cascade on delete cascade,
+  account_type text not null check (account_type in ('CSC', 'OIC')),
+  activity_status text not null check (
+    activity_status in (
+      'Available in Office',
+      'Not Available',
+      'On Break',
+      'In a Meeting',
+      'Out for University Activity',
+      'Available After an Hour',
+      'Online Consultation Only'
+    )
+  ),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists activity_statuses_account_type_idx on public.activity_statuses(account_type);
+create index if not exists activity_statuses_updated_at_idx on public.activity_statuses(updated_at);
+
+-- Upsert pattern used by status updates in relational deployments:
+-- insert into public.activity_statuses (account_id, account_type, activity_status, updated_at)
+-- values ('00000000-0000-0000-0000-000000000000', 'CSC', 'Available in Office', now())
+-- on conflict (account_id) do update
+-- set account_type = excluded.account_type,
+--     activity_status = excluded.activity_status,
+--     updated_at = excluded.updated_at;

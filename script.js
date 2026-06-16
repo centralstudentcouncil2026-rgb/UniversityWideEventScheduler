@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260616-block-times-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-block-times-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-activity-status-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-activity-status-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -16,15 +16,6 @@ const WEEK_SNAP_MINUTES = 15;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
-const APP_STATUS_OPTIONS = [
-  'Available in office',
-  'Not available',
-  'On break',
-  'In a meeting',
-  'Out for university activity',
-  'Available later',
-  'Online consultation only'
-];
 const DEFAULT_ANNOUNCEMENT = {
   title: 'CSC S.Y.N.C. is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
@@ -155,14 +146,15 @@ function bindEvents() {
     usersButton: openUsers,
     activityLogButton: openActivityLog,
     chooseActivityStatusButton: chooseActivityStatus,
-    updateOfficeStatusButton: () => updateAppStatus('incampus_offcampus', 'Incampus & Offcampus'),
-    updatePresidentStatusButton: () => updateAppStatus('csc_president', 'CSC President'),
+    updateOfficeStatusButton: () => updateAppStatus('OIC'),
+    updatePresidentStatusButton: () => updateAppStatus('CSC'),
     confirmYesButton: confirmPendingAction
   });
   bindSubmitActions({
     loginForm: login,
     registerForm: registerAccount,
     eventForm: submitEventForm,
+    activityStatusForm: submitActivityStatusForm,
     announcementForm: addAnnouncement,
     concernForm: addConcern,
     blockedTimeForm: addBlockedTime,
@@ -306,6 +298,7 @@ function renderRole() {
 
 function renderFormOptions() {
   fillSelect('eventCategory', state.store.categories.filter((item) => item.active).map((item) => [item.id, item.name]));
+  fillSelect('activityStatusSelect', ACTIVITY_STATUS_OPTIONS.map((item) => [item, item]));
 }
 
 function renderFilterOptions() {
@@ -316,20 +309,20 @@ function renderFilterOptions() {
 }
 
 function renderStatuses() {
-  const office = findStatus('incampus_offcampus');
-  const president = findStatus('csc_president');
-  if ($('officeStatusValue')) $('officeStatusValue').textContent = statusLabel(office);
-  if ($('presidentStatusValue')) $('presidentStatusValue').textContent = statusLabel(president);
+  if ($('cscStatusValue')) $('cscStatusValue').textContent = statusLabel(findStatus('CSC'));
+  if ($('oicStatusValue')) $('oicStatusValue').textContent = statusLabel(findStatus('OIC'));
 }
 
-function findStatus(key) {
+function findStatus(accountType) {
   const statuses = Array.isArray(state.store.activityStatuses) ? state.store.activityStatuses : [];
-  return statuses.find((item) => item.id === key || item.key === key);
+  return statuses
+    .filter((item) => item.account_type === accountType)
+    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))[0];
 }
 
 function statusLabel(status) {
   if (!status) return 'Status not posted';
-  return status.status_label || cap(status.status || '') || 'Status not posted';
+  return status.activity_status || status.status_label || cap(status.status || '') || 'Status not posted';
 }
 
 function initializeCalendar() {
@@ -1119,47 +1112,46 @@ function renderNotifications() {
 }
 
 function chooseActivityStatus() {
-  const choices = [
-    canUpdateOfficeStatus(state.store) && { key: 'incampus_offcampus', label: 'Incampus & Offcampus' },
-    canUpdatePresidentStatus(state.store) && { key: 'csc_president', label: 'CSC President' }
-  ].filter(Boolean);
-  if (!choices.length) return showToast('This account cannot update activity status.', 'error');
-  if (choices.length === 1) return updateAppStatus(choices[0].key, choices[0].label);
-  const optionText = choices.map((item, index) => `${index + 1}. ${item.label}`).join('\n');
-  const next = prompt(`Choose activity status to update:\n${optionText}\n\nEnter a number or exact name:`, choices[0].label);
-  if (next === null) return;
-  const choice = cleanSingleLine(next);
-  const selected = choices[Number(choice) - 1] || choices.find((item) => item.label.toLowerCase() === choice.toLowerCase());
-  if (!selected) return showToast('Choose one of the listed activity status options.', 'error');
-  updateAppStatus(selected.key, selected.label);
+  const user = currentUser(state.store);
+  const accountType = ACCOUNT_TYPES.includes(user.account_type) ? user.account_type : 'CSC';
+  updateAppStatus(accountType);
 }
 
-function updateAppStatus(key, label) {
-  const allowed = key === 'csc_president' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
-  if (!requirePermission(allowed, `This account cannot update ${label} status.`)) return;
-  const existing = findStatus(key);
-  const currentLabel = existing?.status_label || existing?.status || APP_STATUS_OPTIONS[0];
-  const optionText = APP_STATUS_OPTIONS.map((item, index) => `${index + 1}. ${item}`).join('\n');
-  const next = prompt(`${label} status:\n${optionText}\n\nEnter a number or exact status:`, currentLabel);
-  if (next === null) return;
-  const choice = cleanSingleLine(next);
-  const numberedChoice = APP_STATUS_OPTIONS[Number(choice) - 1];
-  const exactChoice = APP_STATUS_OPTIONS.find((item) => item.toLowerCase() === choice.toLowerCase());
-  const statusLabelValue = numberedChoice || exactChoice;
-  if (!statusLabelValue) return showToast('Choose one of the listed status options.', 'error');
+function updateAppStatus(accountType) {
+  const allowed = accountType === 'CSC' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
+  if (!requirePermission(allowed, `This account cannot update ${accountType} status.`)) return;
+  const existing = findStatus(accountType);
+  const currentLabel = existing?.activity_status || existing?.status_label || ACTIVITY_STATUS_OPTIONS[0];
+  $('activityStatusAccountType').value = accountType;
+  $('activityStatusTitle').textContent = `${accountType} Activity Status`;
+  fillSelect('activityStatusSelect', ACTIVITY_STATUS_OPTIONS.map((item) => [item, item]), currentLabel);
+  openDialog('activityStatusModal');
+}
+
+function submitActivityStatusForm(event) {
+  event.preventDefault();
+  const accountType = $('activityStatusAccountType').value;
+  const statusLabelValue = $('activityStatusSelect').value;
+  if (!ACCOUNT_TYPES.includes(accountType) || !ACTIVITY_STATUS_OPTIONS.includes(statusLabelValue)) return showToast('Choose one of the listed status options.', 'error');
+  const allowed = accountType === 'CSC' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
+  if (!requirePermission(allowed, `This account cannot update ${accountType} status.`)) return;
   const textError = textLimitError(statusLabelValue, TEXT_LIMITS.statusLabel, 'Status');
   if (textError) return showToast(textError, 'error');
+  const user = currentUser(state.store);
+  const existing = findStatus(accountType);
   if (!Array.isArray(state.store.activityStatuses)) state.store.activityStatuses = [];
-  const item = existing || { id: key, key, created_at: new Date().toISOString() };
+  const item = existing || { id: accountType.toLowerCase(), created_at: new Date().toISOString() };
   Object.assign(item, {
-    status: statusLabelValue.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'active',
-    status_label: statusLabelValue,
+    account_id: user.id,
+    account_type: accountType,
+    activity_status: statusLabelValue,
     updated_at: new Date().toISOString(),
-    updated_by: currentUser(state.store).full_name
+    updated_by: user.full_name
   });
   if (!existing) state.store.activityStatuses.push(item);
-  log('app_status_updated', `${currentUser(state.store).full_name} updated ${label} status to "${statusLabelValue}".`, item);
-  persist(`${label} status updated.`);
+  log('app_status_updated', `${user.full_name} updated ${accountType} status to "${statusLabelValue}".`, item);
+  closeDialog('activityStatusModal');
+  persist(`${accountType} status updated.`);
 }
 
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }
@@ -1319,8 +1311,9 @@ function userHtml(user) {
   const organization = state.store.organizations.find((org) => org.id === user.organization_id);
   const permissions = user.permissions || {};
   const presetOptions = Object.entries(ACCOUNT_PRESETS).map(([value, preset]) => `<option value="${escapeHtml(value)}"${user.account_preset === value ? ' selected' : ''}>${escapeHtml(preset.label)}</option>`).join('');
+  const accountTypeOptions = ACCOUNT_TYPES.map((type) => `<option value="${escapeHtml(type)}"${user.account_type === type ? ' selected' : ''}>${escapeHtml(type)}</option>`).join('');
   const toggles = ACCOUNT_PERMISSION_FIELDS.map(({ key, label }) => `<label class="permission-toggle"><input type="checkbox" data-account-permission="${escapeHtml(key)}" data-user-id="${escapeHtml(user.id)}"${permissions[key] !== false && permissions[key] ? ' checked' : ''}>${escapeHtml(label)}</label>`).join('');
-  return `<div class="activity-item account-card"><div class="account-card-head"><div><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.account_preset || user.role))}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div><label>Preset<select data-account-preset data-user-id="${escapeHtml(user.id)}">${presetOptions}</select></label></div><div class="permission-grid">${toggles}</div></div>`;
+  return `<div class="activity-item account-card"><div class="account-card-head"><div><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.account_preset || user.role))} - ${escapeHtml(user.account_type || 'CSC')}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div><div class="account-card-controls"><label>Preset<select data-account-preset data-user-id="${escapeHtml(user.id)}">${presetOptions}</select></label><label>Account Type<select data-account-type data-user-id="${escapeHtml(user.id)}">${accountTypeOptions}</select></label></div></div><div class="permission-grid">${toggles}</div></div>`;
 }
 
 const ACCOUNT_PERMISSION_FIELDS = [
@@ -1331,8 +1324,8 @@ const ACCOUNT_PERMISSION_FIELDS = [
   { key: 'deleteAllEvents', label: 'Delete all events' },
   { key: 'manageBlockedTimes', label: 'Manage blocked times' },
   { key: 'manageAnnouncements', label: 'Manage announcements' },
-  { key: 'updatePresidentStatus', label: 'Update CSC President status' },
-  { key: 'updateOfficeStatus', label: 'Update Incampus/Offcampus status' },
+  { key: 'updatePresidentStatus', label: 'Update CSC status' },
+  { key: 'updateOfficeStatus', label: 'Update OIC status' },
   { key: 'manageCategories', label: 'Manage categories' }
 ];
 
@@ -1343,12 +1336,16 @@ async function handleUserPermissionChange(event) {
   if (!user) return;
   const previousUser = {
     account_preset: user.account_preset,
+    account_type: user.account_type,
     role: user.role,
     permissions: { ...(user.permissions || {}) }
   };
 
   if (target.matches('[data-account-preset]')) {
     applyAccountPreset(user, target.value);
+  } else if (target.matches('[data-account-type]')) {
+    if (!ACCOUNT_TYPES.includes(target.value)) return;
+    user.account_type = target.value;
   } else if (target.matches('[data-account-permission]')) {
     user.permissions = { ...user.permissions, [target.dataset.accountPermission]: target.checked };
   } else {
@@ -1372,6 +1369,7 @@ function applyAccountPreset(user, presetName) {
   const preset = ACCOUNT_PRESETS[presetName] || ACCOUNT_PRESETS.organization;
   user.account_preset = ACCOUNT_PRESETS[presetName] ? presetName : 'organization';
   user.role = preset.role;
+  user.account_type = user.account_preset === 'head_events' || user.account_preset === 'organization' ? 'OIC' : 'CSC';
   user.permissions = { ...preset.permissions };
 }
 

@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260607-security-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260607-performance-v1';
+import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-activity-status-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260616-activity-status-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-security-v1';
 
 const $ = (id) => document.getElementById(id);
@@ -407,10 +407,19 @@ function announcementHtml(item) {
 
 function renderStatuses() {
   const statuses = Array.isArray(state.store.activityStatuses) ? state.store.activityStatuses : [];
-  const office = statuses.find((item) => item.id === 'incampus_offcampus' || item.key === 'incampus_offcampus');
-  const president = statuses.find((item) => item.id === 'csc_president' || item.key === 'csc_president');
-  $('officeStatusValue').textContent = (office && office.status_label) || readableStatus(office && office.status) || 'Status not posted';
-  $('presidentStatusValue').textContent = (president && president.status_label) || readableStatus(president && president.status) || 'Status not posted';
+  $('cscStatusValue').textContent = publicStatusLabel(latestStatusForType(statuses, 'CSC'));
+  $('oicStatusValue').textContent = publicStatusLabel(latestStatusForType(statuses, 'OIC'));
+}
+
+function latestStatusForType(statuses, accountType) {
+  return statuses
+    .filter((item) => item.account_type === accountType)
+    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))[0];
+}
+
+function publicStatusLabel(status) {
+  if (!status) return 'Status not posted';
+  return status.activity_status || status.status_label || readableStatus(status.status) || 'Status not posted';
 }
 
 function openPublicDayDialog(date, anchorEl) {

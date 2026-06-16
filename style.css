@@ -1250,6 +1250,13 @@ body.is-super-admin .check-row.super-admin-only {
   margin: 5px 0 0;
 }
 
+.account-card-controls {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+}
+
 .form-grid {
   display: grid;
   gap: 14px;
@@ -1844,6 +1851,10 @@ body.is-super-admin .check-row.super-admin-only {
   .split-actions > div {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .account-card-controls {
+    grid-template-columns: 1fr;
   }
 
   .details-list {
