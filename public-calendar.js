@@ -13,7 +13,7 @@ const LEGACY_DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
-const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', publicViewMode: 'today', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -128,15 +128,21 @@ function showCalendarError() {
 function initializePublicCalendar() {
   state.calendar = new FullCalendar.Calendar($('calendar'), {
     initialView: 'dayGridMonth',
-    firstDay: 1,
+    firstDay: 0,
     height: publicCalendarHeight(),
     headerToolbar: false,
     displayEventTime: false,
     dayMaxEvents: false,
     dayMaxEventRows: false,
+    fixedWeekCount: false,
+    showNonCurrentDates: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
     events: (info, success) => success(publicEvents(publicConnectedViewType(info))),
-    datesSet: (info) => { state.spanLabels.clear(); $('calendarTitle').textContent = info.view.title; },
+    datesSet: (info) => {
+      state.spanLabels.clear();
+      $('calendarTitle').textContent = info.view.title;
+      syncPublicViewControls(info.view.type);
+    },
     dateClick: (info) => openPublicDayDialog(info.dateStr, info.dayEl),
     eventClick: (info) => {
       const panelDate = info.event.extendedProps && info.event.extendedProps.panelDate ? info.event.extendedProps.panelDate : info.event.startStr;
@@ -157,8 +163,7 @@ function initializePublicCalendar() {
   if (prevButton) prevButton.addEventListener('click', () => { state.calendar.prev(); schedulePublicCalendarResize(0); });
   if (nextButton) nextButton.addEventListener('click', () => { state.calendar.next(); schedulePublicCalendarResize(0); });
   if (viewSelector) viewSelector.addEventListener('change', (event) => {
-    state.calendar.changeView(event.target.value);
-    schedulePublicCalendarResize(0);
+    changePublicView(event.target.value);
   });
   if (filterButton) filterButton.addEventListener('click', openOrganizationFilter);
   if (filterCloseButton) filterCloseButton.addEventListener('click', closeOrganizationFilter);
@@ -172,9 +177,29 @@ function initializePublicCalendar() {
   if (window.visualViewport) window.visualViewport.addEventListener('resize', handlePublicResize, { passive: true });
 
   state.calendar.render();
+  changePublicView('today');
   renderOrganizationFilter();
   bindPublicCalendarResizeObserver();
   schedulePublicCalendarResize(0);
+}
+
+function changePublicView(value) {
+  state.publicViewMode = value === 'multiMonthYear' ? 'multiMonthYear' : value === 'dayGridMonth' ? 'dayGridMonth' : 'today';
+  if (state.publicViewMode === 'today') {
+    state.calendar.changeView('dayGridMonth');
+    state.calendar.today();
+  } else {
+    state.calendar.changeView(state.publicViewMode);
+  }
+  syncPublicViewControls(state.calendar.view.type);
+  schedulePublicCalendarResize(0);
+}
+
+function syncPublicViewControls(viewType = state.calendar?.view.type) {
+  const selector = $('publicViewSelector');
+  if (selector) selector.value = state.publicViewMode;
+  const showPeriodButtons = state.publicViewMode === 'dayGridMonth' && viewType === 'dayGridMonth';
+  $('prevButton')?.closest('.period-controls')?.classList.toggle('is-hidden', !showPeriodButtons);
 }
 
 function bindPublicCalendarResizeObserver() {

@@ -256,6 +256,10 @@ button {
   gap: 8px;
 }
 
+.period-controls.is-hidden {
+  display: none !important;
+}
+
 .toolbar-actions {
   align-items: center;
   display: flex;
@@ -536,9 +540,11 @@ button {
   border-bottom: 1px solid var(--aup-border);
   display: flex;
   flex: 0 0 auto;
+  justify-content: center;
   min-height: 58px;
   padding: 14px 18px 12px;
   position: relative;
+  text-align: center;
   z-index: 1;
 }
 
@@ -549,6 +555,7 @@ button {
   letter-spacing: 0;
   line-height: 1.15;
   margin: 0;
+  width: 100%;
 }
 
 .calendar-panel::before {
