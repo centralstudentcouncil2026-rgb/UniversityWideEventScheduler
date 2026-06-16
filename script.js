@@ -83,7 +83,7 @@ const state = {
   weekSelection: null,
   resizeObserver: null,
   resizeTimer: 0,
-  portalViewMode: 'today',
+  portalViewMode: 'timeGridWeek',
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
   search: ''
@@ -173,6 +173,9 @@ function bindEvents() {
   bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'categoriesList', 'organizationsList', 'accountRequestsList']);
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
+  on('viewSelector', 'pointerdown', (event) => {
+    if (event.currentTarget.value === 'today') returnToCurrentWeek();
+  });
   on('viewSelector', 'change', (event) => changeView(event.target.value));
   on('headerOrganizationFilter', 'change', (event) => {
     state.filters.organization = event.target.value;
@@ -336,7 +339,7 @@ function initializeCalendar() {
       cancelWeekRectangleSelection();
       $('calendarTitle').textContent = info.view.title;
       const selector = $('viewSelector');
-      if (selector) selector.value = ['dayGridMonth', 'multiMonthYear'].includes(state.portalViewMode) ? state.portalViewMode : 'today';
+      if (selector) selector.value = portalSelectorValue();
       updateAvailability();
     },
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
@@ -1512,17 +1515,27 @@ function changeView(view) {
   } else if (view === 'multiMonthYear') {
     state.portalViewMode = 'multiMonthYear';
     state.calendar.changeView('multiMonthYear');
-  } else if (view === 'dayGridMonth') {
-    state.portalViewMode = 'dayGridMonth';
-    state.calendar.changeView('dayGridMonth');
-  } else {
-    state.portalViewMode = 'today';
+  } else if (view === 'timeGridWeek') {
+    state.portalViewMode = 'timeGridWeek';
     state.calendar.changeView('timeGridWeek');
-    state.calendar.today();
+  } else {
+    returnToCurrentWeek();
   }
   const selector = $('viewSelector');
-  if (selector) selector.value = ['dayGridMonth', 'multiMonthYear'].includes(state.portalViewMode) ? state.portalViewMode : 'today';
+  if (selector) selector.value = portalSelectorValue();
   setTimeout(() => state.calendar.updateSize(), 0);
+}
+
+function returnToCurrentWeek() {
+  state.portalViewMode = 'today';
+  state.calendar.changeView('timeGridWeek');
+  state.calendar.today();
+}
+
+function portalSelectorValue() {
+  if (state.portalViewMode === 'multiMonthYear') return 'multiMonthYear';
+  if (state.portalViewMode === 'timeGridWeek') return 'timeGridWeek';
+  return 'today';
 }
 function bindCalendarResizeObserver() {
   if (!window.ResizeObserver || state.resizeObserver) return;
