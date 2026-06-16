@@ -546,7 +546,7 @@
   }
 
   .public-shell .topbar {
-    margin-bottom: 46px;
+    margin-bottom: 52px;
   }
 
   .public-shell .mobile-only,
@@ -611,20 +611,21 @@
   .public-shell .calendar-nav,
   .portal-shell .calendar-nav {
     grid-column: 1 / -1;
-    display: grid;
     justify-content: stretch;
     order: 3;
   }
 
   .public-shell .calendar-nav {
+    align-items: center;
     background: transparent;
-    grid-template-columns: minmax(0, 1fr) minmax(70px, 0.56fr) auto auto;
-    justify-content: center;
+    display: flex;
+    gap: 8px;
+    justify-content: stretch;
     left: 10px;
     max-width: calc(100vw - 20px);
     position: absolute;
     right: 10px;
-    top: calc(100% + 2px);
+    top: calc(100% + 8px);
     z-index: 25;
   }
 
@@ -644,7 +645,31 @@
   }
 
   .public-shell .period-controls {
+    flex: 0 0 auto;
     justify-content: center;
+    order: 3;
+  }
+
+  .public-shell .public-organization-select,
+  .public-shell .view-selector {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+
+  .public-shell .view-selector {
+    flex-grow: 0.54;
+    order: 2;
+  }
+
+  .public-shell .public-organization-select {
+    order: 1;
+  }
+
+  .public-shell .period-controls .icon-button {
+    height: 40px;
+    min-width: 0;
+    width: 40px;
   }
 
   .portal-shell .toolbar-actions {
@@ -743,42 +768,22 @@
 
 @media (max-width: 480px) {
   .public-shell .calendar-nav {
-    align-items: center;
-    gap: 5px;
-    grid-template-columns: minmax(0, 1fr) minmax(68px, 0.52fr) 38px 38px;
-    justify-content: center;
+    gap: 7px;
   }
 
   .public-shell .period-controls {
-    gap: 5px;
-    grid-column: auto;
-    display: contents;
-    justify-self: end;
-    order: 3;
+    gap: 7px;
   }
 
   .public-shell .period-controls .icon-button {
     height: 38px;
-    min-width: 0;
     width: 38px;
-  }
-
-  .public-shell .public-organization-select {
-    order: 1;
-  }
-
-  .public-shell #prevButton {
-    order: 3;
-  }
-
-  .public-shell #nextButton {
-    order: 4;
   }
 
   .public-shell .public-organization-select,
   .public-shell .view-selector {
     min-width: 0;
-    width: 100%;
+    width: auto;
   }
 
   .public-shell .view-selector {
@@ -798,13 +803,16 @@
 
 @media (max-width: 380px) {
   .public-shell .calendar-nav {
-    gap: 4px;
-    grid-template-columns: minmax(0, 1fr) minmax(62px, 0.5fr) 34px 34px;
+    gap: 5px;
   }
 
   .public-shell .period-controls .icon-button {
-    height: 34px;
-    width: 34px;
+    height: 36px;
+    width: 36px;
+  }
+
+  .public-shell .period-controls {
+    gap: 5px;
   }
 
   .public-shell .public-organization-select,
