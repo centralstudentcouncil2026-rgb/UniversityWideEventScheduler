@@ -109,6 +109,19 @@ create table if not exists public.schedules (
   constraint schedules_valid_time_range check (end_time > start_time)
 );
 
+-- Migration preflight: older schedules tables must receive new columns before
+-- indexes, updates, or constraints reference them.
+alter table if exists public.schedules add column if not exists admin_recommendation text;
+alter table if exists public.schedules add column if not exists approval_date timestamptz;
+alter table if exists public.schedules add column if not exists notification_status text;
+alter table if exists public.schedules add column if not exists revision_of uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists original_schedule_id uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists revision_status text;
+alter table if exists public.schedules add column if not exists revision_created_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_submitted_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_history jsonb not null default '[]'::jsonb;
+alter table if exists public.schedules alter column approval_status set default 'pending';
+
 create index if not exists schedules_category_id_idx on public.schedules(category_id);
 create index if not exists schedules_organization_id_idx on public.schedules(organization_id);
 create index if not exists schedules_start_time_idx on public.schedules(start_time);
