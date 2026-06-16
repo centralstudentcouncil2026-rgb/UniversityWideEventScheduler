@@ -1,6 +1,6 @@
-import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-activity-status-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260616-activity-status-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260607-security-v1';
+import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-announcements-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260616-announcements-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260616-announcements-v1';
 
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
@@ -402,7 +402,7 @@ function isDefaultAnnouncement(item) {
 }
 
 function announcementHtml(item) {
-  return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`;
+  return `<div class="notice"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`;
 }
 
 function renderStatuses() {

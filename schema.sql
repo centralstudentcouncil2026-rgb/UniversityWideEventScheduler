@@ -187,3 +187,42 @@ create index if not exists activity_statuses_updated_at_idx on public.activity_s
 -- set account_type = excluded.account_type,
 --     activity_status = excluded.activity_status,
 --     updated_at = excluded.updated_at;
+
+create table if not exists public.announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null,
+  visibility_status text not null default 'show' check (visibility_status in ('show', 'hidden')),
+  created_by uuid references auth.users(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists announcements_visibility_status_idx on public.announcements(visibility_status);
+create index if not exists announcements_created_by_idx on public.announcements(created_by);
+create index if not exists announcements_updated_at_idx on public.announcements(updated_at);
+
+alter table if exists public.announcements add column if not exists visibility_status text not null default 'show';
+alter table if exists public.announcements add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;
+alter table if exists public.announcements add column if not exists created_at timestamptz not null default now();
+alter table if exists public.announcements add column if not exists updated_at timestamptz not null default now();
+alter table if exists public.announcements drop column if exists priority;
+alter table if exists public.announcements drop column if exists expires_at;
+
+update public.announcements
+set visibility_status = 'show'
+where visibility_status is null;
+
+do $$
+begin
+  if to_regclass('public.announcements') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conname = 'announcements_visibility_status_allowed'
+         and conrelid = 'public.announcements'::regclass
+     ) then
+    alter table public.announcements
+      add constraint announcements_visibility_status_allowed check (visibility_status in ('show', 'hidden'));
+  end if;
+end $$;

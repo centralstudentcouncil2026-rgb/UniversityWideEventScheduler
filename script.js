@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-activity-status-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-activity-status-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-announcements-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-announcements-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260607-security-v1';
+} from './app-rules.js?v=20260616-announcements-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -139,6 +139,10 @@ function bindEvents() {
     notificationsButton: openNotifications,
     dashboardButton: openDashboard,
     announcementsButton: openAnnouncements,
+    announcementEditButton: editLatestAnnouncement,
+    announcementDeleteButton: deleteCurrentAnnouncement,
+    announcementHideButton: () => setCurrentAnnouncementVisibility('hidden'),
+    announcementShowButton: () => setCurrentAnnouncementVisibility('show'),
     concernsButton: openConcerns,
     eventRequestsButton: openEventRequests,
     blockedTimesButton: openBlockedTimes,
@@ -177,6 +181,8 @@ function bindEvents() {
   on('eventScheduleType', 'change', updateScheduleType);
   on('eventDate', 'change', syncSingleDayEndDate);
   on('eventContactInfo', 'input', (event) => { event.target.value = event.target.value.replace(/\D/g, '').slice(0, 11); });
+  on('announcementTitle', 'input', updateAnnouncementLivePreview);
+  on('announcementContent', 'input', updateAnnouncementLivePreview);
   on('occurrenceList', 'click', handleOccurrenceListClick);
   on('blockType', 'change', updateBlockTimeFields);
   on('blockStartDate', 'change', syncSingleDayBlockEndDate);
@@ -1055,7 +1061,11 @@ function persistMovedCalendarItem(info) {
   Object.assign(record, candidate); log('event_request_moved', `${currentUser(state.store).full_name} moved "${record.title}".`, record); persist('Event schedule updated.');
 }
 
-function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
+function openAnnouncements() {
+  clearAnnouncementEditor();
+  renderAnnouncements();
+  openDialog('announcementsModal');
+}
 function renderAnnouncementPreview() {
   const preview = $('announcementPreview');
   if (!preview) return;
@@ -1070,30 +1080,120 @@ function isDefaultAnnouncement(item) {
   );
 }
 function visibleAnnouncements() { return activeAnnouncements(state.store).filter((item) => !isDefaultAnnouncement(item)); }
-function announcementPreviewHtml(item) { return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }
-function renderAnnouncements() {
-  const announcements = visibleAnnouncements();
-  $('announcementsList').innerHTML = announcements.length
-    ? announcements.map((item) => `<div class="activity-item notice ${classToken(item.priority)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(cap(item.priority))} - ${escapeHtml(item.posted_by)} - expires ${escapeHtml(item.expires_at.slice(0, 10))}</p>${canManageAnnouncements(state.store) ? actionButton('announcement-delete', item.id, 'Delete', 'danger-button') : ''}</div>`).join('')
-    : `<div class="activity-item notice normal"><strong>${escapeHtml(DEFAULT_ANNOUNCEMENT.title)}</strong><p>${escapeHtml(DEFAULT_ANNOUNCEMENT.content)}</p></div>`;
+function allAnnouncements() {
+  return [...(state.store.announcements || [])].filter((item) => !isDefaultAnnouncement(item)).sort((a, b) => new Date(b.updated_at || b.created_at || b.posted_at || 0) - new Date(a.updated_at || a.created_at || a.posted_at || 0));
 }
+function latestAnnouncement() { return allAnnouncements()[0] || null; }
+function announcementPreviewHtml(item) { return `<div class="notice"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }
+function renderAnnouncements() {
+  const announcements = allAnnouncements();
+  $('announcementsList').innerHTML = announcements.length
+    ? announcements.map(announcementAdminHtml).join('')
+    : `<div class="activity-item notice"><strong>${escapeHtml(DEFAULT_ANNOUNCEMENT.title)}</strong><p>${escapeHtml(DEFAULT_ANNOUNCEMENT.content)}</p></div>`;
+  updateAnnouncementActionButtons();
+}
+
+function announcementAdminHtml(item) {
+  const visibility = item.visibility_status === 'hidden' ? 'Hidden' : 'Shown';
+  const actions = canManageAnnouncements(state.store)
+    ? `${actionButton('announcement-edit', item.id, 'Edit', 'secondary-button')}${actionButton('announcement-delete', item.id, 'Delete', 'danger-button')}${item.visibility_status === 'hidden' ? actionButton('announcement-show', item.id, 'Show', 'secondary-button') : actionButton('announcement-hide', item.id, 'Hide', 'secondary-button')}`
+    : '';
+  return `<div class="activity-item notice"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.visibility_status || 'show')}">${escapeHtml(visibility)}</span></strong><p>${escapeHtml(item.content)}</p><p>${escapeHtml(item.created_by || item.posted_by || 'Unknown')} - ${escapeHtml(formatDateTime(item.updated_at || item.created_at || item.posted_at))}</p>${actions}</div>`;
+}
+
 function addAnnouncement(event) {
   event.preventDefault();
   if (!canManageAnnouncements(state.store)) return;
+  const existing = state.store.announcements.find((item) => item.id === $('announcementId').value);
   const title = cleanSingleLine($('announcementTitle').value);
   const content = cleanMultiline($('announcementContent').value);
-  const expiry = $('announcementExpiry').value;
-  if (!title || !content || !expiry) return showToast('Complete announcement title, content, and expiry date.', 'error');
+  if (!title || !content) return showToast('Complete announcement title and content.', 'error');
   const textError = firstTextLimitError([
     [title, TEXT_LIMITS.announcementTitle, 'Announcement title'],
     [content, TEXT_LIMITS.announcementContent, 'Announcement content']
   ]);
   if (textError) return showToast(textError, 'error');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) return showToast('Use a valid announcement expiry date.', 'error');
-  const item = { id: createId(), title, content, priority: $('announcementPriority').value, posted_by: currentUser(state.store).full_name, posted_at: new Date().toISOString(), expires_at: `${expiry}T23:59:59` };
-  state.store.announcements.push(item);
-  log('announcement_posted', `Posted announcement "${item.title}".`, item);
-  event.target.reset(); persist('Announcement posted.'); renderAnnouncements();
+  const now = new Date().toISOString();
+  const user = currentUser(state.store);
+  const item = existing || { id: createId(), visibility_status: 'show', created_by: user.full_name, created_at: now };
+  Object.assign(item, { title, content, updated_at: now });
+  if (!existing) state.store.announcements.push(item);
+  log(existing ? 'announcement_updated' : 'announcement_posted', `${existing ? 'Updated' : 'Posted'} announcement "${item.title}".`, item);
+  clearAnnouncementEditor(item);
+  persist(existing ? 'Announcement updated.' : 'Announcement posted.');
+  renderAnnouncements();
+  renderAnnouncementPreview();
+}
+
+function updateAnnouncementLivePreview() {
+  const title = cleanSingleLine($('announcementTitle')?.value) || DEFAULT_ANNOUNCEMENT.title;
+  const content = cleanMultiline($('announcementContent')?.value) || DEFAULT_ANNOUNCEMENT.content;
+  const preview = $('announcementLivePreview');
+  if (preview) preview.innerHTML = announcementPreviewHtml({ title, content });
+  updateAnnouncementActionButtons();
+}
+
+function clearAnnouncementEditor(previewAnnouncement = latestAnnouncement()) {
+  if ($('announcementForm')) $('announcementForm').reset();
+  if ($('announcementId')) $('announcementId').value = '';
+  if ($('announcementSubmitButton')) $('announcementSubmitButton').textContent = 'Post Announcement';
+  const preview = $('announcementLivePreview');
+  if (preview) preview.innerHTML = announcementPreviewHtml(previewAnnouncement || DEFAULT_ANNOUNCEMENT);
+  updateAnnouncementActionButtons();
+}
+
+function loadAnnouncementEditor(id) {
+  const item = state.store.announcements.find((announcement) => announcement.id === id);
+  if (!item) return showToast('Announcement was not found.', 'error');
+  $('announcementId').value = item.id;
+  $('announcementTitle').value = item.title || '';
+  $('announcementContent').value = item.content || '';
+  $('announcementSubmitButton').textContent = 'Update Announcement';
+  updateAnnouncementLivePreview();
+  $('announcementTitle').focus();
+}
+
+function currentAnnouncementForAction() {
+  return state.store.announcements.find((item) => item.id === $('announcementId')?.value) || latestAnnouncement();
+}
+
+function editLatestAnnouncement() {
+  const item = currentAnnouncementForAction();
+  if (!item) return showToast('No announcement to edit.', 'error');
+  loadAnnouncementEditor(item.id);
+}
+
+function deleteCurrentAnnouncement() {
+  const item = currentAnnouncementForAction();
+  if (!item) return showToast('No announcement to delete.', 'error');
+  confirmAction('Delete this announcement?', () => removeById('announcements', item.id, 'announcement_deleted', 'Announcement deleted.'));
+}
+
+function setCurrentAnnouncementVisibility(visibility_status) {
+  const item = currentAnnouncementForAction();
+  if (!item) return showToast('No announcement to update.', 'error');
+  setAnnouncementVisibility(item.id, visibility_status);
+}
+
+function setAnnouncementVisibility(id, visibility_status) {
+  if (!canManageAnnouncements(state.store)) return;
+  const item = state.store.announcements.find((announcement) => announcement.id === id);
+  if (!item) return;
+  item.visibility_status = visibility_status;
+  item.updated_at = new Date().toISOString();
+  log(`announcement_${visibility_status === 'hidden' ? 'hidden' : 'shown'}`, `${visibility_status === 'hidden' ? 'Hid' : 'Showed'} announcement "${item.title}".`, item);
+  persist(`Announcement ${visibility_status === 'hidden' ? 'hidden' : 'shown'}.`);
+  renderAnnouncements();
+  renderAnnouncementPreview();
+  updateAnnouncementLivePreview();
+}
+
+function updateAnnouncementActionButtons() {
+  const current = currentAnnouncementForAction();
+  setHidden('announcementEditButton', !current);
+  setHidden('announcementDeleteButton', !current);
+  setHidden('announcementHideButton', !current || current.visibility_status === 'hidden');
+  setHidden('announcementShowButton', !current || current.visibility_status !== 'hidden');
 }
 
 function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
@@ -1102,7 +1202,7 @@ function renderNotifications() {
   const upcomingLimit = addDays(new Date(), 7);
   const ownEvents = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id);
   const notices = [
-    ...activeAnnouncements(state.store).map((item) => ({ title: `Announcement: ${item.title}`, detail: `${cap(item.priority)} - ${item.content}`, date: item.posted_at })),
+    ...activeAnnouncements(state.store).map((item) => ({ title: `Announcement: ${item.title}`, detail: item.content, date: item.updated_at || item.created_at || item.posted_at })),
     ...state.store.blockedTimes.filter((item) => new Date(item.end_time) >= new Date()).map((item) => ({ title: `Blocked period: ${item.title}`, detail: `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`, date: item.created_at })),
     ...ownEvents.filter((item) => eventIsActive(item) && new Date(item.start_time) >= new Date() && new Date(item.start_time) <= upcomingLimit).map((item) => ({ title: `Upcoming event: ${item.title}`, detail: `${item.venue} - ${formatDateTime(item.start_time)}`, date: item.start_time })),
     ...ownEvents.filter((item) => item.conflict_event_ids?.length).map((item) => ({ title: `Conflict warning: ${item.title}`, detail: `${item.conflict_event_ids.length} overlapping event(s) need review.`, date: item.updated_at })),
@@ -1396,7 +1496,10 @@ function handleListAction(event) {
 const LIST_ACTION_PERMISSIONS = {
   'event-approve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot review event requests.' },
   'event-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot review event requests.' },
+  'announcement-edit': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
   'announcement-delete': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
+  'announcement-hide': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
+  'announcement-show': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
   'block-delete': { allowed: () => canManageBlockedTimes(state.store), message: 'This account cannot manage blocked times.' },
   'category-toggle': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
   'category-delete': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
@@ -1411,7 +1514,10 @@ const LIST_ACTIONS = {
   'event-view': viewEventRequest,
   'event-approve': (id) => reviewEventRequest(id, 'approved'),
   'event-reject': (id) => reviewEventRequest(id, 'rejected'),
+  'announcement-edit': loadAnnouncementEditor,
   'announcement-delete': (id) => confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
+  'announcement-hide': (id) => setAnnouncementVisibility(id, 'hidden'),
+  'announcement-show': (id) => setAnnouncementVisibility(id, 'show'),
   'block-delete': (id) => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
   'category-toggle': toggleCategory,
   'category-delete': (id) => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),

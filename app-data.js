@@ -70,6 +70,7 @@ export function normalizeStore(store = {}) {
   normalized.events = normalized.events.map(normalizeEvent);
   normalized.blockedTimes = normalized.blockedTimes.map(normalizeBlockedTime);
   normalized.activityStatuses = normalized.activityStatuses.map(normalizeActivityStatus).filter(Boolean);
+  normalized.announcements = normalized.announcements.map(normalizeAnnouncement);
   return normalized;
 }
 
@@ -139,6 +140,7 @@ export function storeForPersistence(store) {
   validateSchedulesForPersistence(store);
   validateBlockedTimesForPersistence(store);
   validateActivityStatusesForPersistence(store);
+  validateAnnouncementsForPersistence(store);
   return {
     ...store,
     events: store.events.map((event) => ({
@@ -148,6 +150,14 @@ export function storeForPersistence(store) {
         : event.private_notes
     }))
   };
+}
+
+function validateAnnouncementsForPersistence(store) {
+  (store.announcements || []).forEach((announcement) => {
+    if (!announcement.title || !announcement.content) throw new Error('Announcement requires title and content.');
+    if (!['show', 'hidden'].includes(announcement.visibility_status)) throw new Error('Announcement visibility must be show or hidden.');
+    if (!announcement.created_by || !announcement.created_at || !announcement.updated_at) throw new Error('Announcement requires creator and timestamps.');
+  });
 }
 
 function validateBlockedTimesForPersistence(store) {
@@ -242,6 +252,17 @@ function normalizeActivityAccountType(value) {
 function normalizeActivityStatusLabel(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return ACTIVITY_STATUS_OPTIONS.find((option) => option.toLowerCase() === normalized) || '';
+}
+
+function normalizeAnnouncement(announcement = {}) {
+  const createdAt = announcement.created_at || announcement.posted_at || new Date().toISOString();
+  return {
+    ...announcement,
+    visibility_status: announcement.visibility_status === 'hidden' ? 'hidden' : 'show',
+    created_by: announcement.created_by || announcement.posted_by || 'Unknown',
+    created_at: createdAt,
+    updated_at: announcement.updated_at || createdAt
+  };
 }
 
 function occurrenceFromRange(start_time, end_time, id = createId()) {

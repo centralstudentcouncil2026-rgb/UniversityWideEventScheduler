@@ -102,10 +102,9 @@ export function findApprovedVenueConflict(store, candidate) {
 
 export function activeAnnouncements(store) {
   const now = new Date();
-  const weight = { urgent: 0, important: 1, normal: 2 };
   return store.announcements
-    .filter((item) => !item.expires_at || new Date(item.expires_at) >= now)
-    .sort((a, b) => (weight[a.priority] ?? 9) - (weight[b.priority] ?? 9) || new Date(b.posted_at) - new Date(a.posted_at));
+    .filter((item) => (item.visibility_status || 'show') === 'show')
+    .sort((a, b) => new Date(b.updated_at || b.created_at || b.posted_at || now) - new Date(a.updated_at || a.created_at || a.posted_at || now));
 }
 
 export function categoryById(store, id) {

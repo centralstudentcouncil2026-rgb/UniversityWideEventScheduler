@@ -1006,20 +1006,22 @@ body.is-super-admin .check-row.super-admin-only {
   padding-left: 10px;
 }
 
-.notice.important {
-  border-left-color: #D97706;
-}
-
-.notice.urgent {
-  border-left-color: var(--danger);
-}
-
 .notice p,
 .empty-text {
   color: var(--aup-muted);
   font-size: 13px;
   line-height: 1.35;
   margin: 4px 0;
+}
+
+.announcement-live-preview {
+  border: 1px solid var(--aup-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.announcement-live-preview .notice {
+  margin-bottom: 0;
 }
 
 #announcementsModal .modal-card {
