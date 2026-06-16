@@ -1769,7 +1769,10 @@ function closeDialog(id) {
 }
 
 function scheduleMobileAnnouncementPopup(force = false) {
-  if (!state.store || isPublic(state.store) || window.innerWidth > MOBILE_BREAKPOINT) return;
+  if (!state.store || isPublic(state.store) || isSuperAdmin(state.store) || window.innerWidth > MOBILE_BREAKPOINT) {
+    sessionStorage.removeItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG);
+    return;
+  }
   const loginRedirectForce = sessionStorage.getItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG) === '1';
   sessionStorage.removeItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG);
   const user = currentUser(state.store);
