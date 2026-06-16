@@ -920,10 +920,17 @@
   min-width: 0;
 }
 
+.portal-shell .header-create-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+
 .portal-shell .header-organization-filter {
-  flex: 1 1 220px;
-  max-width: 260px;
-  min-width: 150px;
+  flex: 1 1 180px;
+  max-width: 220px;
+  min-width: 124px;
 }
 
 .portal-shell #viewSelector {
@@ -951,8 +958,27 @@
   }
 
   .portal-shell .header-organization-filter {
-    max-width: none;
+    max-width: 40vw;
     min-width: 0;
+  }
+
+  .portal-shell .header-create-button {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0;
+    height: 40px;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0;
+    width: 40px;
+  }
+
+  .portal-shell .header-create-button::before {
+    content: "+";
+    font-size: 24px;
+    line-height: 1;
   }
 
   .portal-shell #viewSelector {
@@ -1007,6 +1033,13 @@
     min-height: 36px;
     padding-left: 8px;
     padding-right: 18px;
+  }
+
+  .portal-shell .header-create-button {
+    height: 36px;
+    min-height: 36px;
+    min-width: 36px;
+    width: 36px;
   }
 
   .portal-shell #viewSelector {

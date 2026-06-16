@@ -24,6 +24,7 @@
         <div class="brand-copy"><h1>CSC S.Y.N.C.</h1><p>Systemized Year-round Network Calendar</p></div>
       </div>
       <nav class="calendar-nav" aria-label="Calendar navigation">
+        <button class="create-button restricted-only header-create-button" id="createEventButton" type="button"><span>Create Schedule</span></button>
         <select id="headerOrganizationFilter" class="view-selector header-organization-filter" aria-label="Organization filter"></select>
         <select id="viewSelector" class="view-selector" aria-label="Calendar view">
           <option value="today">Today</option>
@@ -41,7 +42,6 @@
     <aside class="sidebar" id="sidebar">
       <section class="sidebar-section admin-action-panel">
         <span class="section-label">Scheduling Actions</span>
-        <button class="create-button restricted-only" id="createEventButton">Post university Activities</button>
         <button class="secondary-button super-admin-only" id="blockedTimesButton">Block Calendar Dates &amp; Time</button>
         <button class="secondary-button super-admin-only" id="chooseActivityStatusButton">Choose Activity Status</button>
       </section>
@@ -83,19 +83,14 @@
   <dialog class="modal reservation-modal" id="eventModal"><form class="modal-card" id="eventForm"><div class="modal-header"><div><h3 id="eventModalTitle">Post University Event</h3></div><button type="button" class="icon-button" data-close="eventModal">&times;</button></div>
     <input type="hidden" id="eventId">
     <div class="form-grid">
-      <label>Event Title<input id="eventTitle" required maxlength="160"></label><label>Event Type<input id="eventType" required maxlength="80"></label>
-      <label>Organization<select id="eventOrganization" required></select></label><label>Category<select id="eventCategory" required></select></label>
-      <label>Venue<input id="eventVenue" required maxlength="140"></label><label>Schedule<select id="eventScheduleType"><option value="single_day">Single day</option><option value="multi_day">Multiple days</option></select></label>
+      <label>Event Title<input id="eventTitle" required maxlength="160"></label><label>Category<select id="eventCategory" required></select></label>
+      <label>Venue<input id="eventVenue" required maxlength="140"></label><label>Date<select id="eventScheduleType" required><option value="single_day">Single day</option><option value="multi_day">Multiple days</option></select></label>
       <div class="schedule-grid full-span" id="singleScheduleFields"><label>Date<input type="date" id="eventDate" required></label><label>Start Time<input type="time" id="eventStart" required></label><label>End Time<input type="time" id="eventEnd" required></label></div>
-      <section class="multi-schedule full-span" id="multiScheduleSection" hidden><div class="section-heading"><div><strong>Daily Schedule</strong></div><button type="button" class="secondary-button" id="addOccurrenceButton">Add Day</button></div><div class="shared-time-grid"><label>Shared Start Time<input type="time" id="eventSharedStart"></label><label>Shared End Time<input type="time" id="eventSharedEnd"></label><button type="button" class="secondary-button" id="applySharedTimesButton">Apply Shared Times</button></div><div class="occurrence-list" id="occurrenceList"></div></section>
-      <label>Expected Attendees<input type="number" id="eventAttendees" min="1" max="99999" required></label><label>Event Status<select id="eventStatus"><option value="planned">Planned</option><option value="finalized">Finalized</option><option value="postponed">Postponed</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option></select></label>
-      <label>Privacy Level<select id="eventPrivacy"><option value="basic">Basic public details</option><option value="internal">Organization and admin only</option></select></label>
-      <label>Contact Person<input id="eventContactPerson" required maxlength="120"></label><label>Contact Email or Number<input id="eventContactInfo" required maxlength="160"></label>
+      <section class="multi-schedule full-span" id="multiScheduleSection" hidden><div class="schedule-grid"><label>Start Date<input type="date" id="eventMultiStartDate"></label><label>Start Time<input type="time" id="eventMultiStartTime"></label><label>End Date<input type="date" id="eventMultiEndDate"></label><label>End Time<input type="time" id="eventMultiEndTime"></label></div></section>
+      <label>Expected Number of Attendees<input type="number" id="eventAttendees" min="1" max="99999" step="1" required></label><label>Privacy Level<select id="eventPrivacy" required><option value="basic">Public</option><option value="internal">Admin only</option></select></label>
+      <label>Contact Person<input id="eventContactPerson" required maxlength="120"></label><label>Contact Number<input id="eventContactInfo" required inputmode="numeric" minlength="12" maxlength="12" pattern="[0-9]{12}"></label>
       <label class="full-span">Short Public Description<textarea id="eventPublicDescription" required rows="2" maxlength="1000"></textarea></label>
       <label class="full-span">Purpose<textarea id="eventPurpose" required rows="3" maxlength="1000"></textarea></label>
-      <label class="full-span">Private Organization Notes<textarea id="eventPrivateNotes" rows="2" maxlength="1000"></textarea></label>
-      <label class="full-span super-admin-only">Admin Notes<textarea id="eventAdminNotes" rows="2" maxlength="1000"></textarea></label>
-      <label class="full-span super-admin-only">Rejection Reason<textarea id="eventRejectionReason" rows="2" maxlength="500"></textarea></label>
     </div>
     <div class="modal-actions split-actions"><div><button type="button" class="danger-button" id="deleteEventButton">Delete Event</button><button type="button" class="secondary-button" id="cancelEventButton">Cancel Event</button></div><button class="primary-button">Save Event</button></div>
   </form></dialog>

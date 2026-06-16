@@ -718,38 +718,42 @@ function matchesFilters(event) {
 function openEventModal(range, record = null) {
   if (!requirePermission(canEditEvent(state.store, record), 'You cannot edit this event.')) return;
   renderFormOptions();
-  $('eventForm').reset(); $('eventId').value = record?.id || ''; $('eventModalTitle').textContent = record ? 'Edit University Event' : 'Post University Event';
-  $('eventOrganization').value = record?.organization_id || currentUser(state.store).organization_id || state.store.organizations[0]?.id || '';
+  $('eventForm').reset(); $('eventId').value = record?.id || ''; $('eventModalTitle').textContent = record ? 'Edit Schedule' : 'Create Schedule';
   $('eventCategory').value = record?.category_id || state.store.categories.find((item) => item.active)?.id || '';
-  $('eventTitle').value = record?.title || ''; $('eventType').value = record?.event_type || ''; $('eventVenue').value = record?.venue || '';
+  $('eventTitle').value = record?.title || ''; $('eventVenue').value = record?.venue || '';
   const occurrences = record ? eventOccurrences(record) : range.occurrences || [{ id: createId(), start_time: range.start.toISOString(), end_time: range.end.toISOString() }];
   $('eventScheduleType').value = record?.schedule_type || (occurrences.length > 1 ? 'multi_day' : 'single_day');
   $('eventDate').value = dateInput(occurrences[0].start_time); $('eventStart').value = timeInput(occurrences[0].start_time); $('eventEnd').value = timeInput(occurrences[0].end_time);
-  $('eventSharedStart').value = timeInput(occurrences[0].start_time); $('eventSharedEnd').value = timeInput(occurrences[0].end_time);
-  renderOccurrenceRows(occurrences);
+  $('eventMultiStartDate').value = dateInput(occurrences[0].start_time);
+  $('eventMultiStartTime').value = timeInput(occurrences[0].start_time);
+  $('eventMultiEndDate').value = dateInput(occurrences.at(-1).end_time);
+  $('eventMultiEndTime').value = timeInput(occurrences.at(-1).end_time);
   updateScheduleType();
-  $('eventAttendees').value = record?.expected_attendees || ''; $('eventStatus').value = record?.event_status || 'planned';
+  $('eventAttendees').value = record?.expected_attendees || '';
   $('eventPrivacy').value = record?.privacy_level || 'basic';
   $('eventContactPerson').value = record?.contact_person || currentUser(state.store).full_name; $('eventContactInfo').value = record?.contact_info || '';
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
-  $('eventPrivateNotes').value = record?.private_notes || ''; $('eventAdminNotes').value = record?.admin_notes || ''; $('eventRejectionReason').value = record?.rejection_reason || '';
-  $('eventOrganization').disabled = isManager(state.store); $('deleteEventButton').hidden = !canDeleteEvent(state.store, record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
+  $('deleteEventButton').hidden = !canDeleteEvent(state.store, record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
   openDialog('eventModal');
 }
 
 function readEventForm() {
   const existing = state.store.events.find((event) => event.id === $('eventId').value);
-  const org = state.store.organizations.find((item) => item.id === $('eventOrganization').value);
+  const user = currentUser(state.store);
+  const org = state.store.organizations.find((item) => item.id === (user.organization_id || state.filters.organization)) || state.store.organizations[0];
+  const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
-  const occurrences = schedule_type === 'multi_day' ? readOccurrenceRows() : [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso($('eventDate').value, $('eventEnd').value) }];
+  const occurrences = schedule_type === 'multi_day'
+    ? [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventMultiStartDate').value, start_time: localIso($('eventMultiStartDate').value, $('eventMultiStartTime').value), end_time: localIso($('eventMultiEndDate').value, $('eventMultiEndTime').value) }]
+    : [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso($('eventDate').value, $('eventEnd').value) }];
   return syncEventRange({
-    ...existing, id: existing?.id || createId(), title: cleanSingleLine($('eventTitle').value), event_type: cleanSingleLine($('eventType').value),
+    ...existing, id: existing?.id || createId(), title: cleanSingleLine($('eventTitle').value), event_type: category?.name || 'Schedule',
     organization_id: org?.id || '', organization_name: org?.organization_name || '', category_id: $('eventCategory').value,
     venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
-    contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: cleanMultiline($('eventPrivateNotes').value),
-    admin_notes: isSuperAdmin(state.store) ? cleanMultiline($('eventAdminNotes').value) : existing?.admin_notes || '', rejection_reason: canApproveEvents(state.store) ? cleanMultiline($('eventRejectionReason').value) : existing?.rejection_reason || '',
-    event_status: $('eventStatus').value, privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
+    contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
+    admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '',
+    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
     created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
 }
@@ -823,7 +827,7 @@ function updateScheduleType() {
   $('singleScheduleFields').hidden = multiDay;
   $('multiScheduleSection').hidden = !multiDay;
   ['eventDate', 'eventStart', 'eventEnd'].forEach((id) => { $(id).required = !multiDay; });
-  if (multiDay) ensureOccurrenceRows();
+  ['eventMultiStartDate', 'eventMultiStartTime', 'eventMultiEndDate', 'eventMultiEndTime'].forEach((id) => { $(id).required = multiDay; });
 }
 
 function findEventBlock(event) {
@@ -849,18 +853,14 @@ function submitEventForm(event) {
 }
 
 function validateEvent(event) {
-  if (!event.title || !event.event_type || !event.organization_id || !event.category_id || !event.venue) return 'Complete title, type, organization, category, and venue.';
+  if (!event.title || !event.organization_id || !event.category_id || !event.venue) return 'Complete event title, category, venue, and organization.';
   const textError = firstTextLimitError([
     [event.title, TEXT_LIMITS.eventTitle, 'Event title'],
-    [event.event_type, TEXT_LIMITS.eventType, 'Event type'],
     [event.venue, TEXT_LIMITS.venue, 'Venue'],
     [event.public_description, TEXT_LIMITS.publicDescription, 'Public description'],
     [event.purpose, TEXT_LIMITS.purpose, 'Purpose'],
     [event.contact_person, TEXT_LIMITS.contactPerson, 'Contact person'],
-    [event.contact_info, TEXT_LIMITS.contactInfo, 'Contact details'],
-    [event.private_notes || '', TEXT_LIMITS.privateNotes, 'Private notes'],
-    [event.admin_notes || '', TEXT_LIMITS.adminNotes, 'Admin notes'],
-    [event.rejection_reason || '', TEXT_LIMITS.rejectionReason, 'Rejection reason']
+    [event.contact_info, TEXT_LIMITS.contactInfo, 'Contact number']
   ]);
   if (textError) return textError;
   if (!event.occurrences.length) return 'Add at least one event day.';
@@ -869,6 +869,7 @@ function validateEvent(event) {
   if (new Set(event.occurrences.map((item) => item.date)).size !== event.occurrences.length) return 'Use one schedule row per date.';
   if (!Number.isInteger(event.expected_attendees) || event.expected_attendees < 1 || event.expected_attendees > 99999) return 'Expected attendees must be between 1 and 99999.';
   if (!event.public_description || !event.purpose || !event.contact_person || !event.contact_info) return 'Complete description, purpose, and contact details.';
+  if (!/^\d{12}$/.test(event.contact_info)) return 'Contact number must contain exactly 12 digits.';
   if (isManager(state.store) && event.organization_id !== currentUser(state.store).organization_id) return 'Organization managers can only manage their assigned organization.';
   return '';
 }
@@ -1657,6 +1658,7 @@ function showToast(message, type = 'info') {
 
 function fillSelect(id, options, selectedValue = '') {
   const select = $(id);
+  if (!select) return;
   select.innerHTML = options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
   select.value = selectedValue || '';
 }
