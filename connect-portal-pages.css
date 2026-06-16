@@ -379,7 +379,9 @@
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
   display: grid;
   gap: 9px;
+  min-width: 0;
   padding: 12px;
+  width: 100%;
 }
 
 .portal-shell .admin-action-panel {
@@ -393,15 +395,21 @@
 .portal-shell .admin-action-panel .create-button,
 .portal-shell .admin-action-panel .secondary-button,
 .portal-shell .sidebar-tab {
+  align-items: center;
+  display: inline-flex;
   justify-content: center;
+  min-width: 0;
   text-align: center;
+  white-space: normal;
   width: 100%;
 }
 
 .portal-shell .sidebar-tabs {
   display: grid;
   gap: 7px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
+  min-width: 0;
+  width: 100%;
 }
 
 .portal-shell .sidebar-tab {

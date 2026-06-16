@@ -306,8 +306,8 @@ function renderFilterOptions() {
 function renderStatuses() {
   const office = findStatus('incampus_offcampus');
   const president = findStatus('csc_president');
-  $('officeStatusValue').textContent = statusLabel(office);
-  $('presidentStatusValue').textContent = statusLabel(president);
+  if ($('officeStatusValue')) $('officeStatusValue').textContent = statusLabel(office);
+  if ($('presidentStatusValue')) $('presidentStatusValue').textContent = statusLabel(president);
 }
 
 function findStatus(key) {
@@ -1039,7 +1039,12 @@ function persistMovedCalendarItem(info) {
 }
 
 function openAnnouncements() { renderAnnouncements(); openDialog('announcementsModal'); }
-function renderAnnouncementPreview() { const first = visibleAnnouncements()[0]; $('announcementPreview').innerHTML = first ? announcementPreviewHtml(first) : announcementPreviewHtml(DEFAULT_ANNOUNCEMENT); }
+function renderAnnouncementPreview() {
+  const preview = $('announcementPreview');
+  if (!preview) return;
+  const first = visibleAnnouncements()[0];
+  preview.innerHTML = first ? announcementPreviewHtml(first) : announcementPreviewHtml(DEFAULT_ANNOUNCEMENT);
+}
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
@@ -1479,7 +1484,16 @@ function filterKey(id) {
   return id.replace(/^filter/, '').replace(/^\w/, (letter) => letter.toLowerCase());
 }
 
-function updateAvailability() { const now = new Date(); const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue }))); const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time)); $('availabilityStatus').textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview'; $('availabilityDetail').textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : ''; }
+function updateAvailability() {
+  const status = $('availabilityStatus');
+  const detail = $('availabilityDetail');
+  if (!status || !detail) return;
+  const now = new Date();
+  const activeEvents = state.store.events.filter((item) => item.approval_status === 'approved' && isPublicEvent(item)).flatMap((event) => eventOccurrences(event).map((occurrence) => ({ ...occurrence, title: event.title, venue: event.venue })));
+  const active = [...activeEvents, ...state.store.blockedTimes].find((item) => overlaps(now, addMinutes(now, 1), item.start_time, item.end_time));
+  status.textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview';
+  detail.textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : '';
+}
 function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
 function bindCalendarResizeObserver() {
   if (!window.ResizeObserver || state.resizeObserver) return;
