@@ -544,6 +544,26 @@
   margin: 4px 0 0;
 }
 
+.public-event-details {
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  margin: 8px 0 0;
+}
+
+.public-event-details dt {
+  color: rgba(15, 23, 42, 0.62);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.public-event-details dd {
+  font-size: 0.86rem;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .public-organization-select {
   max-width: 190px;
   overflow: hidden;

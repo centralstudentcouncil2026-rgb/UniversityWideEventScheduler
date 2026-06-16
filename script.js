@@ -801,13 +801,23 @@ function readEventForm() {
     venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
     contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
-    admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '', admin_recommendation: existing?.admin_recommendation || '',
-    approval_date: existing?.approval_date || '', notification_status: existing?.notification_status || '',
+    admin_notes: existing?.admin_notes || '', rejection_reason: resubmitsRejectedSchedule(existing) ? '' : existing?.rejection_reason || '', admin_recommendation: resubmitsRejectedSchedule(existing) ? '' : existing?.admin_recommendation || '',
+    approval_date: resubmitsRejectedSchedule(existing) ? '' : existing?.approval_date || '', notification_status: existing?.notification_status || '',
     revision_of: existing?.revision_of || '', original_schedule_id: existing?.original_schedule_id || '', revision_status: existing?.revision_status || '',
     revision_created_at: existing?.revision_created_at || '', revision_submitted_at: existing?.revision_submitted_at || '', revision_history: existing?.revision_history || [],
-    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: existing?.approval_status || (isSuperAdmin(state.store) ? 'approved' : 'pending'), created_by: existing?.created_by || currentUser(state.store).id,
+    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: approvalStatusForSave(existing), created_by: existing?.created_by || currentUser(state.store).id,
     schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
+}
+
+function resubmitsRejectedSchedule(existing) {
+  return Boolean(existing && isManager(state.store) && existing.approval_status === 'rejected');
+}
+
+function approvalStatusForSave(existing) {
+  if (isSuperAdmin(state.store)) return 'approved';
+  if (resubmitsRejectedSchedule(existing)) return 'pending';
+  return existing?.approval_status || 'pending';
 }
 
 function syncEventRange(event) {
@@ -903,7 +913,7 @@ function submitEventForm(event) {
   const error = validateEvent(candidate);
   if (error) return showToast(error, 'error');
   const block = findEventBlock(candidate);
-  if (block) return showConflict('Blocked Date or Time', `This period has been blocked by the admin. Please choose another date or time.`, [block], false);
+  if (block) return showConflict('Blocked Date or Time', `This period has been blocked by the admin. Please choose another date or time.${block.reason ? ` Reason: ${block.reason}` : ''}`, [block], false);
   const conflicts = findVenueConflicts(state.store, candidate);
   candidate.conflict_event_ids = conflicts.map((item) => item.id);
   state.pendingEvent = candidate;
@@ -959,7 +969,7 @@ function saveEvent(candidate) {
     return;
   }
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
-  if (existingIndex < 0 && candidate.approval_status === 'pending') {
+  if (candidate.approval_status === 'pending' && (existingIndex < 0 || existing?.approval_status === 'rejected')) {
     notifyAdmins({
       notification_type: 'schedule_approval',
       reference_id: candidate.id,
@@ -1242,8 +1252,14 @@ function applyApprovedRevision(revision, approvedAt) {
 
 function showConflict(title, subtitle, records, canContinue) {
   $('conflictTitle').textContent = title; $('conflictSubtitle').textContent = subtitle;
-  $('conflictBody').innerHTML = records.map((record) => `<p><strong>${escapeHtml(record.title)}</strong><br>${escapeHtml(record.venue || 'University-wide')}<br>${escapeHtml(record.occurrences ? scheduleSummary(record) : `${formatDateTime(record.start_time)} to ${formatTime(record.end_time)}`)}</p>`).join('');
+  $('conflictBody').innerHTML = records.map(conflictRecordHtml).join('');
   $('conflictContinueButton').hidden = !canContinue; openDialog('conflictModal');
+}
+
+function conflictRecordHtml(record) {
+  const schedule = record.occurrences ? scheduleSummary(record) : `${formatDateTime(record.start_time)} to ${formatTime(record.end_time)}`;
+  const reason = record.reason ? `<br><strong>Reason:</strong> ${escapeHtml(record.reason)}` : '';
+  return `<p><strong>${escapeHtml(record.title)}</strong><br>${escapeHtml(record.venue || 'University-wide')}<br>${escapeHtml(schedule)}${reason}</p>`;
 }
 function continueAfterConflict() { closeDialog('conflictModal'); const next = state.pendingConflictContinuation; state.pendingConflictContinuation = null; next?.(); }
 

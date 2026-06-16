@@ -461,7 +461,30 @@ function publicDayItems(date) {
 }
 
 function publicDayEventHtml({ event, occurrence }) {
-  return `<article class="public-day-event" style="border-left-color:${escapeHtml(eventPrimaryColor(event))};--event-accent-color:${escapeHtml(eventAccentColor(event))}"><strong>${escapeHtml(event.title)}</strong><p>${formatTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}</p><p>${escapeHtml(event.organization_name)} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.public_description || '')}</p></article>`;
+  const details = {
+    Organization: event.organization_name,
+    Category: publicCategoryName(event),
+    Venue: event.venue,
+    Schedule: `${formatPublicDateTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}`,
+    'Expected Attendees': event.expected_attendees,
+    'Contact Person': event.contact_person,
+    'Contact Number': event.contact_info,
+    Description: event.public_description,
+    Purpose: event.purpose
+  };
+  return `<article class="public-day-event" style="border-left-color:${escapeHtml(eventPrimaryColor(event))};--event-accent-color:${escapeHtml(eventAccentColor(event))}"><strong>${escapeHtml(event.title)}</strong><dl class="public-event-details">${detailRows(details)}</dl></article>`;
+}
+
+function publicCategoryName(event) {
+  const category = state.store.categories.find((item) => item.id === event.category_id || item.name === event.event_type);
+  return category?.name || event.event_type || '';
+}
+
+function detailRows(data) {
+  return Object.entries(data)
+    .filter(([, value]) => value != null && String(value).trim() !== '')
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+    .join('');
 }
 
 function positionPublicDayDialog(dialog, anchorEl) {
@@ -516,6 +539,10 @@ function readableStatus(value) {
 
 function formatTime(value) {
   return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatPublicDateTime(value) {
+  return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function formatCompactTime(value) {
