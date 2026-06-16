@@ -111,6 +111,13 @@ function normalizeUser(user = {}) {
     role: safeUser.role || presetConfig.role,
     account_preset: preset,
     account_type: ACCOUNT_TYPES.includes(safeUser.account_type) ? safeUser.account_type : defaultAccountType(preset),
+    email: safeUser.email || '',
+    contact_number: safeUser.contact_number || safeUser.contact || '',
+    suspended_status: Boolean(safeUser.suspended_status || safeUser.suspension_status),
+    suspension_status: Boolean(safeUser.suspension_status || safeUser.suspended_status),
+    suspension_date: safeUser.suspension_date || '',
+    created_at: safeUser.created_at || new Date().toISOString(),
+    updated_at: safeUser.updated_at || safeUser.created_at || new Date().toISOString(),
     permissions: { ...presetConfig.permissions, ...(safeUser.permissions || {}) }
   };
 }
@@ -137,6 +144,7 @@ function normalizeCategories(categories = []) {
 }
 
 export function storeForPersistence(store) {
+  validateAccountsForPersistence(store);
   validateSchedulesForPersistence(store);
   validateBlockedTimesForPersistence(store);
   validateActivityStatusesForPersistence(store);
@@ -185,6 +193,9 @@ function validateSchedulesForPersistence(store) {
     if (!['basic', 'internal'].includes(event.privacy_level)) throw new Error('Schedule privacy level must be Public or Admin only.');
     if (!event.contact_person || !/^\d{11}$/.test(String(event.contact_info || ''))) throw new Error('Schedule requires contact person and an 11-digit contact number.');
     if (!event.public_description || !event.purpose) throw new Error('Schedule requires public description and purpose.');
+    if (!['pending', 'approved', 'rejected'].includes(event.approval_status || 'approved')) throw new Error('Schedule approval status is invalid.');
+    if (event.approval_date && !['unread', 'read'].includes(event.notification_status || '')) throw new Error('Reviewed schedules require a notification status.');
+    if (String(event.admin_recommendation || '').length > 1000) throw new Error('Admin recommendation is too long.');
     eventOccurrencesForValidation(event).forEach((occurrence) => {
       if (!occurrence.start_time || !occurrence.end_time || new Date(occurrence.end_time) <= new Date(occurrence.start_time)) throw new Error('Schedule end date and time must be later than start date and time.');
     });
@@ -209,8 +220,19 @@ function normalizeEvent(event) {
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
     occurrences,
     start_time: firstOccurrence.start_time || event.start_time,
-    end_time: lastOccurrence.end_time || event.end_time
+    end_time: lastOccurrence.end_time || event.end_time,
+    admin_recommendation: event.admin_recommendation || '',
+    approval_date: event.approval_date || '',
+    notification_status: event.notification_status || ''
   };
+}
+
+function validateAccountsForPersistence(store) {
+  (store.users || []).forEach((user) => {
+    if (user.suspended_status && !user.suspension_date) throw new Error('Suspended accounts require a suspension date.');
+    if (String(user.contact_number || '').length > 20) throw new Error('Account contact number is too long.');
+    if (String(user.email || '').length > 160) throw new Error('Account email is too long.');
+  });
 }
 
 function normalizeBlockedTime(block = {}) {

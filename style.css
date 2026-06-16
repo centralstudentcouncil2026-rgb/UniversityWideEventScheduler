@@ -1096,7 +1096,18 @@ body.is-super-admin .check-row.super-admin-only {
   align-items: start;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.account-card-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.account-details {
+  margin-top: 4px;
 }
 
 .account-card-head label {
@@ -1117,12 +1128,6 @@ body.is-super-admin .check-row.super-admin-only {
   min-height: 40px;
   padding: 8px 10px;
   text-transform: none;
-}
-
-.permission-grid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .permission-toggle {
@@ -1250,13 +1255,6 @@ body.is-super-admin .check-row.super-admin-only {
   color: var(--aup-muted);
   line-height: 1.4;
   margin: 5px 0 0;
-}
-
-.account-card-controls {
-  align-items: end;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(160px, 1fr));
 }
 
 .form-grid {
@@ -1855,10 +1853,6 @@ body.is-super-admin .check-row.super-admin-only {
     flex-direction: column;
   }
 
-  .account-card-controls {
-    grid-template-columns: 1fr;
-  }
-
   .details-list {
     grid-template-columns: 1fr;
   }
@@ -1867,9 +1861,12 @@ body.is-super-admin .check-row.super-admin-only {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .account-card-head,
-  .permission-grid {
+  .account-card-head {
     grid-template-columns: 1fr;
+  }
+
+  .account-card-actions {
+    justify-content: stretch;
   }
 }
 

@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-announcements-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-announcements-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-accounts-v1';
+import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-accounts-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -158,13 +158,15 @@ function bindEvents() {
     loginForm: login,
     registerForm: registerAccount,
     eventForm: submitEventForm,
+    eventReviewForm: submitEventReviewForm,
+    accountEditForm: submitAccountEditForm,
     activityStatusForm: submitActivityStatusForm,
     announcementForm: addAnnouncement,
     concernForm: addConcern,
     blockedTimeForm: addBlockedTime,
     organizationForm: addOrganization
   });
-  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'organizationsList', 'accountRequestsList']);
+  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'organizationsList', 'usersList']);
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
   on('viewSelector', 'pointerdown', (event) => {
@@ -186,7 +188,6 @@ function bindEvents() {
   on('occurrenceList', 'click', handleOccurrenceListClick);
   on('blockType', 'change', updateBlockTimeFields);
   on('blockStartDate', 'change', syncSingleDayBlockEndDate);
-  on('usersList', 'change', handleUserPermissionChange);
   const closePublicDialogButton = $('closePublicDayDialog');
   if (closePublicDialogButton) closePublicDialogButton.addEventListener('click', closePublicDayDialog);
   $('calendar').addEventListener('pointerdown', startWeekRectangleSelection, true);
@@ -755,8 +756,9 @@ function readEventForm() {
     venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
     contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
-    admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '',
-    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
+    admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '', admin_recommendation: existing?.admin_recommendation || '',
+    approval_date: existing?.approval_date || '', notification_status: existing?.notification_status || '',
+    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: existing?.approval_status || (isSuperAdmin(state.store) ? 'approved' : 'pending'), created_by: existing?.created_by || currentUser(state.store).id,
     schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
 }
@@ -912,7 +914,7 @@ function openDetails(props) {
     const scheduleLabel = selectedOccurrence ? `${formatDateTime(selectedOccurrence.start_time)} to ${formatTime(selectedOccurrence.end_time)}` : scheduleSummary(record);
     const data = { Organization: record.organization_name, Category: category.name, Venue: record.venue, Schedule: scheduleLabel, Approval: cap(record.approval_status), Status: cap(record.event_status), Description: record.public_description };
     if (privateView) Object.assign(data, { Purpose: record.purpose, 'Contact Person': record.contact_person, 'Contact Info': record.contact_info, 'Private Notes': record.private_notes || 'None' });
-    if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
+    if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Recommendation': record.admin_recommendation || 'None', 'Approval Date': record.approval_date ? formatDateTime(record.approval_date) : 'None', 'Notification Status': record.notification_status || 'None', 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
     $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canDeleteEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
     $('detailsApproveButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'rejected';
@@ -1037,9 +1039,44 @@ function reviewEvent(event, status) {
     const conflict = findApprovedVenueConflict(state.store, event);
     if (conflict) return showConflict('Approval Blocked', 'An approved event already uses this venue and time.', [conflict], false);
   }
-  event.approval_status = status; event.updated_at = new Date().toISOString();
-  log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${event.title}" as ${status}.`, event);
-  closeDialog('detailsModal'); persist(`Event request ${status}.`);
+  openEventReviewModal(event, status);
+}
+
+function openEventReviewModal(event, status) {
+  $('eventReviewId').value = event.id;
+  $('eventReviewStatus').value = status;
+  $('eventReviewTitle').textContent = status === 'approved' ? 'Approve Event Request' : 'Reject Event Request';
+  $('eventReviewSubtitle').textContent = status === 'approved'
+    ? `Add a recommendation or comment for "${event.title}".`
+    : `Inform the creator why "${event.title}" is rejected. The creator will be told to delete the proposed event.`;
+  $('eventReviewRecommendation').value = event.admin_recommendation || event.rejection_reason || '';
+  $('eventReviewSubmitButton').textContent = status === 'approved' ? 'Approve Request' : 'Reject Request';
+  openDialog('eventReviewModal');
+}
+
+function submitEventReviewForm(event) {
+  event.preventDefault();
+  const record = state.store.events.find((item) => item.id === $('eventReviewId').value);
+  const status = $('eventReviewStatus').value;
+  if (!record || !['approved', 'rejected'].includes(status)) return showToast('Event request was not found.', 'error');
+  if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return;
+  const recommendation = cleanMultiline($('eventReviewRecommendation').value);
+  const textError = textLimitError(recommendation, TEXT_LIMITS.adminNotes, 'Admin recommendation');
+  if (textError) return showToast(textError, 'error');
+  const now = new Date().toISOString();
+  Object.assign(record, {
+    approval_status: status,
+    admin_recommendation: recommendation,
+    approval_date: now,
+    notification_status: 'unread',
+    updated_at: now
+  });
+  if (status === 'rejected') record.rejection_reason = recommendation || 'Rejected by admin. Proposed event should be deleted.';
+  log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${record.title}" as ${status}.`, record);
+  closeDialog('eventReviewModal');
+  closeDialog('detailsModal');
+  persist(`Event request ${status}.`);
+  renderEventRequests();
 }
 
 function showConflict(title, subtitle, records, canContinue) {
@@ -1209,10 +1246,27 @@ function renderNotifications() {
     ...activeAnnouncements(state.store).map((item) => ({ title: `Announcement: ${item.title}`, detail: item.content, date: item.updated_at || item.created_at || item.posted_at })),
     ...state.store.blockedTimes.filter((item) => new Date(item.end_time) >= new Date()).map((item) => ({ title: `Blocked period: ${item.title}`, detail: `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`, date: item.created_at })),
     ...ownEvents.filter((item) => eventIsActive(item) && new Date(item.start_time) >= new Date() && new Date(item.start_time) <= upcomingLimit).map((item) => ({ title: `Upcoming event: ${item.title}`, detail: `${item.venue} - ${formatDateTime(item.start_time)}`, date: item.start_time })),
+    ...ownEvents.filter((item) => item.approval_date && item.notification_status && eventNotificationBelongsToUser(item, user)).map(eventReviewNotification),
     ...ownEvents.filter((item) => item.conflict_event_ids?.length).map((item) => ({ title: `Conflict warning: ${item.title}`, detail: `${item.conflict_event_ids.length} overlapping event(s) need review.`, date: item.updated_at })),
     ...state.store.concerns.filter((item) => isSuperAdmin(state.store) || item.organization_id === user.organization_id).filter((item) => item.admin_response).map((item) => ({ title: `Concern update: ${item.title}`, detail: `${cap(item.status)} - ${item.admin_response}`, date: item.updated_at }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
   $('notificationsList').innerHTML = notices.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>${escapeHtml(formatDateTime(item.date))}</p></div>`).join('') || empty('No notifications right now.');
+}
+
+function eventNotificationBelongsToUser(item, user) {
+  return item.created_by === user.id || (!isSuperAdmin(state.store) && item.organization_id === user.organization_id);
+}
+
+function eventReviewNotification(item) {
+  const approved = item.approval_status === 'approved';
+  const recommendation = item.admin_recommendation ? ` Recommendation: ${item.admin_recommendation}` : '';
+  return {
+    title: `${approved ? 'Approved' : 'Rejected'} request: ${item.title}`,
+    detail: approved
+      ? `Your event request was approved.${recommendation}`
+      : `Your event request was rejected. Please delete the proposed event.${recommendation}`,
+    date: item.approval_date || item.updated_at
+  };
 }
 
 function chooseActivityStatus() {
@@ -1297,7 +1351,8 @@ function renderEventRequests() {
 function eventRequestHtml(item) {
   const conflictCount = Array.isArray(item.conflict_event_ids) ? item.conflict_event_ids.length : 0;
   const conflictText = conflictCount ? `Warning: ${conflictCount} schedule conflict(s)` : 'No schedule conflict warning';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
+  const reviewText = item.approval_date ? `<p>${escapeHtml(formatDateTime(item.approval_date))} - ${escapeHtml(item.admin_recommendation || 'No recommendation added.')}</p>` : '';
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${reviewText}${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
 }
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); updateBlockTimeFields(); openDialog('blockedTimesModal'); }
@@ -1402,71 +1457,119 @@ function organizationHtml(item) {
 
 function openUsers() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
 function renderUsers() {
-  const requests = state.store.accountRequests.filter((item) => item.status === 'pending');
-  $('accountRequestsList').innerHTML = requests.map(accountRequestHtml).join('') || empty('No pending account requests');
-  $('usersList').innerHTML = state.store.users.map(userHtml).join('');
-}
-
-function accountRequestHtml(item) {
-  return `<div class="activity-item"><strong>${escapeHtml(item.full_name)} <span class="status-pill pending">Pending</span></strong><p>${escapeHtml(roleLabel(item.role))} - @${escapeHtml(item.username)}</p><p>${escapeHtml(item.organization_name || 'No organization')}</p>${actionButton('account-approve', item.id, 'Approve', 'primary-button')}${actionButton('account-reject', item.id, 'Reject', 'danger-button')}</div>`;
+  $('usersList').innerHTML = state.store.users.map(userHtml).join('') || empty('No accounts');
 }
 
 function userHtml(user) {
   const organization = state.store.organizations.find((org) => org.id === user.organization_id);
-  const permissions = user.permissions || {};
-  const presetOptions = Object.entries(ACCOUNT_PRESETS).map(([value, preset]) => `<option value="${escapeHtml(value)}"${user.account_preset === value ? ' selected' : ''}>${escapeHtml(preset.label)}</option>`).join('');
-  const accountTypeOptions = ACCOUNT_TYPES.map((type) => `<option value="${escapeHtml(type)}"${user.account_type === type ? ' selected' : ''}>${escapeHtml(type)}</option>`).join('');
-  const toggles = ACCOUNT_PERMISSION_FIELDS.map(({ key, label }) => `<label class="permission-toggle"><input type="checkbox" data-account-permission="${escapeHtml(key)}" data-user-id="${escapeHtml(user.id)}"${permissions[key] !== false && permissions[key] ? ' checked' : ''}>${escapeHtml(label)}</label>`).join('');
-  return `<div class="activity-item account-card"><div class="account-card-head"><div><strong>${escapeHtml(user.full_name)}</strong><p>@${escapeHtml(user.username)} - ${escapeHtml(roleLabel(user.account_preset || user.role))} - ${escapeHtml(user.account_type || 'CSC')}</p><p>${escapeHtml(organization ? organization.organization_name : 'No organization')}</p></div><div class="account-card-controls"><label>Preset<select data-account-preset data-user-id="${escapeHtml(user.id)}">${presetOptions}</select></label><label>Account Type<select data-account-type data-user-id="${escapeHtml(user.id)}">${accountTypeOptions}</select></label></div></div><div class="permission-grid">${toggles}</div></div>`;
+  const status = accountStatus(user);
+  const rows = {
+    Name: user.full_name || '',
+    Role: roleLabel(user.account_preset || user.role),
+    Organization: organization ? organization.organization_name : 'No organization',
+    Email: accountEmail(user),
+    'Contact Number': user.contact_number || user.contact || 'Not provided',
+    'Account Status': status,
+    'Creation Date': user.created_at ? formatDateTime(user.created_at) : 'Not recorded'
+  };
+  const suspendLabel = user.suspended_status ? 'Reactivate Account' : 'Suspend Account';
+  return `<div class="activity-item account-card"><div class="account-card-head"><div><strong>${escapeHtml(user.full_name || user.username)}</strong><p>@${escapeHtml(user.username || 'account')} - ${escapeHtml(status)}</p></div><div class="account-card-actions">${actionButton('account-edit', user.id, 'Edit Account', 'secondary-button')}${actionButton('account-suspend', user.id, suspendLabel, 'secondary-button')}${actionButton('account-delete', user.id, 'Delete Account', 'danger-button')}</div></div><dl class="details-list account-details">${rowsObject(rows)}</dl></div>`;
 }
 
-const ACCOUNT_PERMISSION_FIELDS = [
-  { key: 'enabled', label: 'Account enabled' },
-  { key: 'manageAccounts', label: 'Manage accounts' },
-  { key: 'approveEvents', label: 'Approve events' },
-  { key: 'editAllEvents', label: 'Edit all events' },
-  { key: 'deleteAllEvents', label: 'Delete all events' },
-  { key: 'manageBlockedTimes', label: 'Manage blocked times' },
-  { key: 'manageAnnouncements', label: 'Manage announcements' },
-  { key: 'updatePresidentStatus', label: 'Update CSC status' },
-  { key: 'updateOfficeStatus', label: 'Update OIC status' },
-  { key: 'manageCategories', label: 'Manage categories' }
-];
+function accountEmail(user) {
+  return user.email || (user.username ? `${user.username}@core.local` : 'Not provided');
+}
 
-async function handleUserPermissionChange(event) {
+function accountStatus(user) {
+  if (user.deleted_at) return 'Deleted';
+  if (user.suspended_status || user.suspension_status) return 'Suspended';
+  if (user.permissions?.enabled === false) return 'Disabled';
+  return 'Active';
+}
+
+function rowsObject(data) {
+  return Object.entries(data).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value == null ? '' : value)}</dd>`).join('');
+}
+
+function openAccountEditor(id) {
+  const user = state.store.users.find((item) => item.id === id);
+  if (!user) return showToast('Account was not found.', 'error');
+  $('accountEditId').value = user.id;
+  $('accountEditName').value = user.full_name || '';
+  fillSelect('accountEditRole', Object.entries(ACCOUNT_PRESETS).map(([value, preset]) => [value, preset.label]), user.account_preset || 'organization');
+  fillSelect('accountEditOrganization', [['', 'No organization'], ...state.store.organizations.map((org) => [org.id, org.organization_name])], user.organization_id || '');
+  $('accountEditEmail').value = accountEmail(user).endsWith('@core.local') ? '' : accountEmail(user);
+  $('accountEditContact').value = user.contact_number || user.contact || '';
+  $('accountEditStatus').value = (user.suspended_status || user.suspension_status) ? 'suspended' : 'active';
+  $('accountEditCreated').value = user.created_at ? formatDateTime(user.created_at) : 'Not recorded';
+  openDialog('accountEditModal');
+}
+
+async function submitAccountEditForm(event) {
+  event.preventDefault();
   if (!canManageAccounts(state.store)) return;
-  const target = event.target;
-  const user = state.store.users.find((item) => item.id === target.dataset.userId);
-  if (!user) return;
-  const previousUser = {
-    account_preset: user.account_preset,
-    account_type: user.account_type,
-    role: user.role,
-    permissions: { ...(user.permissions || {}) }
-  };
-
-  if (target.matches('[data-account-preset]')) {
-    applyAccountPreset(user, target.value);
-  } else if (target.matches('[data-account-type]')) {
-    if (!ACCOUNT_TYPES.includes(target.value)) return;
-    user.account_type = target.value;
-  } else if (target.matches('[data-account-permission]')) {
-    user.permissions = { ...user.permissions, [target.dataset.accountPermission]: target.checked };
-  } else {
-    return;
-  }
-
-  if (user.id === currentUser(state.store).id && (!user.permissions.enabled || !user.permissions.manageAccounts || user.role !== 'super_admin')) {
-    Object.assign(user, previousUser);
-    showToast('The active Manager account must stay enabled with Manage accounts access.', 'error');
+  const user = state.store.users.find((item) => item.id === $('accountEditId').value);
+  if (!user) return showToast('Account was not found.', 'error');
+  const previous = { ...user, permissions: { ...(user.permissions || {}) } };
+  const fullName = cleanSingleLine($('accountEditName').value);
+  const email = cleanSingleLine($('accountEditEmail').value);
+  const contact = cleanSingleLine($('accountEditContact').value);
+  if (!fullName) return showToast('Account name is required.', 'error');
+  const textError = firstTextLimitError([
+    [fullName, TEXT_LIMITS.fullName, 'Account name'],
+    [email, 160, 'Email'],
+    [contact, 20, 'Contact number']
+  ]);
+  if (textError) return showToast(textError, 'error');
+  applyAccountPreset(user, $('accountEditRole').value);
+  user.full_name = fullName;
+  user.organization_id = $('accountEditOrganization').value;
+  user.email = email;
+  user.contact_number = contact;
+  applyAccountSuspension(user, $('accountEditStatus').value === 'suspended');
+  if (user.id === currentUser(state.store).id && ((user.suspended_status || user.suspension_status) || !user.permissions?.enabled || !user.permissions?.manageAccounts || user.role !== 'super_admin')) {
+    Object.assign(user, previous);
+    showToast('The active Manager account must remain active with Manage accounts access.', 'error');
     renderUsers();
     return;
   }
-
   user.updated_at = new Date().toISOString();
-  log('account_permissions_updated', `Updated access for ${user.full_name}.`, { user_id: user.id, account_preset: user.account_preset, permissions: user.permissions });
-  await persist('Account access updated.');
+  log('account_modified', `Modified account "${user.full_name}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number, role: user.role, organization_id: user.organization_id });
+  closeDialog('accountEditModal');
+  await persist('Account updated.');
   renderUsers();
+}
+
+function applyAccountSuspension(user, suspended) {
+  user.suspended_status = Boolean(suspended);
+  user.suspension_status = Boolean(suspended);
+  user.suspension_date = suspended ? (user.suspension_date || new Date().toISOString()) : '';
+  user.permissions = { ...(user.permissions || {}), enabled: !suspended };
+}
+
+function suspendAccount(id) {
+  const user = state.store.users.find((item) => item.id === id);
+  if (!user || !canManageAccounts(state.store)) return;
+  if (user.id === currentUser(state.store).id) return showToast('You cannot suspend the active Manager account.', 'error');
+  const suspended = !(user.suspended_status || user.suspension_status);
+  applyAccountSuspension(user, suspended);
+  user.updated_at = new Date().toISOString();
+  log(suspended ? 'account_suspended' : 'account_reactivated', `${suspended ? 'Suspended' : 'Reactivated'} account "${user.full_name}".`, { user_id: user.id, suspension_date: user.suspension_date });
+  persist(suspended ? 'Account suspended.' : 'Account reactivated.');
+  renderUsers();
+}
+
+function deleteAccount(id) {
+  const user = state.store.users.find((item) => item.id === id);
+  if (!user || !canManageAccounts(state.store)) return;
+  if (user.id === currentUser(state.store).id) return showToast('You cannot delete the active Manager account.', 'error');
+  confirmAction(`Delete account "${user.full_name}"?`, async () => {
+    const deleted = { ...user, deleted_at: new Date().toISOString(), deleted_by: currentUser(state.store).id };
+    state.store.users = state.store.users.filter((item) => item.id !== id);
+    log('account_deleted', `Deleted account "${deleted.full_name}".`, deleted);
+    await persist('Account deleted.');
+    renderUsers();
+  });
 }
 
 function applyAccountPreset(user, presetName) {
@@ -1507,8 +1610,9 @@ const LIST_ACTION_PERMISSIONS = {
   'block-delete': { allowed: () => canManageBlockedTimes(state.store), message: 'This account cannot manage blocked times.' },
   'category-toggle': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
   'category-delete': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
-  'account-approve': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
-  'account-reject': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'account-edit': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'account-suspend': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'account-delete': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
   'concern-review': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-resolve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' }
@@ -1526,8 +1630,9 @@ const LIST_ACTIONS = {
   'category-toggle': toggleCategory,
   'category-delete': (id) => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
   'organization-delete': confirmOrganizationDelete,
-  'account-approve': approveAccount,
-  'account-reject': rejectAccount,
+  'account-edit': openAccountEditor,
+  'account-suspend': suspendAccount,
+  'account-delete': deleteAccount,
   'concern-review': reviewConcern,
   'concern-resolve': (id) => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
   'concern-reject': (id) => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
@@ -1744,14 +1849,6 @@ async function registerAccount(event) {
 function updateRegistrationFields() {
   $('registerOrganizationWrap').hidden = false;
   $('registerOrganizationName').required = true;
-}
-async function approveAccount(id) {
-  try { await decideAccountRequest(id, 'approved'); await reloadStore(); renderUsers(); showToast('Account request approved.', 'success'); }
-  catch (error) { showToast(error.message, 'error'); }
-}
-async function rejectAccount(id) {
-  try { await decideAccountRequest(id, 'rejected'); await reloadStore(); renderUsers(); showToast('Account request rejected.', 'success'); }
-  catch (error) { showToast(error.message, 'error'); }
 }
 async function reloadStore() {
   state.store = (await loadStore()).store;

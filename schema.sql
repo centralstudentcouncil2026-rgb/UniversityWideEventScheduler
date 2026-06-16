@@ -92,7 +92,10 @@ create table if not exists public.schedules (
   public_description text not null,
   purpose text not null,
   schedule_schema_version integer not null default 2,
-  approval_status text not null default 'approved' check (approval_status = 'approved'),
+  approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
+  admin_recommendation text,
+  approval_date timestamptz,
+  notification_status text check (notification_status in ('unread', 'read')),
   event_status text not null default 'planned',
   created_by uuid references auth.users(id) on update cascade on delete set null,
   created_at timestamptz not null default now(),
@@ -105,6 +108,31 @@ create index if not exists schedules_organization_id_idx on public.schedules(org
 create index if not exists schedules_start_time_idx on public.schedules(start_time);
 create index if not exists schedules_end_time_idx on public.schedules(end_time);
 create index if not exists schedules_privacy_level_idx on public.schedules(privacy_level);
+create index if not exists schedules_approval_status_idx on public.schedules(approval_status);
+create index if not exists schedules_approval_date_idx on public.schedules(approval_date);
+create index if not exists schedules_notification_status_idx on public.schedules(notification_status);
+
+alter table if exists public.schedules add column if not exists admin_recommendation text;
+alter table if exists public.schedules add column if not exists approval_date timestamptz;
+alter table if exists public.schedules add column if not exists notification_status text;
+alter table if exists public.schedules alter column approval_status set default 'pending';
+
+update public.schedules
+set notification_status = 'unread'
+where approval_date is not null
+  and notification_status is null;
+
+do $$
+begin
+  if to_regclass('public.schedules') is not null then
+    alter table public.schedules drop constraint if exists schedules_approval_status_check;
+    alter table public.schedules
+      add constraint schedules_approval_status_check check (approval_status in ('pending', 'approved', 'rejected'));
+    alter table public.schedules drop constraint if exists schedules_notification_status_check;
+    alter table public.schedules
+      add constraint schedules_notification_status_check check (notification_status is null or notification_status in ('unread', 'read'));
+  end if;
+end $$;
 
 create table if not exists public.blocked_times (
   id uuid primary key default gen_random_uuid(),
@@ -138,6 +166,12 @@ end
 where block_type is null;
 
 alter table if exists public.profiles add column if not exists account_type text;
+alter table if exists public.profiles add column if not exists contact_number text;
+alter table if exists public.profiles add column if not exists email text;
+alter table if exists public.profiles add column if not exists suspension_status boolean not null default false;
+alter table if exists public.profiles add column if not exists suspension_date timestamptz;
+alter table if exists public.profiles add column if not exists deletion_logs jsonb not null default '[]'::jsonb;
+alter table if exists public.profiles add column if not exists modification_logs jsonb not null default '[]'::jsonb;
 do $$
 begin
   if to_regclass('public.profiles') is not null
@@ -159,6 +193,9 @@ set account_type = case
   else 'CSC'
 end
 where account_type is null;
+
+create index if not exists profiles_suspension_status_idx on public.profiles(suspension_status);
+create index if not exists profiles_suspension_date_idx on public.profiles(suspension_date);
 
 create table if not exists public.activity_statuses (
   account_id uuid primary key references auth.users(id) on update cascade on delete cascade,
