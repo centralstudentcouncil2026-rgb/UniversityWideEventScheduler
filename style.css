@@ -256,10 +256,6 @@ button {
   gap: 8px;
 }
 
-.period-controls.is-hidden {
-  display: none !important;
-}
-
 .toolbar-actions {
   align-items: center;
   display: flex;

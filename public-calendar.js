@@ -202,8 +202,6 @@ function changePublicView(value) {
 function syncPublicViewControls(viewType = state.calendar?.view.type) {
   const selector = $('publicViewSelector');
   if (selector) selector.value = state.publicViewMode;
-  const showPeriodButtons = state.publicViewMode === 'dayGridMonth' && viewType === 'dayGridMonth';
-  $('prevButton')?.closest('.period-controls')?.classList.toggle('is-hidden', !showPeriodButtons);
 }
 
 function bindPublicCalendarResizeObserver() {

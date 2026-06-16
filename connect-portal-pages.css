@@ -574,7 +574,7 @@
   }
 
   .public-shell .topbar {
-    margin-bottom: 58px;
+    margin-bottom: 46px;
   }
 
   .public-shell .mobile-only,
@@ -651,7 +651,7 @@
     left: 10px;
     position: absolute;
     right: 10px;
-    top: calc(100% + 8px);
+    top: calc(100% + 2px);
     z-index: 25;
   }
 
@@ -755,6 +755,7 @@
     align-self: start;
     min-height: 0;
     overflow: visible;
+    padding-top: 0;
   }
 
   #calendar {
