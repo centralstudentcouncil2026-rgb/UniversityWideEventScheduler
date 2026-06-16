@@ -23,17 +23,17 @@ window.SUPABASE_CONFIG = Object.freeze({
 })();
 
 (() => {
-  const fullName = 'Centralized Organization Network for News, Events, Coordination, & Timely Events';
-  const compactName = ['Centralized Organization Network', 'News • Events • Coordination • Timely Events'];
+  const fullName = 'CSC S.Y.N.C. — Systemized Year-round Network Calendar';
+  const compactName = ['CSC S.Y.N.C.', 'Systemized Year-round Network Calendar'];
 
   function applyConnectBranding() {
-    document.title = document.title?.startsWith('CONNECT') ? document.title : `CONNECT | ${fullName}`;
+    document.title = document.title?.startsWith('CSC S.Y.N.C.') ? document.title : fullName;
 
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) metaDescription.setAttribute('content', fullName);
 
     const brandTitle = document.querySelector('.brand-area h1');
-    if (brandTitle) brandTitle.textContent = 'CONNECT';
+    if (brandTitle) brandTitle.textContent = 'CSC S.Y.N.C.';
 
     const brandSubtitle = document.querySelector('.brand-area p');
     if (!brandSubtitle) return;

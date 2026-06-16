@@ -6,6 +6,10 @@ const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
 const DEFAULT_ANNOUNCEMENT = {
+  title: 'CSC S.Y.N.C. is ready for scheduling',
+  content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
+};
+const LEGACY_DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
@@ -382,8 +386,9 @@ function renderAnnouncements() {
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
-  return title === DEFAULT_ANNOUNCEMENT.title.toLowerCase()
-    && content === DEFAULT_ANNOUNCEMENT.content.toLowerCase();
+  return [DEFAULT_ANNOUNCEMENT, LEGACY_DEFAULT_ANNOUNCEMENT].some((announcement) =>
+    title === announcement.title.toLowerCase() && content === announcement.content.toLowerCase()
+  );
 }
 
 function announcementHtml(item) {

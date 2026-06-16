@@ -26,7 +26,7 @@ function roleAllowed(store) {
 }
 
 function roleError(store) {
-  if (!userPermission(currentUser(store), 'enabled')) return 'This account is disabled. Contact the CONNECT manager.';
+  if (!userPermission(currentUser(store), 'enabled')) return 'This account is disabled. Contact the CSC S.Y.N.C. manager.';
   return loginType === 'student'
     ? 'This login is for student organizations only.'
     : 'This login is for administrators only.';
@@ -57,7 +57,7 @@ if (form) form.addEventListener('submit', async (event) => {
       return;
     }
 
-    setMessage('Login successful. Opening CONNECT portal...', 'success');
+    setMessage('Login successful. Opening CSC S.Y.N.C. portal...', 'success');
     sessionStorage.setItem(MOBILE_ANNOUNCEMENT_LOGIN_FLAG, '1');
     window.location.href = portalHref;
   } catch (error) {

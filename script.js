@@ -26,6 +26,10 @@ const APP_STATUS_OPTIONS = [
   'Online consultation only'
 ];
 const DEFAULT_ANNOUNCEMENT = {
+  title: 'CSC S.Y.N.C. is ready for scheduling',
+  content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
+};
+const LEGACY_DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
@@ -1037,8 +1041,9 @@ function renderAnnouncementPreview() { const first = visibleAnnouncements()[0]; 
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
-  return title === DEFAULT_ANNOUNCEMENT.title.toLowerCase()
-    && content === DEFAULT_ANNOUNCEMENT.content.toLowerCase();
+  return [DEFAULT_ANNOUNCEMENT, LEGACY_DEFAULT_ANNOUNCEMENT].some((announcement) =>
+    title === announcement.title.toLowerCase() && content === announcement.content.toLowerCase()
+  );
 }
 function visibleAnnouncements() { return activeAnnouncements(state.store).filter((item) => !isDefaultAnnouncement(item)); }
 function announcementPreviewHtml(item) { return `<div class="notice ${classToken(item.priority || 'normal')}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }

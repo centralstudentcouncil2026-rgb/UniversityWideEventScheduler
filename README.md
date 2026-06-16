@@ -1,12 +1,12 @@
-# CONNECT: University-Wide Event Scheduler
+# CSC S.Y.N.C. — Systemized Year-round Network Calendar
 
-CONNECT is a static university organization calendar connected to a fresh
+CSC S.Y.N.C. is a static university organization calendar connected to a fresh
 Supabase backend. It does not use the original scheduler Supabase project.
 
 ## Deployment
 
 The frontend is configured for Supabase project `lcmyqhyxtipzovmgbdtf`. The
-backend stores the CONNECT scheduler payload in Supabase behind Auth-backed
+backend stores the CSC S.Y.N.C. scheduler payload in Supabase behind Auth-backed
 RPCs and Row Level Security.
 
 GitHub Pages publishes the static frontend from the `main` branch root:
@@ -81,13 +81,13 @@ Open `http://127.0.0.1:5173/index.html`.
 
 ## Backend
 
-`schema.sql` documents the CONNECT Auth/RPC backend applied to project
+`schema.sql` documents the CSC S.Y.N.C. Auth/RPC backend applied to project
 `lcmyqhyxtipzovmgbdtf`. The authoritative migrations are recorded in that
 project's Supabase migration history.
 
 ## Supabase MCP For Codex
 
-Use this MCP target for CONNECT project work in Codex:
+Use this MCP target for CSC S.Y.N.C. project work in Codex:
 
 ```bash
 codex mcp add supabase --url https://mcp.supabase.com/mcp?project_ref=lcmyqhyxtipzovmgbdtf
