@@ -58,6 +58,7 @@ export function normalizeStore(store = {}) {
   normalized.users = normalized.users.map(normalizeUser);
   normalized.categories = normalizeCategories(normalized.categories);
   normalized.events = normalized.events.map(normalizeEvent);
+  normalized.blockedTimes = normalized.blockedTimes.map(normalizeBlockedTime);
   return normalized;
 }
 
@@ -120,6 +121,7 @@ function normalizeCategories(categories = []) {
 
 export function storeForPersistence(store) {
   validateSchedulesForPersistence(store);
+  validateBlockedTimesForPersistence(store);
   return {
     ...store,
     events: store.events.map((event) => ({
@@ -129,6 +131,15 @@ export function storeForPersistence(store) {
         : event.private_notes
     }))
   };
+}
+
+function validateBlockedTimesForPersistence(store) {
+  (store.blockedTimes || []).forEach((block) => {
+    if (!block.title || !['single_day', 'multi_day'].includes(block.block_type)) throw new Error('Blocked period requires a title and block type.');
+    if (!block.start_time || !block.end_time || new Date(block.end_time) <= new Date(block.start_time)) throw new Error('Blocked-period end date and time must be later than start date and time.');
+    if (String(block.reason || '').length > 500) throw new Error('Blocked-period reason is too long.');
+    if (!block.created_by || !block.created_at) throw new Error('Blocked period requires creator and created date.');
+  });
 }
 
 function validateSchedulesForPersistence(store) {
@@ -164,6 +175,21 @@ function normalizeEvent(event) {
     occurrences,
     start_time: firstOccurrence.start_time || event.start_time,
     end_time: lastOccurrence.end_time || event.end_time
+  };
+}
+
+function normalizeBlockedTime(block = {}) {
+  const start = block.start_time || '';
+  const end = block.end_time || '';
+  const sameDay = String(start).slice(0, 10) === String(end).slice(0, 10);
+  return {
+    ...block,
+    block_type: block.block_type || (sameDay ? 'single_day' : 'multi_day'),
+    reason: block.reason || '',
+    created_by: block.created_by || block.createdBy || 'unknown',
+    created_at: block.created_at || block.createdDate || new Date().toISOString(),
+    start_time: start,
+    end_time: end
   };
 }
 

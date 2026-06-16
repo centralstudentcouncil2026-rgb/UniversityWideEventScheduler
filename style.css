@@ -837,6 +837,18 @@ body.is-public .view-selector {
   display: none;
 }
 
+#blockTimeFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#blockTimeFields.is-multi-day {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#blockTimeFields .multi-day-field[hidden] {
+  display: none;
+}
+
 .multi-schedule {
   border: 1px solid #dbe3ee;
   border-radius: 8px;
@@ -1795,7 +1807,9 @@ body.is-super-admin .check-row.super-admin-only {
   }
 
   #scheduleFields,
-  #scheduleFields.is-multi-day {
+  #scheduleFields.is-multi-day,
+  #blockTimeFields,
+  #blockTimeFields.is-multi-day {
     grid-template-columns: 1fr;
   }
 

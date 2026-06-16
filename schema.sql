@@ -105,3 +105,34 @@ create index if not exists schedules_organization_id_idx on public.schedules(org
 create index if not exists schedules_start_time_idx on public.schedules(start_time);
 create index if not exists schedules_end_time_idx on public.schedules(end_time);
 create index if not exists schedules_privacy_level_idx on public.schedules(privacy_level);
+
+create table if not exists public.blocked_times (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  block_type text not null check (block_type in ('single_day', 'multi_day')),
+  start_time timestamptz not null,
+  end_time timestamptz not null,
+  reason text,
+  created_by uuid references auth.users(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  constraint blocked_times_valid_time_range check (end_time > start_time),
+  constraint blocked_times_reason_length check (reason is null or char_length(reason) <= 500)
+);
+
+create index if not exists blocked_times_block_type_idx on public.blocked_times(block_type);
+create index if not exists blocked_times_start_time_idx on public.blocked_times(start_time);
+create index if not exists blocked_times_end_time_idx on public.blocked_times(end_time);
+create index if not exists blocked_times_created_by_idx on public.blocked_times(created_by);
+
+-- Migration/update helpers for an existing blocked_times table.
+alter table if exists public.blocked_times add column if not exists block_type text;
+alter table if exists public.blocked_times add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;
+alter table if exists public.blocked_times add column if not exists created_at timestamptz not null default now();
+
+update public.blocked_times
+set block_type = case
+  when block_type is not null then block_type
+  when start_time::date = end_time::date then 'single_day'
+  else 'multi_day'
+end
+where block_type is null;

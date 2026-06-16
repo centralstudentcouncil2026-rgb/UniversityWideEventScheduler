@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260616-schedule-categories-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-schedule-categories-v1';
+import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260616-block-times-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-block-times-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -186,7 +186,8 @@ function bindEvents() {
   on('eventDate', 'change', syncSingleDayEndDate);
   on('eventContactInfo', 'input', (event) => { event.target.value = event.target.value.replace(/\D/g, '').slice(0, 11); });
   on('occurrenceList', 'click', handleOccurrenceListClick);
-  on('blockAllDay', 'change', updateBlockTimeFields);
+  on('blockType', 'change', updateBlockTimeFields);
+  on('blockStartDate', 'change', syncSingleDayBlockEndDate);
   on('usersList', 'change', handleUserPermissionChange);
   const closePublicDialogButton = $('closePublicDayDialog');
   if (closePublicDialogButton) closePublicDialogButton.addEventListener('click', closePublicDayDialog);
@@ -1203,27 +1204,43 @@ function eventRequestHtml(item) {
   return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
 }
 
-function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); openDialog('blockedTimesModal'); }
-function updateBlockTimeFields() { $('blockStart').disabled = $('blockAllDay').checked; $('blockEnd').disabled = $('blockAllDay').checked; }
+function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); updateBlockTimeFields(); openDialog('blockedTimesModal'); }
+function updateBlockTimeFields() {
+  const multiDay = $('blockType')?.value === 'multi_day';
+  $('blockTimeFields')?.classList.toggle('is-multi-day', multiDay);
+  const endDateLabel = $('blockEndDateLabel');
+  if (endDateLabel) endDateLabel.hidden = !multiDay;
+  if ($('blockStartDateLabelText')) $('blockStartDateLabelText').textContent = multiDay ? 'Start Date' : 'Date';
+  $('blockEndDate').required = multiDay;
+  $('blockEndDate').readOnly = !multiDay;
+  if (!multiDay) syncSingleDayBlockEndDate();
+}
+
+function syncSingleDayBlockEndDate() {
+  if ($('blockType')?.value !== 'multi_day') $('blockEndDate').value = $('blockStartDate').value;
+}
+
 function addBlockedTime(event) {
   event.preventDefault();
   if (!canManageBlockedTimes(state.store)) return;
   const title = cleanSingleLine($('blockTitle').value);
   const reason = cleanMultiline($('blockReason').value);
-  const date = $('blockDate').value;
-  const allDay = $('blockAllDay').checked;
-  if (!title || !reason || !date) return showToast('Complete blocked-period title, date, and reason.', 'error');
+  const blockType = $('blockType').value;
+  const startDate = $('blockStartDate').value;
+  const endDate = blockType === 'multi_day' ? $('blockEndDate').value : startDate;
+  if (!title || !startDate || !endDate) return showToast('Complete blocked-period title and date fields.', 'error');
   const textError = firstTextLimitError([
     [title, TEXT_LIMITS.blockTitle, 'Blocked-period title'],
     [reason, TEXT_LIMITS.blockReason, 'Blocked-period reason']
   ]);
   if (textError) return showToast(textError, 'error');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return showToast('Use a valid blocked-period date.', 'error');
-  if (!allDay && (!$('blockStart').value || !$('blockEnd').value)) return showToast('Choose start and end times for a partial-day block.', 'error');
-  const start = allDay ? `${date}T00:00:00` : localIso(date, $('blockStart').value);
-  const end = allDay ? `${date}T23:59:59` : localIso(date, $('blockEnd').value);
+  if (!['single_day', 'multi_day'].includes(blockType)) return showToast('Choose a valid block type.', 'error');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return showToast('Use valid blocked-period dates.', 'error');
+  if (!$('blockStart').value || !$('blockEnd').value) return showToast('Choose start and end times for the blocked period.', 'error');
+  const start = localIso(startDate, $('blockStart').value);
+  const end = localIso(endDate, $('blockEnd').value);
   if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
-  const item = { id: createId(), title, start_time: start, end_time: end, all_day: allDay, reason, created_by: currentUser(state.store).id, created_at: new Date().toISOString() };
+  const item = { id: createId(), title, block_type: blockType, start_time: start, end_time: end, reason, created_by: currentUser(state.store).id, created_at: new Date().toISOString() };
   state.store.blockedTimes.push(item);
   log('blocked_time_created', `Added blocked period "${item.title}".`, item);
   event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes();
@@ -1233,7 +1250,8 @@ function renderBlockedTimes() {
 }
 
 function blockedTimeHtml(item) {
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatTime(item.end_time))}</p><p>${escapeHtml(item.reason)}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
+  const blockType = item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
 }
 
 function openCategories() { if (!requirePermission(canManageCategories(state.store), 'This account cannot manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }

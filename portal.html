@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260616-schedule-modal-v1">
+  <link rel="stylesheet" href="style.css?v=20260616-block-times-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
   <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-create-schedule-overlay-v1">
@@ -112,7 +112,7 @@
 
   <dialog class="modal tool-modal" id="eventRequestsModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Event Requests</h3></div><button class="icon-button" data-close="eventRequestsModal">&times;</button></div><div class="activity-list" id="eventRequestsList"></div></article></dialog>
 
-  <dialog class="modal tool-modal" id="blockedTimesModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Blocked Dates & Times</h3></div><button class="icon-button" data-close="blockedTimesModal">&times;</button></div><form class="form-grid" id="blockedTimeForm"><label>Title<input id="blockTitle" required maxlength="120"></label><label>Date<input type="date" id="blockDate" required></label><label class="check-row"><input type="checkbox" id="blockAllDay">Full date</label><label>Start Time<input type="time" id="blockStart" required></label><label>End Time<input type="time" id="blockEnd" required></label><label class="full-span">Reason<textarea id="blockReason" required maxlength="500"></textarea></label><button class="primary-button">Add Block</button></form><div class="activity-list" id="blockedTimesList"></div></article></dialog>
+  <dialog class="modal tool-modal" id="blockedTimesModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Blocked Dates & Times</h3></div><button type="button" class="icon-button" data-close="blockedTimesModal" aria-label="Close blocked dates modal">&times;</button></div><form class="form-grid" id="blockedTimeForm"><label>Title<input id="blockTitle" required maxlength="120"></label><label>Block Type<select id="blockType" required><option value="single_day">Single Day</option><option value="multi_day">Multiple Day</option></select></label><div class="schedule-grid block-time-fields full-span" id="blockTimeFields"><label><span id="blockStartDateLabelText">Date</span><input type="date" id="blockStartDate" required></label><label>Start Time<input type="time" id="blockStart" required></label><label class="multi-day-field" id="blockEndDateLabel"><span>End Date</span><input type="date" id="blockEndDate"></label><label>End Time<input type="time" id="blockEnd" required></label></div><label class="full-span">Reason<textarea id="blockReason" maxlength="500"></textarea></label><button class="primary-button">Add Block</button></form><div class="activity-list" id="blockedTimesList"></div></article></dialog>
 
   <dialog class="modal tool-modal" id="categoriesModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Categories</h3></div><button class="icon-button" data-close="categoriesModal">&times;</button></div><form class="form-grid" id="categoryForm"><label>Name<input id="categoryName" required maxlength="80"></label><label>Color<input type="color" id="categoryColor" value="#2563EB"></label><button class="primary-button">Add Category</button></form><div class="activity-list" id="categoriesList"></div></article></dialog>
 
@@ -128,6 +128,6 @@
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260616-schedule-modal-v1"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260616-block-times-v1"></script>
 </body>
 </html>
