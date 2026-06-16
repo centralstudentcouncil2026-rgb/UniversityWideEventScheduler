@@ -1035,7 +1035,7 @@
   }
 }
 
-@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+@media (max-width: 900px) {
   .portal-shell #createEventButton {
     display: none !important;
   }
@@ -1050,28 +1050,33 @@
     box-shadow: 0 12px 26px rgba(15, 23, 42, 0.2);
     display: inline-flex;
     font-size: 28px;
-    height: 46px;
+    height: 46px !important;
     justify-content: center;
     line-height: 1;
     min-height: 46px;
     min-width: 46px;
+    margin: 0;
     padding: 0;
     position: absolute;
     right: 16px;
     top: 12px;
-    width: 46px;
+    width: 46px !important;
     z-index: 12;
+  }
+
+  .portal-shell .sidebar.open ~ .calendar-panel .floating-create-button {
+    display: none !important;
   }
 }
 
 @media (max-width: 520px) {
   .portal-shell .floating-create-button {
-    height: 42px;
+    height: 42px !important;
     min-height: 42px;
     min-width: 42px;
     right: 12px;
     top: 8px;
-    width: 42px;
+    width: 42px !important;
   }
 }
 
