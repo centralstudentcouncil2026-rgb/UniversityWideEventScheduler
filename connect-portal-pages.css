@@ -630,18 +630,11 @@
   }
 
   .public-shell .calendar-nav {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto 1fr auto;
   }
 
   .portal-shell .calendar-nav {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .public-shell .calendar-nav h2,
-  .portal-shell .calendar-nav h2 {
-    font-size: 18px;
-    margin-left: 0;
-    text-align: right;
+    grid-template-columns: auto 1fr;
   }
 
   .public-shell .period-controls,

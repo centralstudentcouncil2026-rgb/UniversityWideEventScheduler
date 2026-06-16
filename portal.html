@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260616-announcement-highlight-v1">
+  <link rel="stylesheet" href="style.css?v=20260616-calendar-title-panel-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-announcement-highlight-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-calendar-title-panel-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -29,7 +29,6 @@
           <button class="icon-button" id="prevButton" aria-label="Previous period">&#8249;</button>
           <button class="icon-button" id="nextButton" aria-label="Next period">&#8250;</button>
         </div>
-        <h2 id="calendarTitle">Calendar</h2>
       </nav>
       <div class="toolbar-actions">
         <div class="search-wrap" id="searchWrap">
@@ -76,7 +75,12 @@
         <button class="text-button" id="logoutButton">Logout to Public Calendar</button>
       </section>
     </aside>
-    <main class="calendar-panel"><div id="calendar"></div></main>
+    <main class="calendar-panel">
+      <div class="calendar-panel-header">
+        <h2 id="calendarTitle">Calendar</h2>
+      </div>
+      <div id="calendar"></div>
+    </main>
     <div class="mobile-scrim" id="mobileScrim"></div>
   </div>
   <div class="toast-region" id="toastRegion" aria-live="polite"></div>
