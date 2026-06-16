@@ -748,12 +748,25 @@
 
 @media (max-width: 480px) {
   .public-shell .calendar-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px;
+    grid-template-columns: minmax(108px, 1fr) minmax(72px, 86px) auto;
   }
 
   .public-shell .period-controls {
-    grid-column: 1 / -1;
-    justify-self: center;
+    gap: 5px;
+    grid-column: auto;
+    justify-self: end;
+    order: 3;
+  }
+
+  .public-shell .period-controls .icon-button {
+    height: 40px;
+    width: 40px;
+  }
+
+  .public-shell .public-filter-button {
+    order: 1;
   }
 
   .public-shell .public-filter-button,
@@ -761,6 +774,31 @@
     max-width: none;
     min-width: 0;
     width: 100%;
+  }
+
+  .public-shell .view-selector {
+    font-size: 14px;
+    order: 2;
+    padding-left: 10px;
+    padding-right: 24px;
+  }
+}
+
+@media (max-width: 380px) {
+  .public-shell .calendar-nav {
+    grid-template-columns: minmax(96px, 1fr) minmax(64px, 78px) auto;
+  }
+
+  .public-shell .period-controls .icon-button {
+    height: 38px;
+    width: 38px;
+  }
+
+  .public-shell .public-filter-button,
+  .public-shell .view-selector {
+    font-size: 13px;
+    padding-left: 9px;
+    padding-right: 20px;
   }
 }
 
