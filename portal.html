@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=20260616-calendar-controls-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-calendar-controls-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-admin-sidebar-tabs-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -49,8 +49,22 @@
     </header>
 
     <aside class="sidebar" id="sidebar">
-      <button class="create-button restricted-only" id="createEventButton">+ Post University Event</button>
-      <section class="sidebar-section announcement-preview"><span class="section-label">Announcements</span><div id="announcementPreview"></div><button class="secondary-button" id="announcementsButton">View Announcements</button></section>
+      <section class="sidebar-section admin-action-panel">
+        <span class="section-label">Scheduling Actions</span>
+        <button class="create-button restricted-only" id="createEventButton">Post university Activities</button>
+        <button class="secondary-button super-admin-only" id="blockedTimesButton">Block Calendar Dates &amp; Time</button>
+        <button class="secondary-button super-admin-only" id="chooseActivityStatusButton">Choose Activity Status</button>
+      </section>
+      <section class="sidebar-section admin-tabs-panel super-admin-only">
+        <span class="section-label">Admin Tabs</span>
+        <div class="sidebar-tabs" role="tablist" aria-label="Admin dashboard tools">
+          <button class="secondary-button sidebar-tab" id="announcementsButton" role="tab" type="button">Announcements</button>
+          <button class="secondary-button sidebar-tab" id="eventRequestsButton" role="tab" type="button">Event Request</button>
+          <button class="secondary-button sidebar-tab" id="usersButton" role="tab" type="button">Accounts</button>
+          <button class="secondary-button sidebar-tab" id="organizationsButton" role="tab" type="button">Organizations</button>
+        </div>
+      </section>
+      <section class="sidebar-section announcement-preview"><span class="section-label">Announcements</span><div id="announcementPreview"></div></section>
       <section class="sidebar-section availability-card"><span class="section-label">Shared Calendar</span><strong id="availabilityStatus">Public Events Overview</strong><p id="availabilityDetail"></p></section>
       <section class="sidebar-section status-card"><span class="section-label">Incampus & Offcampus</span><strong>Coordinator Status</strong><span class="status-value" id="officeStatusValue">Status not posted</span><button class="secondary-button status-update-button" id="updateOfficeStatusButton" hidden>Update Status</button></section>
       <section class="sidebar-section status-card"><span class="section-label">CSC President</span><strong>Active Status</strong><span class="status-value" id="presidentStatusValue">Status not posted</span><button class="secondary-button status-update-button" id="updatePresidentStatusButton" hidden>Update Status</button></section>
@@ -58,15 +72,6 @@
         <span class="section-label">Portal</span>
         <button class="secondary-button restricted-only" id="dashboardButton">Dashboard</button>
         <button class="secondary-button restricted-only" id="concernsButton">Concerns</button>
-      </section>
-      <section class="sidebar-section">
-        <span class="section-label">Admin Tools</span>
-        <button class="secondary-button super-admin-only" id="eventRequestsButton">Event Requests</button>
-        <button class="secondary-button super-admin-only" id="blockedTimesButton">Blocked Dates & Times</button>
-        <button class="secondary-button super-admin-only" id="categoriesButton">Categories</button>
-        <button class="secondary-button super-admin-only" id="organizationsButton">Organizations</button>
-        <button class="secondary-button super-admin-only" id="usersButton">Accounts</button>
-        <button class="secondary-button super-admin-only" id="activityLogButton">Activity Log</button>
       </section>
       <section class="sidebar-section">
         <span class="section-label">Account</span>

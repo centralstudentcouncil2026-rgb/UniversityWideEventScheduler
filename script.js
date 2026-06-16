@@ -68,6 +68,7 @@ const PORTAL_TOOL_VISIBILITY = {
   organizationsButton: canManageAccounts,
   usersButton: canManageAccounts,
   activityLogButton: canManageAccounts,
+  chooseActivityStatusButton: (store) => canUpdateOfficeStatus(store) || canUpdatePresidentStatus(store),
   updateOfficeStatusButton: canUpdateOfficeStatus,
   updatePresidentStatusButton: canUpdatePresidentStatus
 };
@@ -154,6 +155,7 @@ function bindEvents() {
     organizationsButton: openOrganizations,
     usersButton: openUsers,
     activityLogButton: openActivityLog,
+    chooseActivityStatusButton: chooseActivityStatus,
     updateOfficeStatusButton: () => updateAppStatus('incampus_offcampus', 'Incampus & Offcampus'),
     updatePresidentStatusButton: () => updateAppStatus('csc_president', 'CSC President'),
     confirmYesButton: confirmPendingAction
@@ -1085,6 +1087,22 @@ function renderNotifications() {
     ...state.store.concerns.filter((item) => isSuperAdmin(state.store) || item.organization_id === user.organization_id).filter((item) => item.admin_response).map((item) => ({ title: `Concern update: ${item.title}`, detail: `${cap(item.status)} - ${item.admin_response}`, date: item.updated_at }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
   $('notificationsList').innerHTML = notices.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>${escapeHtml(formatDateTime(item.date))}</p></div>`).join('') || empty('No notifications right now.');
+}
+
+function chooseActivityStatus() {
+  const choices = [
+    canUpdateOfficeStatus(state.store) && { key: 'incampus_offcampus', label: 'Incampus & Offcampus' },
+    canUpdatePresidentStatus(state.store) && { key: 'csc_president', label: 'CSC President' }
+  ].filter(Boolean);
+  if (!choices.length) return showToast('This account cannot update activity status.', 'error');
+  if (choices.length === 1) return updateAppStatus(choices[0].key, choices[0].label);
+  const optionText = choices.map((item, index) => `${index + 1}. ${item.label}`).join('\n');
+  const next = prompt(`Choose activity status to update:\n${optionText}\n\nEnter a number or exact name:`, choices[0].label);
+  if (next === null) return;
+  const choice = cleanSingleLine(next);
+  const selected = choices[Number(choice) - 1] || choices.find((item) => item.label.toLowerCase() === choice.toLowerCase());
+  if (!selected) return showToast('Choose one of the listed activity status options.', 'error');
+  updateAppStatus(selected.key, selected.label);
 }
 
 function updateAppStatus(key, label) {

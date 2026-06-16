@@ -371,6 +371,53 @@
   display: none !important;
 }
 
+.portal-shell .admin-action-panel,
+.portal-shell .admin-tabs-panel {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.92));
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 14px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+}
+
+.portal-shell .admin-action-panel {
+  order: -8;
+}
+
+.portal-shell .admin-tabs-panel {
+  order: -7;
+}
+
+.portal-shell .admin-action-panel .create-button,
+.portal-shell .admin-action-panel .secondary-button,
+.portal-shell .sidebar-tab {
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+}
+
+.portal-shell .sidebar-tabs {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.portal-shell .sidebar-tab {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.24);
+  border-radius: 10px;
+  color: #0f172a;
+  min-height: 42px;
+  padding-inline: 10px;
+}
+
+.portal-shell .sidebar-tab:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: #2563eb;
+}
+
 .portal-shell .sidebar .announcement-preview {
   order: -5;
 }
