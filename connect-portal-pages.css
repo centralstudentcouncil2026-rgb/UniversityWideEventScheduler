@@ -926,10 +926,6 @@
   min-width: 124px;
 }
 
-.portal-shell .floating-create-button {
-  display: none;
-}
-
 .portal-shell #viewSelector {
   flex: 0 1 118px;
   max-width: 118px;
@@ -1032,51 +1028,6 @@
     min-height: 36px;
     min-width: 42px;
     padding: 0 6px;
-  }
-}
-
-@media (max-width: 900px) {
-  .portal-shell #createEventButton {
-    display: none !important;
-  }
-
-  .portal-shell .calendar-panel {
-    position: relative;
-  }
-
-  .portal-shell .floating-create-button {
-    align-items: center;
-    border-radius: 999px;
-    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.2);
-    display: inline-flex;
-    font-size: 28px;
-    height: 46px !important;
-    justify-content: center;
-    line-height: 1;
-    min-height: 46px;
-    min-width: 46px;
-    margin: 0;
-    padding: 0;
-    position: absolute;
-    right: 16px;
-    top: 12px;
-    width: 46px !important;
-    z-index: 12;
-  }
-
-  .portal-shell .sidebar.open ~ .calendar-panel .floating-create-button {
-    display: none !important;
-  }
-}
-
-@media (max-width: 520px) {
-  .portal-shell .floating-create-button {
-    height: 42px !important;
-    min-height: 42px;
-    min-width: 42px;
-    right: 12px;
-    top: 8px;
-    width: 42px !important;
   }
 }
 

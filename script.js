@@ -132,7 +132,6 @@ function bindEvents() {
     mobileMenuButton: openSidebar,
     mobileScrim: closeSidebar,
     createEventButton: () => openEventModal(defaultRange()),
-    mobileCreateEventButton: () => openEventModal(defaultRange()),
     addOccurrenceButton: () => addOccurrenceRow(),
     applySharedTimesButton: applySharedTimes,
     cancelEventButton: cancelEventFromModal,
