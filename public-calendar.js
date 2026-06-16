@@ -1,6 +1,6 @@
-import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-announcements-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260616-announcements-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260616-announcements-v1';
+import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-revisions-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260616-revisions-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260616-revisions-v1';
 
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';

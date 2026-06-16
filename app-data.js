@@ -206,6 +206,8 @@ function validateSchedulesForPersistence(store) {
     if (!['pending', 'approved', 'rejected'].includes(event.approval_status || 'approved')) throw new Error('Schedule approval status is invalid.');
     if (event.approval_date && !['unread', 'read'].includes(event.notification_status || '')) throw new Error('Reviewed schedules require a notification status.');
     if (String(event.admin_recommendation || '').length > 1000) throw new Error('Admin recommendation is too long.');
+    if (event.revision_of && !['pending', 'approved', 'rejected'].includes(event.revision_status || event.approval_status || 'pending')) throw new Error('Schedule revision status is invalid.');
+    if (event.revision_of && !event.revision_submitted_at) throw new Error('Schedule revision requires a submitted timestamp.');
     eventOccurrencesForValidation(event).forEach((occurrence) => {
       if (!occurrence.start_time || !occurrence.end_time || new Date(occurrence.end_time) <= new Date(occurrence.start_time)) throw new Error('Schedule end date and time must be later than start date and time.');
     });
@@ -233,7 +235,13 @@ function normalizeEvent(event) {
     end_time: lastOccurrence.end_time || event.end_time,
     admin_recommendation: event.admin_recommendation || '',
     approval_date: event.approval_date || '',
-    notification_status: event.notification_status || ''
+    notification_status: event.notification_status || '',
+    revision_of: event.revision_of || '',
+    original_schedule_id: event.original_schedule_id || event.revision_of || '',
+    revision_status: event.revision_status || (event.revision_of ? event.approval_status || 'pending' : ''),
+    revision_created_at: event.revision_created_at || '',
+    revision_submitted_at: event.revision_submitted_at || '',
+    revision_history: Array.isArray(event.revision_history) ? event.revision_history : []
   };
 }
 

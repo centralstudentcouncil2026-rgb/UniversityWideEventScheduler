@@ -96,6 +96,12 @@ create table if not exists public.schedules (
   admin_recommendation text,
   approval_date timestamptz,
   notification_status text check (notification_status in ('unread', 'read')),
+  revision_of uuid references public.schedules(id) on update cascade on delete cascade,
+  original_schedule_id uuid references public.schedules(id) on update cascade on delete cascade,
+  revision_status text check (revision_status in ('pending', 'approved', 'rejected')),
+  revision_created_at timestamptz,
+  revision_submitted_at timestamptz,
+  revision_history jsonb not null default '[]'::jsonb,
   event_status text not null default 'planned',
   created_by uuid references auth.users(id) on update cascade on delete set null,
   created_at timestamptz not null default now(),
@@ -111,10 +117,19 @@ create index if not exists schedules_privacy_level_idx on public.schedules(priva
 create index if not exists schedules_approval_status_idx on public.schedules(approval_status);
 create index if not exists schedules_approval_date_idx on public.schedules(approval_date);
 create index if not exists schedules_notification_status_idx on public.schedules(notification_status);
+create index if not exists schedules_revision_of_idx on public.schedules(revision_of);
+create index if not exists schedules_original_schedule_id_idx on public.schedules(original_schedule_id);
+create index if not exists schedules_revision_status_idx on public.schedules(revision_status);
 
 alter table if exists public.schedules add column if not exists admin_recommendation text;
 alter table if exists public.schedules add column if not exists approval_date timestamptz;
 alter table if exists public.schedules add column if not exists notification_status text;
+alter table if exists public.schedules add column if not exists revision_of uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists original_schedule_id uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists revision_status text;
+alter table if exists public.schedules add column if not exists revision_created_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_submitted_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_history jsonb not null default '[]'::jsonb;
 alter table if exists public.schedules alter column approval_status set default 'pending';
 
 update public.schedules
@@ -131,8 +146,27 @@ begin
     alter table public.schedules drop constraint if exists schedules_notification_status_check;
     alter table public.schedules
       add constraint schedules_notification_status_check check (notification_status is null or notification_status in ('unread', 'read'));
+    alter table public.schedules drop constraint if exists schedules_revision_status_check;
+    alter table public.schedules
+      add constraint schedules_revision_status_check check (revision_status is null or revision_status in ('pending', 'approved', 'rejected'));
   end if;
 end $$;
+
+create table if not exists public.schedule_revisions (
+  revision_id uuid primary key default gen_random_uuid(),
+  schedule_id uuid not null references public.schedules(id) on update cascade on delete cascade,
+  proposed_schedule jsonb not null,
+  revision_approval_status text not null default 'pending' check (revision_approval_status in ('pending', 'approved', 'rejected')),
+  submitted_by uuid references auth.users(id) on update cascade on delete set null,
+  submitted_at timestamptz not null default now(),
+  reviewed_by uuid references auth.users(id) on update cascade on delete set null,
+  reviewed_at timestamptz,
+  revision_history jsonb not null default '[]'::jsonb
+);
+
+create index if not exists schedule_revisions_schedule_id_idx on public.schedule_revisions(schedule_id);
+create index if not exists schedule_revisions_status_idx on public.schedule_revisions(revision_approval_status);
+create index if not exists schedule_revisions_submitted_at_idx on public.schedule_revisions(submitted_at);
 
 create table if not exists public.blocked_times (
   id uuid primary key default gen_random_uuid(),

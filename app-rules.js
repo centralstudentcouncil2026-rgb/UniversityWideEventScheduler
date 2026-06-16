@@ -62,7 +62,7 @@ export function canDeleteEvent(store, event) {
 }
 
 export function isPublicEvent(event) {
-  return event.privacy_level !== 'internal' && !['draft', 'cancelled', 'disabled'].includes(event.event_status);
+  return !event.revision_of && event.privacy_level !== 'internal' && !['draft', 'cancelled', 'disabled'].includes(event.event_status);
 }
 
 export function normalizeVenue(value) {
@@ -86,6 +86,7 @@ export function findBlockingTime(store, start, end, excludeId = '') {
 export function findVenueConflicts(store, candidate, approvalStatuses = ['pending', 'approved']) {
   return store.events.filter((event) =>
     event.id !== candidate.id
+    && event.id !== candidate.revision_of
     && approvalStatuses.includes(event.approval_status)
     && !['cancelled', 'disabled', 'completed'].includes(event.event_status)
     && eventOccurrences(candidate).some((candidateOccurrence) =>

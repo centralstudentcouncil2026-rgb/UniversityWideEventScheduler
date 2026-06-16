@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-notifications-v1';
-import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-notifications-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-revisions-v1';
+import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-revisions-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260616-announcements-v1';
+} from './app-rules.js?v=20260616-revisions-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -415,6 +415,7 @@ function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.
   const visibleEvents = state.store.events.filter((event) => {
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
+    if (event.revision_of) return event.organization_id === user.organization_id && event.approval_status === 'pending';
     return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
   }).filter(matchesFilters);
   const weekLineLayout = state.calendar?.view.type === 'timeGridWeek' ? buildWeekLineLayout(visibleEvents) : new Map();
@@ -798,6 +799,8 @@ function readEventForm() {
     contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
     admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '', admin_recommendation: existing?.admin_recommendation || '',
     approval_date: existing?.approval_date || '', notification_status: existing?.notification_status || '',
+    revision_of: existing?.revision_of || '', original_schedule_id: existing?.original_schedule_id || '', revision_status: existing?.revision_status || '',
+    revision_created_at: existing?.revision_created_at || '', revision_submitted_at: existing?.revision_submitted_at || '', revision_history: existing?.revision_history || [],
     event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: existing?.approval_status || (isSuperAdmin(state.store) ? 'approved' : 'pending'), created_by: existing?.created_by || currentUser(state.store).id,
     schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
@@ -936,6 +939,21 @@ function finishAgreement() { if (!$('agreementSubmitButton').disabled && state.p
 function saveEvent(candidate) {
   if (!requirePermission(canEditEvent(state.store, candidate), 'You cannot save this event.')) return;
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
+  const existing = existingIndex >= 0 ? state.store.events[existingIndex] : null;
+  if (existing && isManager(state.store) && existing.approval_status === 'approved' && !existing.revision_of) {
+    const revision = createScheduleRevision(existing, candidate);
+    state.store.events.push(revision);
+    notifyAdmins({
+      notification_type: 'schedule_revision',
+      reference_id: revision.id,
+      title: 'Schedule Revision Submitted',
+      message: `${revision.organization_name || 'An organization'} submitted a revision for "${existing.title}".`
+    });
+    log('schedule_revision_submitted', `${currentUser(state.store).full_name} submitted a revision for "${existing.title}".`, revision);
+    state.pendingCalendarDate = revision.occurrences[0]?.date || dateInput(revision.start_time);
+    closeDialog('eventModal'); state.pendingEvent = null; persist('Schedule revision submitted for approval.');
+    return;
+  }
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
   if (existingIndex < 0 && candidate.approval_status === 'pending') {
     notifyAdmins({
@@ -948,6 +966,27 @@ function saveEvent(candidate) {
   log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
   state.pendingCalendarDate = candidate.occurrences[0]?.date || dateInput(candidate.start_time);
   closeDialog('eventModal'); state.pendingEvent = null; persist('Event saved.');
+}
+
+function createScheduleRevision(original, candidate) {
+  const now = new Date().toISOString();
+  const revisionId = createId();
+  return {
+    ...candidate,
+    id: revisionId,
+    revision_of: original.id,
+    original_schedule_id: original.id,
+    revision_status: 'pending',
+    revision_created_at: now,
+    revision_submitted_at: now,
+    revision_history: [...(original.revision_history || []), { revision_id: revisionId, submitted_at: now, submitted_by: currentUser(state.store).id, status: 'pending' }],
+    approval_status: 'pending',
+    approval_date: '',
+    notification_status: '',
+    created_by: currentUser(state.store).id,
+    created_at: now,
+    updated_at: now
+  };
 }
 
 function openDetails(props) {
@@ -1117,8 +1156,11 @@ function submitEventReviewForm(event) {
     admin_recommendation: recommendation,
     approval_date: now,
     notification_status: 'unread',
+    revision_status: record.revision_of ? status : record.revision_status,
     updated_at: now
   });
+  if (record.revision_of && status === 'approved') applyApprovedRevision(record, now);
+  if (record.revision_of && status === 'rejected') record.event_status = 'disabled';
   if (status === 'rejected') record.rejection_reason = recommendation || 'Rejected by admin. Proposed event should be deleted.';
   if (record.created_by) {
     const approved = status === 'approved';
@@ -1137,6 +1179,40 @@ function submitEventReviewForm(event) {
   closeDialog('detailsModal');
   persist(`Event request ${status}.`);
   renderEventRequests();
+}
+
+function applyApprovedRevision(revision, approvedAt) {
+  const original = state.store.events.find((item) => item.id === revision.revision_of);
+  if (!original) return;
+  const keep = {
+    id: original.id,
+    created_by: original.created_by,
+    created_at: original.created_at,
+    revision_history: [...(original.revision_history || []), {
+      revision_id: revision.id,
+      status: 'submitted',
+      submitted_at: revision.revision_submitted_at || revision.created_at,
+      submitted_by: revision.created_by
+    }, {
+      revision_id: revision.id,
+      status: 'approved',
+      approved_at: approvedAt,
+      approved_by: currentUser(state.store).id,
+      recommendation: revision.admin_recommendation || ''
+    }]
+  };
+  Object.assign(original, {
+    ...revision,
+    ...keep,
+    revision_of: '',
+    original_schedule_id: '',
+    revision_status: '',
+    approval_status: 'approved',
+    approval_date: approvedAt,
+    notification_status: 'unread',
+    updated_at: approvedAt
+  });
+  revision.event_status = 'disabled';
 }
 
 function showConflict(title, subtitle, records, canContinue) {
@@ -1412,7 +1488,8 @@ function eventRequestHtml(item) {
   const conflictCount = Array.isArray(item.conflict_event_ids) ? item.conflict_event_ids.length : 0;
   const conflictText = conflictCount ? `Warning: ${conflictCount} schedule conflict(s)` : 'No schedule conflict warning';
   const reviewText = item.approval_date ? `<p>${escapeHtml(formatDateTime(item.approval_date))} - ${escapeHtml(item.admin_recommendation || 'No recommendation added.')}</p>` : '';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${reviewText}${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
+  const requestType = item.revision_of ? 'Revision Request' : 'Schedule Request';
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(requestType)} - ${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${reviewText}${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
 }
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); updateBlockTimeFields(); openDialog('blockedTimesModal'); }
