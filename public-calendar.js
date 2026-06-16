@@ -9,7 +9,7 @@ const DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
-const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -47,6 +47,7 @@ async function refreshPublicStore() {
     cachePublicStore(result.store);
     renderAnnouncements();
     renderStatuses();
+    renderOrganizationFilter();
     if (calendarChanged) {
       if (typeof state.calendar?.batchRendering === 'function') state.calendar.batchRendering(() => state.calendar.refetchEvents());
       else state.calendar?.refetchEvents();
@@ -140,21 +141,23 @@ function initializePublicCalendar() {
     eventDidMount: applyPublicEventAccent
   });
 
-  const todayButton = $('todayButton');
   const prevButton = $('prevButton');
   const nextButton = $('nextButton');
   const viewSelector = $('publicViewSelector');
+  const filterButton = $('publicFilterButton');
+  const filterCloseButton = $('closePublicFilterModal');
   const closeButton = $('closePublicDayDialog');
   const menuButton = $('mobileMenuButton');
   const scrim = $('mobileScrim');
 
-  if (todayButton) todayButton.addEventListener('click', () => { state.calendar.today(); schedulePublicCalendarResize(0); });
   if (prevButton) prevButton.addEventListener('click', () => { state.calendar.prev(); schedulePublicCalendarResize(0); });
   if (nextButton) nextButton.addEventListener('click', () => { state.calendar.next(); schedulePublicCalendarResize(0); });
   if (viewSelector) viewSelector.addEventListener('change', (event) => {
     state.calendar.changeView(event.target.value);
     schedulePublicCalendarResize(0);
   });
+  if (filterButton) filterButton.addEventListener('click', openOrganizationFilter);
+  if (filterCloseButton) filterCloseButton.addEventListener('click', closeOrganizationFilter);
   if (closeButton) closeButton.addEventListener('click', closePublicDayDialog);
   if (menuButton) menuButton.addEventListener('click', openPublicSidebar);
   if (scrim) scrim.addEventListener('click', closePublicSidebar);
@@ -165,6 +168,7 @@ function initializePublicCalendar() {
   if (window.visualViewport) window.visualViewport.addEventListener('resize', handlePublicResize, { passive: true });
 
   state.calendar.render();
+  renderOrganizationFilter();
   bindPublicCalendarResizeObserver();
   schedulePublicCalendarResize(0);
 }
@@ -220,8 +224,82 @@ function schedulePublicCalendarResize(delay = 0) {
 function publicEvents(viewType = state.calendar?.view.type) {
   const approvedEvents = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .filter(matchesSelectedOrganization)
   const dateCounts = publicDateEventCounts(approvedEvents);
   return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts, viewType)), []);
+}
+
+function matchesSelectedOrganization(event) {
+  if (!state.selectedOrganizationId) return true;
+  return event.organization_id === state.selectedOrganizationId || organizationKey(event.organization_name) === state.selectedOrganizationId;
+}
+
+function openOrganizationFilter() {
+  renderOrganizationFilter();
+  $('publicFilterModal')?.showModal();
+}
+
+function closeOrganizationFilter() {
+  const dialog = $('publicFilterModal');
+  if (dialog?.open) dialog.close();
+}
+
+function renderOrganizationFilter() {
+  const options = publicOrganizations();
+  if (state.selectedOrganizationId && !options.some((item) => item.id === state.selectedOrganizationId)) state.selectedOrganizationId = '';
+  const selected = options.find((item) => item.id === state.selectedOrganizationId);
+  const summary = $('publicFilterSummary');
+  const button = $('publicFilterButton');
+  if (summary) summary.textContent = selected ? `Showing schedules from ${selected.name}.` : 'Showing all organization schedules.';
+  if (button) button.textContent = selected ? selected.name : 'Organizations';
+  const list = $('publicOrganizationOptions');
+  if (!list) return;
+  list.innerHTML = [
+    organizationFilterButton('', 'All organizations'),
+    ...options.map((item) => organizationFilterButton(item.id, item.name))
+  ].join('');
+  list.querySelectorAll('[data-organization-filter]').forEach((button) => {
+    button.addEventListener('click', () => selectOrganizationFilter(button.dataset.organizationFilter || ''));
+  });
+}
+
+function organizationFilterButton(id, label) {
+  const selected = state.selectedOrganizationId === id;
+  return `<button type="button" class="public-filter-option${selected ? ' selected' : ''}" data-organization-filter="${escapeHtml(id)}"><span>${escapeHtml(label)}</span>${selected ? '<strong>Selected</strong>' : ''}</button>`;
+}
+
+function selectOrganizationFilter(id) {
+  state.selectedOrganizationId = id;
+  closeOrganizationFilter();
+  renderOrganizationFilter();
+  closePublicDayDialog();
+  state.calendar?.refetchEvents();
+  if (state.selectedDate) openPublicDayDialog(state.selectedDate, null);
+}
+
+function publicOrganizations() {
+  const organizations = new Map();
+  (Array.isArray(state.store?.organizations) ? state.store.organizations : []).forEach((org) => {
+    const name = cleanOrganizationName(org.organization_name || org.name);
+    if (name) organizations.set(org.id || organizationKey(name), { id: org.id || organizationKey(name), name });
+  });
+  (Array.isArray(state.store?.events) ? state.store.events : [])
+    .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .forEach((event) => {
+      const name = cleanOrganizationName(event.organization_name);
+      if (!name) return;
+      const id = event.organization_id || organizationKey(name);
+      if (!organizations.has(id)) organizations.set(id, { id, name });
+    });
+  return [...organizations.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function cleanOrganizationName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function organizationKey(value) {
+  return `name:${cleanOrganizationName(value).toLowerCase()}`;
 }
 
 function publicDateEventCounts(events) {
@@ -336,6 +414,7 @@ function openPublicDayDialog(date, anchorEl) {
 function publicDayItems(date) {
   return state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
+    .filter(matchesSelectedOrganization)
     .reduce((results, event) => {
       const matchingOccurrences = eventOccurrences(event)
         .filter((occurrence) => occurrence.date === date)

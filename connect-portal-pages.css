@@ -484,6 +484,57 @@
   margin: 4px 0 0;
 }
 
+.public-filter-button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-filter-modal {
+  max-width: min(520px, calc(100vw - 32px));
+}
+
+.public-filter-modal .modal-card {
+  min-width: min(500px, calc(100vw - 32px));
+}
+
+.public-filter-options {
+  display: grid;
+  gap: 10px;
+  max-height: min(420px, calc(100vh - 220px));
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.public-filter-option {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  border-radius: 10px;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 800;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.public-filter-option:hover,
+.public-filter-option.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.public-filter-option strong {
+  color: #2563eb;
+  font-size: 12px;
+  margin-left: 12px;
+}
+
 @media (max-width: 1024px) {
   .brand-tagline-grid {
     max-width: 260px;
@@ -565,7 +616,6 @@
 
   .public-shell .brand-area p,
   .portal-shell .brand-area p,
-  .public-shell #todayButton,
   .portal-shell #todayButton,
   .portal-shell .print-button {
     display: none;
@@ -575,9 +625,16 @@
   .portal-shell .calendar-nav {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
     justify-content: stretch;
     order: 3;
+  }
+
+  .public-shell .calendar-nav {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .portal-shell .calendar-nav {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .public-shell .calendar-nav h2,
@@ -592,6 +649,11 @@
     align-items: center;
     display: inline-flex;
     gap: 8px;
+  }
+
+  .public-filter-button {
+    max-width: 130px;
+    padding-inline: 10px;
   }
 
   .portal-shell .toolbar-actions {

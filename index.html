@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=20260616-announcement-highlight-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-announcement-highlight-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-public-org-filter-v1">
 </head>
 <body class="public-shell is-public">
   <div class="app-shell">
@@ -26,12 +26,12 @@
         </div>
       </div>
       <nav class="calendar-nav" aria-label="Calendar navigation">
-        <button class="toolbar-button" id="todayButton">Today</button>
         <div class="period-controls" aria-label="Period controls">
           <button class="icon-button" id="prevButton" aria-label="Previous period">&#8249;</button>
           <button class="icon-button" id="nextButton" aria-label="Next period">&#8250;</button>
         </div>
         <h2 id="calendarTitle">Calendar</h2>
+        <button class="toolbar-button public-filter-button" id="publicFilterButton" type="button">Organizations</button>
         <select id="publicViewSelector" class="view-selector" aria-label="Calendar view">
           <option value="dayGridMonth">Month</option>
           <option value="multiMonthYear">Year</option>
@@ -69,9 +69,22 @@
     <div class="public-day-events" id="publicDayEvents"></div>
   </div>
 
+  <dialog class="modal public-filter-modal" id="publicFilterModal">
+    <article class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Filter Organizations</h3>
+          <p id="publicFilterSummary">Showing all organization schedules.</p>
+        </div>
+        <button type="button" class="icon-button" id="closePublicFilterModal" aria-label="Close organization filter">&times;</button>
+      </div>
+      <div class="public-filter-options" id="publicOrganizationOptions"></div>
+    </article>
+  </dialog>
+
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260607-performance-v1"></script>
-  <script type="module" src="public-calendar.js?v=20260616-announcement-highlight-v1"></script>
+  <script type="module" src="public-calendar.js?v=20260616-public-org-filter-v1"></script>
 </body>
 </html>
