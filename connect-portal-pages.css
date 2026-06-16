@@ -1030,3 +1030,140 @@
     padding: 0 6px;
   }
 }
+
+.portal-shell,
+.portal-shell * {
+  min-width: 0;
+}
+
+.portal-shell .sidebar-section,
+.portal-shell .admin-action-panel,
+.portal-shell .admin-tabs-panel,
+.portal-shell .activity-item,
+.portal-shell .metric,
+.portal-shell .modal-card,
+.portal-shell .calendar-panel,
+.public-shell .sidebar-section,
+.public-shell .activity-item,
+.public-shell .public-day-event,
+.public-shell .calendar-panel {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.portal-shell .section-label,
+.portal-shell .sidebar-tab,
+.portal-shell .toolbar-button,
+.portal-shell .secondary-button,
+.portal-shell .primary-button,
+.portal-shell .danger-button,
+.portal-shell .text-button,
+.portal-shell .create-button,
+.portal-shell .view-selector,
+.portal-shell .activity-item,
+.portal-shell .metric,
+.portal-shell .modal-card,
+.public-shell .section-label,
+.public-shell .view-selector,
+.public-shell .activity-item,
+.public-shell .public-day-event {
+  line-height: 1.22;
+}
+
+.portal-shell .admin-action-panel .create-button,
+.portal-shell .admin-action-panel .secondary-button,
+.portal-shell .sidebar-tab,
+.portal-shell .sidebar-section > .secondary-button,
+.portal-shell .sidebar-section > .text-button {
+  min-height: 42px;
+  padding-block: 8px;
+}
+
+.portal-shell .notification-bell {
+  aspect-ratio: 1;
+  font-size: 19px;
+  justify-content: center;
+  overflow: visible;
+  padding: 0;
+  position: relative;
+}
+
+.portal-shell .notification-badge {
+  font-size: 10px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 4px;
+  position: absolute;
+  right: -3px;
+  top: -4px;
+  z-index: 2;
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .portal-shell .brand-copy h1,
+  .public-shell .brand-copy h1 {
+    font-size: clamp(18px, 5vw, 24px) !important;
+  }
+
+  .portal-shell .brand-area p,
+  .public-shell .brand-area p {
+    font-size: clamp(10px, 2.8vw, 12px);
+  }
+
+  .portal-shell .sidebar,
+  .public-shell .sidebar {
+    width: min(88vw, 330px);
+  }
+
+  .portal-shell .sidebar-section,
+  .portal-shell .admin-action-panel,
+  .portal-shell .admin-tabs-panel,
+  .public-shell .sidebar-section {
+    padding: clamp(10px, 3vw, 14px);
+  }
+
+  .portal-shell .sidebar-tab,
+  .portal-shell .admin-action-panel .create-button,
+  .portal-shell .admin-action-panel .secondary-button,
+  .portal-shell .sidebar-section > .secondary-button,
+  .portal-shell .sidebar-section > .text-button {
+    font-size: clamp(12px, 3.2vw, 14px);
+  }
+
+  .portal-shell .activity-item,
+  .portal-shell .metric span,
+  .portal-shell .modal-card,
+  .public-shell .activity-item,
+  .public-shell .public-day-event {
+    font-size: clamp(12px, 3.2vw, 14px);
+  }
+}
+
+@media (max-width: 520px) {
+  .portal-shell .modal-card,
+  .public-shell .modal-card {
+    border-radius: 14px;
+    max-width: calc(100vw - 18px);
+    padding: 14px;
+  }
+
+  .portal-shell .modal-actions,
+  .public-shell .modal-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .portal-shell .modal-actions button,
+  .public-shell .modal-actions button {
+    width: 100%;
+  }
+
+  .portal-shell .activity-item button,
+  .public-shell .activity-item button {
+    margin-top: 6px;
+    max-width: 100%;
+    white-space: normal;
+  }
+}
