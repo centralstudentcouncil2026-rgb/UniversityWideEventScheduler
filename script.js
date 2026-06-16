@@ -1086,6 +1086,10 @@ function allAnnouncements() {
 function latestAnnouncement() { return allAnnouncements()[0] || null; }
 function announcementPreviewHtml(item) { return `<div class="notice"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p></div>`; }
 function renderAnnouncements() {
+  if (!$('announcementsList')) {
+    updateAnnouncementActionButtons();
+    return;
+  }
   const announcements = allAnnouncements();
   $('announcementsList').innerHTML = announcements.length
     ? announcements.map(announcementAdminHtml).join('')
