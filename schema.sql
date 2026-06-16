@@ -263,3 +263,20 @@ begin
       add constraint announcements_visibility_status_allowed check (visibility_status in ('show', 'hidden'));
   end if;
 end $$;
+
+create table if not exists public.notifications (
+  notification_id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on update cascade on delete cascade,
+  notification_type text not null,
+  reference_id text not null,
+  title text not null,
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists notifications_user_id_idx on public.notifications(user_id);
+create index if not exists notifications_is_read_idx on public.notifications(is_read);
+create index if not exists notifications_type_idx on public.notifications(notification_type);
+create index if not exists notifications_reference_id_idx on public.notifications(reference_id);
+create index if not exists notifications_created_at_idx on public.notifications(created_at);

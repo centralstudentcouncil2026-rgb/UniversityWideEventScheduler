@@ -1455,6 +1455,12 @@ body.is-super-admin .check-row.super-admin-only {
   border-bottom: 0;
 }
 
+.activity-item.unread-notification {
+  background: #EFF6FF;
+  border-left: 4px solid var(--aup-blue);
+  padding-left: 12px;
+}
+
 .activity-item strong {
   color: var(--aup-navy);
 }

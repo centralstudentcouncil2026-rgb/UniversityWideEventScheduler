@@ -51,7 +51,6 @@
           <button class="secondary-button sidebar-tab" id="announcementsButton" role="tab" type="button">Announcements</button>
           <button class="secondary-button sidebar-tab" id="eventRequestsButton" role="tab" type="button">Event Request</button>
           <button class="secondary-button sidebar-tab" id="usersButton" role="tab" type="button">Accounts</button>
-          <button class="secondary-button sidebar-tab" id="organizationsButton" role="tab" type="button">Organizations</button>
         </div>
       </section>
       <section class="sidebar-section">
@@ -110,7 +109,7 @@
 
   <dialog class="modal tool-modal" id="filtersModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Calendar Filters</h3></div><button class="icon-button" data-close="filtersModal">&times;</button></div><div class="form-grid"><label>Organization<select id="filterOrganization"></select></label><label>Venue<input id="filterVenue" maxlength="140"></label><label>Category<select id="filterCategory"></select></label><label>Event Type<input id="filterEventType" maxlength="80"></label><label>Date<input type="date" id="filterDate"></label><label>Month<input type="month" id="filterMonth"></label><label class="restricted-only">Approval<select id="filterApproval"></select></label><label class="restricted-only">Event Status<select id="filterEventStatus"></select></label></div><div class="modal-actions"><button class="secondary-button" id="resetFiltersButton">Reset</button><button class="primary-button" data-close="filtersModal">Apply</button></div></article></dialog>
 
-  <dialog class="modal tool-modal" id="notificationsModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Notifications</h3></div><button class="icon-button" data-close="notificationsModal">&times;</button></div><div class="activity-list" id="notificationsList"></div></article></dialog>
+  <dialog class="modal tool-modal" id="notificationsModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3>Notifications</h3></div><button class="icon-button" data-close="notificationsModal">&times;</button></div><div class="modal-actions"><button class="secondary-button" id="markNotificationsReadButton" type="button">Mark All as Read</button></div><div class="activity-list" id="notificationsList"></div></article></dialog>
 
   <dialog class="modal tool-modal" id="dashboardModal"><article class="modal-card wide-modal"><div class="modal-header"><div><h3 id="dashboardTitle">Dashboard</h3></div><button class="icon-button" data-close="dashboardModal">&times;</button></div><div class="dashboard-grid" id="dashboardGrid"></div><div class="activity-list" id="dashboardList"></div></article></dialog>
 
@@ -141,6 +140,6 @@
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260616-accounts-v1"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260616-notifications-v1"></script>
 </body>
 </html>

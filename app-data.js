@@ -7,6 +7,7 @@ const EMPTY_COLLECTIONS = [
   'blockedTimes',
   'announcements',
   'concerns',
+  'notifications',
   'activityLogs',
   'accountRequests'
 ];
@@ -71,6 +72,7 @@ export function normalizeStore(store = {}) {
   normalized.blockedTimes = normalized.blockedTimes.map(normalizeBlockedTime);
   normalized.activityStatuses = normalized.activityStatuses.map(normalizeActivityStatus).filter(Boolean);
   normalized.announcements = normalized.announcements.map(normalizeAnnouncement);
+  normalized.notifications = normalized.notifications.map(normalizeNotification);
   return normalized;
 }
 
@@ -149,6 +151,7 @@ export function storeForPersistence(store) {
   validateBlockedTimesForPersistence(store);
   validateActivityStatusesForPersistence(store);
   validateAnnouncementsForPersistence(store);
+  validateNotificationsForPersistence(store);
   return {
     ...store,
     events: store.events.map((event) => ({
@@ -158,6 +161,13 @@ export function storeForPersistence(store) {
         : event.private_notes
     }))
   };
+}
+
+function validateNotificationsForPersistence(store) {
+  (store.notifications || []).forEach((notification) => {
+    if (!notification.notification_id || !notification.user_id || !notification.notification_type || !notification.reference_id) throw new Error('Notification requires id, user, type, and reference.');
+    if (!notification.title || !notification.message || !notification.created_at) throw new Error('Notification requires title, message, and created date.');
+  });
 }
 
 function validateAnnouncementsForPersistence(store) {
@@ -284,6 +294,20 @@ function normalizeAnnouncement(announcement = {}) {
     created_by: announcement.created_by || announcement.posted_by || 'Unknown',
     created_at: createdAt,
     updated_at: announcement.updated_at || createdAt
+  };
+}
+
+function normalizeNotification(notification = {}) {
+  return {
+    ...notification,
+    notification_id: notification.notification_id || notification.id || createId(),
+    user_id: notification.user_id || '',
+    notification_type: notification.notification_type || notification.type || 'general',
+    reference_id: notification.reference_id || notification.referenceId || '',
+    title: notification.title || 'Notification',
+    message: notification.message || '',
+    is_read: Boolean(notification.is_read),
+    created_at: notification.created_at || new Date().toISOString()
   };
 }
 

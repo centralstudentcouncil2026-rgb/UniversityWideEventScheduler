@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-accounts-v1';
-import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-accounts-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-notifications-v1';
+import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-notifications-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -56,7 +56,6 @@ const PORTAL_TOOL_VISIBILITY = {
   eventRequestsButton: canApproveEvents,
   blockedTimesButton: canManageBlockedTimes,
   categoriesButton: canManageCategories,
-  organizationsButton: canManageAccounts,
   usersButton: canManageAccounts,
   activityLogButton: canManageAccounts,
   chooseActivityStatusButton: (store) => canUpdateOfficeStatus(store) || canUpdatePresidentStatus(store),
@@ -137,6 +136,7 @@ function bindEvents() {
     filtersButton: () => openDialog('filtersModal'),
     resetFiltersButton: resetFilters,
     notificationsButton: openNotifications,
+    markNotificationsReadButton: markAllNotificationsRead,
     dashboardButton: openDashboard,
     announcementsButton: openAnnouncements,
     announcementEditButton: editLatestAnnouncement,
@@ -146,7 +146,6 @@ function bindEvents() {
     concernsButton: openConcerns,
     eventRequestsButton: openEventRequests,
     blockedTimesButton: openBlockedTimes,
-    organizationsButton: openOrganizations,
     usersButton: openUsers,
     activityLogButton: openActivityLog,
     chooseActivityStatusButton: chooseActivityStatus,
@@ -166,7 +165,7 @@ function bindEvents() {
     blockedTimeForm: addBlockedTime,
     organizationForm: addOrganization
   });
-  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'organizationsList', 'usersList']);
+  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'organizationsList', 'usersList', 'notificationsList']);
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
   on('viewSelector', 'pointerdown', (event) => {
@@ -289,6 +288,7 @@ function renderAll() {
   renderFormOptions();
   renderFilterOptions();
   renderAnnouncementPreview();
+  updateNotificationBadge();
 }
 
 function renderRole() {
@@ -306,6 +306,46 @@ function renderRole() {
 function renderFormOptions() {
   fillSelect('eventCategory', state.store.categories.filter((item) => item.active).map((item) => [item.id, item.name]));
   fillSelect('activityStatusSelect', ACTIVITY_STATUS_OPTIONS.map((item) => [item, item]));
+}
+
+function currentUserNotifications() {
+  const user = currentUser(state.store);
+  return (state.store.notifications || [])
+    .filter((item) => item.user_id === user.id)
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+}
+
+function unreadNotificationCount() {
+  return currentUserNotifications().filter((item) => !item.is_read).length;
+}
+
+function updateNotificationBadge() {
+  const badge = $('notificationBadge');
+  if (!badge) return;
+  const count = unreadNotificationCount();
+  badge.textContent = count;
+  badge.hidden = count === 0;
+}
+
+function createNotification({ user_id, notification_type, reference_id, title, message }) {
+  if (!user_id || !notification_type || !reference_id || !title || !message) return;
+  if (!Array.isArray(state.store.notifications)) state.store.notifications = [];
+  const existing = state.store.notifications.find((item) =>
+    item.user_id === user_id
+    && item.notification_type === notification_type
+    && item.reference_id === reference_id
+    && !item.is_read
+  );
+  const created_at = new Date().toISOString();
+  if (existing) Object.assign(existing, { title, message, created_at, is_read: false });
+  else state.store.notifications.push({ notification_id: createId(), user_id, notification_type, reference_id, title, message, is_read: false, created_at });
+  updateNotificationBadge();
+}
+
+function notifyAdmins(notification) {
+  state.store.users
+    .filter((user) => user.role === 'super_admin' && user.permissions?.enabled !== false)
+    .forEach((user) => createNotification({ ...notification, user_id: user.id }));
 }
 
 function renderFilterOptions() {
@@ -897,6 +937,14 @@ function saveEvent(candidate) {
   if (!requirePermission(canEditEvent(state.store, candidate), 'You cannot save this event.')) return;
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
+  if (existingIndex < 0 && candidate.approval_status === 'pending') {
+    notifyAdmins({
+      notification_type: 'schedule_approval',
+      reference_id: candidate.id,
+      title: 'New Schedule Request',
+      message: `${candidate.organization_name || 'An organization'} submitted "${candidate.title}" for approval.`
+    });
+  }
   log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
   state.pendingCalendarDate = candidate.occurrences[0]?.date || dateInput(candidate.start_time);
   closeDialog('eventModal'); state.pendingEvent = null; persist('Event saved.');
@@ -1072,6 +1120,18 @@ function submitEventReviewForm(event) {
     updated_at: now
   });
   if (status === 'rejected') record.rejection_reason = recommendation || 'Rejected by admin. Proposed event should be deleted.';
+  if (record.created_by) {
+    const approved = status === 'approved';
+    createNotification({
+      user_id: record.created_by,
+      notification_type: 'schedule_approval',
+      reference_id: record.id,
+      title: `${approved ? 'Approved' : 'Rejected'} Schedule Request`,
+      message: approved
+        ? `Your schedule "${record.title}" was approved.${recommendation ? ` Recommendation: ${recommendation}` : ''}`
+        : `Your schedule "${record.title}" was rejected. Please delete the proposed event.${recommendation ? ` Recommendation: ${recommendation}` : ''}`
+    });
+  }
   log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${record.title}" as ${status}.`, record);
   closeDialog('eventReviewModal');
   closeDialog('detailsModal');
@@ -1239,34 +1299,28 @@ function updateAnnouncementActionButtons() {
 
 function openNotifications() { renderNotifications(); openDialog('notificationsModal'); }
 function renderNotifications() {
-  const user = currentUser(state.store);
-  const upcomingLimit = addDays(new Date(), 7);
-  const ownEvents = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id);
-  const notices = [
-    ...activeAnnouncements(state.store).map((item) => ({ title: `Announcement: ${item.title}`, detail: item.content, date: item.updated_at || item.created_at || item.posted_at })),
-    ...state.store.blockedTimes.filter((item) => new Date(item.end_time) >= new Date()).map((item) => ({ title: `Blocked period: ${item.title}`, detail: `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`, date: item.created_at })),
-    ...ownEvents.filter((item) => eventIsActive(item) && new Date(item.start_time) >= new Date() && new Date(item.start_time) <= upcomingLimit).map((item) => ({ title: `Upcoming event: ${item.title}`, detail: `${item.venue} - ${formatDateTime(item.start_time)}`, date: item.start_time })),
-    ...ownEvents.filter((item) => item.approval_date && item.notification_status && eventNotificationBelongsToUser(item, user)).map(eventReviewNotification),
-    ...ownEvents.filter((item) => item.conflict_event_ids?.length).map((item) => ({ title: `Conflict warning: ${item.title}`, detail: `${item.conflict_event_ids.length} overlapping event(s) need review.`, date: item.updated_at })),
-    ...state.store.concerns.filter((item) => isSuperAdmin(state.store) || item.organization_id === user.organization_id).filter((item) => item.admin_response).map((item) => ({ title: `Concern update: ${item.title}`, detail: `${cap(item.status)} - ${item.admin_response}`, date: item.updated_at }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
-  $('notificationsList').innerHTML = notices.map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>${escapeHtml(formatDateTime(item.date))}</p></div>`).join('') || empty('No notifications right now.');
+  const notices = currentUserNotifications();
+  $('markNotificationsReadButton').hidden = !notices.some((item) => !item.is_read);
+  $('notificationsList').innerHTML = notices.map(notificationHtml).join('') || empty('No notifications right now.');
+  updateNotificationBadge();
 }
 
-function eventNotificationBelongsToUser(item, user) {
-  return item.created_by === user.id || (!isSuperAdmin(state.store) && item.organization_id === user.organization_id);
+function notificationHtml(item) {
+  return `<div class="activity-item ${item.is_read ? '' : 'unread-notification'}"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.is_read ? 'read' : 'pending'}">${escapeHtml(item.is_read ? 'Read' : 'Unread')}</span></strong><p>${escapeHtml(item.message)}</p><p>${escapeHtml(formatDateTime(item.created_at))}</p>${item.is_read ? '' : actionButton('notification-read', item.notification_id, 'Mark as Read', 'secondary-button')}</div>`;
 }
 
-function eventReviewNotification(item) {
-  const approved = item.approval_status === 'approved';
-  const recommendation = item.admin_recommendation ? ` Recommendation: ${item.admin_recommendation}` : '';
-  return {
-    title: `${approved ? 'Approved' : 'Rejected'} request: ${item.title}`,
-    detail: approved
-      ? `Your event request was approved.${recommendation}`
-      : `Your event request was rejected. Please delete the proposed event.${recommendation}`,
-    date: item.approval_date || item.updated_at
-  };
+function markNotificationRead(id) {
+  const item = (state.store.notifications || []).find((notification) => notification.notification_id === id);
+  if (!item || item.user_id !== currentUser(state.store).id) return;
+  item.is_read = true;
+  persist('Notification marked as read.');
+  renderNotifications();
+}
+
+function markAllNotificationsRead() {
+  currentUserNotifications().forEach((item) => { item.is_read = true; });
+  persist('Notifications marked as read.');
+  renderNotifications();
 }
 
 function chooseActivityStatus() {
@@ -1330,6 +1384,12 @@ function addConcern(event) {
   if (textError) return showToast(textError, 'error');
   const item = { id: createId(), organization_id: org.id, organization_name: org.organization_name, title, category: $('concernCategory').value, priority: $('concernPriority').value, description, status: 'pending', admin_response: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   state.store.concerns.push(item);
+  notifyAdmins({
+    notification_type: 'concern_new',
+    reference_id: item.id,
+    title: 'New Concern Submitted',
+    message: `${item.organization_name} submitted concern "${item.title}".`
+  });
   log('concern_submitted', `${user.full_name} raised "${item.title}".`, item);
   event.target.reset(); persist('Concern submitted.'); renderConcerns();
 }
@@ -1613,6 +1673,7 @@ const LIST_ACTION_PERMISSIONS = {
   'account-edit': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
   'account-suspend': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
   'account-delete': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'notification-read': { allowed: () => !isPublic(state.store), message: 'Login to manage notifications.' },
   'concern-review': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-resolve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' }
@@ -1633,6 +1694,7 @@ const LIST_ACTIONS = {
   'account-edit': openAccountEditor,
   'account-suspend': suspendAccount,
   'account-delete': deleteAccount,
+  'notification-read': markNotificationRead,
   'concern-review': reviewConcern,
   'concern-resolve': (id) => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
   'concern-reject': (id) => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
@@ -1692,9 +1754,22 @@ function updateConcernStatus(id, status, action, message, description) {
   if (!item) return;
   item.status = status;
   item.updated_at = new Date().toISOString();
+  notifyConcernOwner(item, action === 'concern_responded' ? 'Concern Reply' : 'Concern Status Updated', action === 'concern_responded' ? `Admin replied to "${item.title}": ${item.admin_response || 'No message provided.'}` : `Concern "${item.title}" was marked ${cap(status)}.`);
   log(action, description || `${message.replace(/\.$/, '')} "${item.title}".`, item);
   persist(message);
   renderConcerns();
+}
+
+function notifyConcernOwner(concern, title, message) {
+  state.store.users
+    .filter((user) => user.organization_id === concern.organization_id && user.role === 'organization_manager')
+    .forEach((user) => createNotification({
+      user_id: user.id,
+      notification_type: 'concern_update',
+      reference_id: concern.id,
+      title,
+      message
+    }));
 }
 
 async function removeById(collection, id, action, message) {
