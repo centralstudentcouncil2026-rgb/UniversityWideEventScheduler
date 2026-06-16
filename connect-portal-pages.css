@@ -618,9 +618,10 @@
 
   .public-shell .calendar-nav {
     background: transparent;
-    grid-template-columns: minmax(0, max-content) max-content max-content;
+    grid-template-columns: minmax(0, 1fr) minmax(70px, 0.56fr) auto auto;
     justify-content: center;
     left: 10px;
+    max-width: calc(100vw - 20px);
     position: absolute;
     right: 10px;
     top: calc(100% + 2px);
@@ -639,7 +640,7 @@
   }
 
   .public-organization-select {
-    max-width: 130px;
+    max-width: 100%;
   }
 
   .public-shell .period-controls {
@@ -743,36 +744,46 @@
 @media (max-width: 480px) {
   .public-shell .calendar-nav {
     align-items: center;
-    gap: 6px;
-    grid-template-columns: minmax(0, max-content) max-content max-content;
+    gap: 5px;
+    grid-template-columns: minmax(0, 1fr) minmax(68px, 0.52fr) 38px 38px;
     justify-content: center;
   }
 
   .public-shell .period-controls {
     gap: 5px;
     grid-column: auto;
+    display: contents;
     justify-self: end;
     order: 3;
   }
 
   .public-shell .period-controls .icon-button {
-    height: 40px;
-    width: 40px;
+    height: 38px;
+    min-width: 0;
+    width: 38px;
   }
 
   .public-shell .public-organization-select {
     order: 1;
   }
 
+  .public-shell #prevButton {
+    order: 3;
+  }
+
+  .public-shell #nextButton {
+    order: 4;
+  }
+
   .public-shell .public-organization-select,
   .public-shell .view-selector {
     min-width: 0;
-    width: auto;
+    width: 100%;
   }
 
   .public-shell .view-selector {
     font-size: 14px;
-    max-width: 96px;
+    max-width: none;
     order: 2;
     padding-left: 10px;
     padding-right: 24px;
@@ -781,34 +792,30 @@
   }
 
   .public-shell .public-organization-select {
-    max-width: 142px;
+    max-width: none;
   }
 }
 
 @media (max-width: 380px) {
   .public-shell .calendar-nav {
-    gap: 5px;
-    grid-template-columns: minmax(0, max-content) max-content max-content;
+    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) minmax(62px, 0.5fr) 34px 34px;
   }
 
   .public-shell .period-controls .icon-button {
-    height: 38px;
-    width: 38px;
+    height: 34px;
+    width: 34px;
   }
 
   .public-shell .public-organization-select,
   .public-shell .view-selector {
-    font-size: 13px;
+    font-size: 12px;
     padding-left: 9px;
-    padding-right: 20px;
-  }
-
-  .public-shell .public-organization-select {
-    max-width: 124px;
+    padding-right: 18px;
   }
 
   .public-shell .view-selector {
-    max-width: 86px;
+    max-width: none;
   }
 }
 
