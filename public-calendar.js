@@ -164,6 +164,9 @@ function initializePublicCalendar() {
 
   if (prevButton) prevButton.addEventListener('click', () => { state.calendar.prev(); schedulePublicCalendarResize(0); });
   if (nextButton) nextButton.addEventListener('click', () => { state.calendar.next(); schedulePublicCalendarResize(0); });
+  if (viewSelector) viewSelector.addEventListener('pointerdown', () => {
+    if (viewSelector.value === 'today') returnToToday();
+  });
   if (viewSelector) viewSelector.addEventListener('change', (event) => {
     changePublicView(event.target.value);
   });
@@ -190,11 +193,18 @@ function initializePublicCalendar() {
 function changePublicView(value) {
   state.publicViewMode = value === 'multiMonthYear' ? 'multiMonthYear' : value === 'dayGridMonth' ? 'dayGridMonth' : 'today';
   if (state.publicViewMode === 'today') {
-    state.calendar.changeView('dayGridMonth');
-    state.calendar.today();
+    returnToToday();
   } else {
     state.calendar.changeView(state.publicViewMode);
   }
+  syncPublicViewControls(state.calendar.view.type);
+  schedulePublicCalendarResize(0);
+}
+
+function returnToToday() {
+  state.publicViewMode = 'today';
+  state.calendar.changeView('dayGridMonth');
+  state.calendar.today();
   syncPublicViewControls(state.calendar.view.type);
   schedulePublicCalendarResize(0);
 }
