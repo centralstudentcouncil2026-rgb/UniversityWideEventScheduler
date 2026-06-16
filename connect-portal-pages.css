@@ -910,3 +910,123 @@
     width: min(460px, 100vw);
   }
 }
+
+.portal-shell .calendar-nav {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.portal-shell .header-organization-filter {
+  flex: 1 1 220px;
+  max-width: 260px;
+  min-width: 150px;
+}
+
+.portal-shell #viewSelector {
+  flex: 0 1 112px;
+  max-width: 112px;
+  min-width: 86px;
+  text-align: center;
+  text-align-last: center;
+}
+
+.portal-shell .period-controls,
+.portal-shell .notification-bell {
+  flex: 0 0 auto;
+}
+
+.portal-shell .notification-bell {
+  justify-content: center;
+}
+
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .portal-shell .calendar-nav {
+    display: flex;
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .portal-shell .header-organization-filter {
+    max-width: none;
+    min-width: 0;
+  }
+
+  .portal-shell #viewSelector {
+    min-width: 76px;
+  }
+}
+
+@media (max-width: 520px) {
+  .portal-shell .calendar-nav {
+    gap: 6px;
+  }
+
+  .portal-shell .header-organization-filter,
+  .portal-shell #viewSelector {
+    font-size: 13px;
+    min-height: 40px;
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 22px;
+  }
+
+  .portal-shell #viewSelector {
+    flex-basis: 82px;
+    max-width: 82px;
+  }
+
+  .portal-shell .period-controls {
+    gap: 6px;
+  }
+
+  .portal-shell .period-controls .icon-button {
+    height: 40px;
+    min-width: 40px;
+    width: 40px;
+  }
+
+  .portal-shell .notification-bell {
+    min-height: 40px;
+    min-width: 46px;
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .portal-shell .calendar-nav {
+    gap: 4px;
+  }
+
+  .portal-shell .header-organization-filter,
+  .portal-shell #viewSelector {
+    font-size: 12px;
+    min-height: 36px;
+    padding-left: 8px;
+    padding-right: 18px;
+  }
+
+  .portal-shell #viewSelector {
+    flex-basis: 70px;
+    max-width: 70px;
+  }
+
+  .portal-shell .period-controls {
+    gap: 4px;
+  }
+
+  .portal-shell .period-controls .icon-button {
+    height: 36px;
+    min-width: 36px;
+    width: 36px;
+  }
+
+  .portal-shell .notification-bell {
+    min-height: 36px;
+    min-width: 42px;
+    padding: 0 6px;
+  }
+}

@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=20260616-calendar-controls-v1">
   <link rel="stylesheet" href="csc-live-theme.css?v=20260607-performance-v1">
   <link rel="stylesheet" href="connect-calendar-overrides.css?v=20260607-performance-v3">
-  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-admin-sidebar-stack-v1">
+  <link rel="stylesheet" href="connect-portal-pages.css?v=20260616-admin-header-controls-v1">
 </head>
 <body class="portal-shell">
   <div class="app-shell">
@@ -24,28 +24,17 @@
         <div class="brand-copy"><h1>CSC S.Y.N.C.</h1><p>Systemized Year-round Network Calendar</p></div>
       </div>
       <nav class="calendar-nav" aria-label="Calendar navigation">
-        <button class="toolbar-button" id="todayButton">Today</button>
+        <select id="headerOrganizationFilter" class="view-selector header-organization-filter" aria-label="Organization filter"></select>
+        <select id="viewSelector" class="view-selector" aria-label="Calendar view">
+          <option value="today">Today</option>
+          <option value="multiMonthYear">Year</option>
+        </select>
         <div class="period-controls" aria-label="Period controls">
           <button class="icon-button" id="prevButton" aria-label="Previous period">&#8249;</button>
           <button class="icon-button" id="nextButton" aria-label="Next period">&#8250;</button>
         </div>
-      </nav>
-      <div class="toolbar-actions">
-        <div class="search-wrap" id="searchWrap">
-          <button class="icon-button mobile-search-button" id="searchToggle" aria-label="Open search">&#128269;</button>
-          <input type="search" id="searchInput" placeholder="Search events" autocomplete="off" maxlength="120">
-        </div>
-        <button class="toolbar-button" id="filtersButton" type="button">Filters</button>
         <button class="notification-bell restricted-only" id="notificationsButton" type="button" aria-label="Open notifications">&#128276;<span class="notification-badge" id="notificationBadge">0</span></button>
-        <select id="viewSelector" class="view-selector" aria-label="Calendar view">
-          <option value="timeGridWeek">Week</option>
-          <option value="timeGridDay">Day</option>
-          <option value="dayGridMonth">Month</option>
-          <option value="multiMonthYear">Year</option>
-          <option value="listWeek">Agenda</option>
-        </select>
-        <button class="profile-pill" id="profileButton" type="button"><span id="profileInitials">PV</span><strong id="profileName">Public Viewer</strong></button>
-      </div>
+      </nav>
     </header>
 
     <aside class="sidebar" id="sidebar">

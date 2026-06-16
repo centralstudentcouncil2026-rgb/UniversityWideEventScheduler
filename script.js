@@ -83,6 +83,7 @@ const state = {
   weekSelection: null,
   resizeObserver: null,
   resizeTimer: 0,
+  portalViewMode: 'today',
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
   search: ''
@@ -121,7 +122,6 @@ async function init() {
 
 function bindEvents() {
   bindClickActions({
-    todayButton: () => state.calendar.today(),
     prevButton: () => state.calendar.prev(),
     nextButton: () => state.calendar.next(),
     searchToggle: toggleSearch,
@@ -174,6 +174,11 @@ function bindEvents() {
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
   on('viewSelector', 'change', (event) => changeView(event.target.value));
+  on('headerOrganizationFilter', 'change', (event) => {
+    state.filters.organization = event.target.value;
+    if ($('filterOrganization')) $('filterOrganization').value = state.filters.organization;
+    refreshCalendar();
+  });
   on('searchInput', 'input', debounce((event) => { state.search = cleanSingleLine(event.target.value).slice(0, TEXT_LIMITS.search).toLowerCase(); refreshCalendar(); }, 180));
   on('registerRole', 'change', updateRegistrationFields);
   on('eventScheduleType', 'change', updateScheduleType);
@@ -284,8 +289,8 @@ function renderRole() {
   document.body.classList.toggle('is-manager', isManager(state.store));
   document.body.classList.toggle('is-super-admin', isSuperAdmin(state.store));
   document.body.classList.toggle('is-public', isPublic(state.store));
-  $('profileName').textContent = user.full_name;
-  $('profileInitials').textContent = initials(user.full_name);
+  if ($('profileName')) $('profileName').textContent = user.full_name;
+  if ($('profileInitials')) $('profileInitials').textContent = initials(user.full_name);
   Object.entries(PORTAL_TOOL_VISIBILITY).forEach(([id, allowed]) => setHidden(id, !allowed(state.store)));
   if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
   if (!isPublic(state.store)) closePublicDayDialog();
@@ -299,7 +304,9 @@ function renderFormOptions() {
 }
 
 function renderFilterOptions() {
-  fillSelect('filterOrganization', [['', 'All organizations'], ...state.store.organizations.map((org) => [org.id, org.organization_name])], state.filters.organization);
+  const organizationOptions = [['', 'All organizations'], ...state.store.organizations.map((org) => [org.id, org.organization_name])];
+  fillSelect('filterOrganization', organizationOptions, state.filters.organization);
+  fillSelect('headerOrganizationFilter', organizationOptions, state.filters.organization);
   fillSelect('filterCategory', [['', 'All categories'], ...state.store.categories.filter((item) => item.active).map((item) => [item.id, item.name])], state.filters.category);
 }
 
@@ -328,7 +335,13 @@ function initializeCalendar() {
     slotMaxTime: '21:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, dayMaxEvents: false, dayMaxEventRows: false, fixedWeekCount: false, showNonCurrentDates: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 }, listWeek: { buttonText: 'Agenda' } },
     events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info), connectedGridViewType(info))); },
-    datesSet: (info) => { cancelWeekRectangleSelection(); $('calendarTitle').textContent = info.view.title; $('viewSelector').value = info.view.type; updateAvailability(); },
+    datesSet: (info) => {
+      cancelWeekRectangleSelection();
+      $('calendarTitle').textContent = info.view.title;
+      const selector = $('viewSelector');
+      if (selector) selector.value = state.portalViewMode === 'multiMonthYear' ? 'multiMonthYear' : 'today';
+      updateAvailability();
+    },
     selectAllow: () => state.calendar.view.type !== 'timeGridWeek' && !isPublic(state.store) && window.innerWidth > MOBILE_BREAKPOINT && state.calendar.view.type !== 'multiMonthYear',
     select: (info) => { if (!requirePermission(canCreateEvents(state.store), 'Login as an organization manager or super admin to create requests.')) return; openEventModal(selectionRange(info)); state.calendar.unselect(); },
     dateClick: (info) => {
@@ -1471,6 +1484,7 @@ function confirmPendingAction() { const action = state.confirmAction; state.conf
 
 function updateFilters() {
   state.filters = Object.fromEntries(FILTER_IDS.map((id) => [filterKey(id), cleanSingleLine($(id).value)]));
+  if ($('headerOrganizationFilter')) $('headerOrganizationFilter').value = state.filters.organization;
   refreshCalendar();
 }
 
@@ -1494,7 +1508,21 @@ function updateAvailability() {
   status.textContent = active ? `Active Until ${formatTime(active.end_time)}` : 'Public Events Overview';
   detail.textContent = active?.venue ? `${active.title} at ${active.venue}` : active ? 'A university block is active.' : '';
 }
-function changeView(view) { state.calendar.changeView(isPublic(state.store) ? 'dayGridMonth' : MOBILE_VIEWS.has(view) ? view : 'timeGridWeek'); setTimeout(() => state.calendar.updateSize(), 0); }
+function changeView(view) {
+  if (isPublic(state.store)) {
+    state.calendar.changeView('dayGridMonth');
+  } else if (view === 'multiMonthYear') {
+    state.portalViewMode = 'multiMonthYear';
+    state.calendar.changeView('multiMonthYear');
+  } else {
+    state.portalViewMode = 'today';
+    state.calendar.changeView('timeGridWeek');
+    state.calendar.today();
+  }
+  const selector = $('viewSelector');
+  if (selector) selector.value = state.portalViewMode === 'multiMonthYear' ? 'multiMonthYear' : 'today';
+  setTimeout(() => state.calendar.updateSize(), 0);
+}
 function bindCalendarResizeObserver() {
   if (!window.ResizeObserver || state.resizeObserver) return;
   const panel = $('calendar') && $('calendar').parentElement;
