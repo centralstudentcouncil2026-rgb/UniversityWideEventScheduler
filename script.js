@@ -195,6 +195,10 @@ function bindEvents() {
   document.addEventListener('pointerup', finishWeekRectangleSelection);
   document.addEventListener('pointercancel', cancelWeekRectangleSelection);
   document.addEventListener('click', (event) => {
+    if (event.target instanceof HTMLDialogElement && event.target.open) {
+      closeDialog(event.target.id);
+      return;
+    }
     const closer = event.target.closest('[data-close]');
     if (closer) closeDialog(closer.dataset.close);
   });
@@ -823,6 +827,11 @@ function applySharedTimes() {
 
 function updateScheduleType() {
   const multiDay = $('eventScheduleType').value === 'multi_day';
+  $('scheduleFields')?.classList.toggle('is-multi-day', multiDay);
+  const endDateLabel = $('eventEndDateLabel');
+  if (endDateLabel) endDateLabel.hidden = !multiDay;
+  if ($('eventDateLabelText')) $('eventDateLabelText').textContent = multiDay ? 'Start Date' : 'Date';
+  $('eventEndDate').required = multiDay;
   if (!multiDay) syncSingleDayEndDate();
   $('eventEndDate').readOnly = !multiDay;
 }

@@ -826,7 +826,15 @@ body.is-public .view-selector {
 }
 
 #scheduleFields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#scheduleFields.is-multi-day {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#scheduleFields .multi-day-field[hidden] {
+  display: none;
 }
 
 .multi-schedule {
@@ -1205,6 +1213,17 @@ body.is-super-admin .check-row.super-admin-only {
   gap: 18px;
   justify-content: space-between;
   margin-bottom: 18px;
+}
+
+.modal-header .icon-button,
+.public-day-header .icon-button {
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  flex: 0 0 44px;
+  height: 44px;
+  max-width: 44px;
+  min-width: 44px;
+  width: 44px;
 }
 
 .modal-header h3 {
@@ -1773,6 +1792,20 @@ body.is-super-admin .check-row.super-admin-only {
   .shared-time-grid,
   .occurrence-row {
     grid-template-columns: 1fr;
+  }
+
+  #scheduleFields,
+  #scheduleFields.is-multi-day {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-header .icon-button,
+  .public-day-header .icon-button {
+    flex-basis: 40px;
+    height: 40px;
+    max-width: 40px;
+    min-width: 40px;
+    width: 40px;
   }
 
   .occurrence-exception-fields {
