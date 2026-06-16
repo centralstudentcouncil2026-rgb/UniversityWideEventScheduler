@@ -1003,9 +1003,30 @@ function openDetails(props) {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
     const selectedOccurrence = props.occurrence || eventOccurrences(record)[0];
     const scheduleLabel = selectedOccurrence ? `${formatDateTime(selectedOccurrence.start_time)} to ${formatTime(selectedOccurrence.end_time)}` : scheduleSummary(record);
-    const data = { Organization: record.organization_name, Category: category.name, Venue: record.venue, Schedule: scheduleLabel, Approval: cap(record.approval_status), Status: cap(record.event_status), Description: record.public_description };
-    if (privateView) Object.assign(data, { Purpose: record.purpose, 'Contact Person': record.contact_person, 'Contact Info': record.contact_info, 'Private Notes': record.private_notes || 'None' });
-    if (isSuperAdmin(state.store)) Object.assign(data, { 'Admin Recommendation': record.admin_recommendation || 'None', 'Approval Date': record.approval_date ? formatDateTime(record.approval_date) : 'None', 'Notification Status': record.notification_status || 'None', 'Admin Notes': record.admin_notes || 'None', 'Rejection Reason': record.rejection_reason || 'None', Conflicts: record.conflict_event_ids?.length || 0 });
+    const data = {
+      Organization: record.organization_name,
+      Category: category.name,
+      Venue: record.venue,
+      Schedule: scheduleLabel,
+      'Expected Attendees': record.expected_attendees,
+      'Privacy Level': privacyLabel(record.privacy_level),
+      'Short Public Description': record.public_description
+    };
+    if (privateView) Object.assign(data, {
+      Purpose: record.purpose,
+      'Contact Person': record.contact_person,
+      'Contact Number': record.contact_info,
+      'Private Notes': record.private_notes
+    });
+    if (isSuperAdmin(state.store)) Object.assign(data, {
+      Approval: cap(record.approval_status),
+      Status: cap(record.event_status),
+      'Admin Recommendation': record.admin_recommendation,
+      'Approval Date': record.approval_date ? formatDateTime(record.approval_date) : '',
+      'Admin Notes': record.admin_notes,
+      'Rejection Reason': record.rejection_reason,
+      Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
+    });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
     $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canDeleteEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
     $('detailsApproveButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'rejected';
@@ -2091,7 +2112,20 @@ function actionButton(action, id, label, className) {
 }
 
 function empty(text) { return `<div class="activity-item"><strong>${escapeHtml(text)}</strong></div>`; }
-function rows(data) { return Object.entries(data).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value == null ? '' : value)}</dd>`).join(''); }
+function privacyLabel(value) {
+  return value === 'internal' ? 'Admin only' : 'Public';
+}
+
+function detailValueHasContent(value) {
+  return value != null && String(value).trim() !== '';
+}
+
+function rows(data) {
+  return Object.entries(data)
+    .filter(([, value]) => detailValueHasContent(value))
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+    .join('');
+}
 function cap(value) { return String(value || '').split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function roleLabel(value) { return cap(value); }
 function initials(value) { return String(value || 'PV').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join(''); }
