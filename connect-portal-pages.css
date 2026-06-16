@@ -7,6 +7,11 @@
   border-bottom: 5px solid #1d4ed8 !important;
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
   min-height: 86px;
+  position: relative;
+}
+
+.public-shell .calendar-nav {
+  justify-content: flex-end;
 }
 
 .public-shell .app-shell,
@@ -492,11 +497,17 @@
 }
 
 .public-filter-modal {
+  background: #fff;
   max-width: min(520px, calc(100vw - 32px));
+  padding: 18px;
 }
 
-.public-filter-modal .modal-card {
-  min-width: min(500px, calc(100vw - 32px));
+.public-filter-modal::backdrop {
+  background: rgba(0, 33, 71, 0.42);
+}
+
+.public-filter-modal .modal-header {
+  margin-bottom: 14px;
 }
 
 .public-filter-field {
@@ -558,7 +569,12 @@
     display: grid;
     gap: 6px;
     grid-template-columns: 1fr auto;
+    position: relative;
     padding: 8px 10px 6px;
+  }
+
+  .public-shell .topbar {
+    margin-bottom: 58px;
   }
 
   .public-shell .mobile-only,
@@ -585,17 +601,39 @@
     min-width: 0;
   }
 
+  .public-shell .brand-area {
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+  }
+
   .public-shell .brand-logo,
   .portal-shell .brand-logo {
     height: 40px;
     width: 40px;
   }
 
-  .public-shell .brand-area p,
   .portal-shell .brand-area p,
   .portal-shell #todayButton,
   .portal-shell .print-button {
     display: none;
+  }
+
+  .public-shell .brand-area p {
+    color: rgba(15, 23, 42, 0.72) !important;
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.15;
+    margin-top: 2px;
+    max-width: 220px;
+    white-space: normal;
+  }
+
+  .public-shell .brand-copy h1 {
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    white-space: normal;
   }
 
   .public-shell .calendar-nav,
@@ -607,7 +645,14 @@
   }
 
   .public-shell .calendar-nav {
-    grid-template-columns: minmax(88px, auto) minmax(0, 1fr) minmax(104px, auto);
+    background: transparent;
+    grid-template-columns: minmax(0, max-content) max-content max-content;
+    justify-content: center;
+    left: 10px;
+    position: absolute;
+    right: 10px;
+    top: calc(100% + 8px);
+    z-index: 25;
   }
 
   .portal-shell .calendar-nav {
