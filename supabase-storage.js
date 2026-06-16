@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260607-security-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260616-schedule-categories-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';

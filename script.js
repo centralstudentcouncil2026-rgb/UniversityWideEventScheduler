@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260607-security-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260607-security-v1';
+import { ACCOUNT_PRESETS, createId } from './app-data.js?v=20260616-schedule-categories-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-schedule-categories-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -151,7 +151,6 @@ function bindEvents() {
     concernsButton: openConcerns,
     eventRequestsButton: openEventRequests,
     blockedTimesButton: openBlockedTimes,
-    categoriesButton: openCategories,
     organizationsButton: openOrganizations,
     usersButton: openUsers,
     activityLogButton: openActivityLog,
@@ -167,10 +166,9 @@ function bindEvents() {
     announcementForm: addAnnouncement,
     concernForm: addConcern,
     blockedTimeForm: addBlockedTime,
-    categoryForm: addCategory,
     organizationForm: addOrganization
   });
-  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'categoriesList', 'organizationsList', 'accountRequestsList']);
+  bindDelegatedLists(['announcementsList', 'concernsList', 'eventRequestsList', 'blockedTimesList', 'organizationsList', 'accountRequestsList']);
   FILTER_IDS.forEach((id) => on(id, 'input', updateFilters));
   ['agreeRules', 'agreePrivacy'].forEach((id) => on(id, 'change', updateAgreementButton));
   on('viewSelector', 'pointerdown', (event) => {
@@ -185,6 +183,8 @@ function bindEvents() {
   on('searchInput', 'input', debounce((event) => { state.search = cleanSingleLine(event.target.value).slice(0, TEXT_LIMITS.search).toLowerCase(); refreshCalendar(); }, 180));
   on('registerRole', 'change', updateRegistrationFields);
   on('eventScheduleType', 'change', updateScheduleType);
+  on('eventDate', 'change', syncSingleDayEndDate);
+  on('eventContactInfo', 'input', (event) => { event.target.value = event.target.value.replace(/\D/g, '').slice(0, 11); });
   on('occurrenceList', 'click', handleOccurrenceListClick);
   on('blockAllDay', 'change', updateBlockTimeFields);
   on('usersList', 'change', handleUserPermissionChange);
@@ -723,15 +723,15 @@ function openEventModal(range, record = null) {
   $('eventTitle').value = record?.title || ''; $('eventVenue').value = record?.venue || '';
   const occurrences = record ? eventOccurrences(record) : range.occurrences || [{ id: createId(), start_time: range.start.toISOString(), end_time: range.end.toISOString() }];
   $('eventScheduleType').value = record?.schedule_type || (occurrences.length > 1 ? 'multi_day' : 'single_day');
-  $('eventDate').value = dateInput(occurrences[0].start_time); $('eventStart').value = timeInput(occurrences[0].start_time); $('eventEnd').value = timeInput(occurrences[0].end_time);
-  $('eventMultiStartDate').value = dateInput(occurrences[0].start_time);
-  $('eventMultiStartTime').value = timeInput(occurrences[0].start_time);
-  $('eventMultiEndDate').value = dateInput(occurrences.at(-1).end_time);
-  $('eventMultiEndTime').value = timeInput(occurrences.at(-1).end_time);
+  $('eventDate').value = dateInput(occurrences[0].start_time);
+  $('eventStart').value = timeInput(occurrences[0].start_time);
+  $('eventEndDate').value = dateInput(occurrences.at(-1).end_time);
+  $('eventEnd').value = timeInput(occurrences.at(-1).end_time);
   updateScheduleType();
   $('eventAttendees').value = record?.expected_attendees || '';
   $('eventPrivacy').value = record?.privacy_level || 'basic';
-  $('eventContactPerson').value = record?.contact_person || currentUser(state.store).full_name; $('eventContactInfo').value = record?.contact_info || '';
+  $('eventContactPerson').value = record?.contact_person || '';
+  $('eventContactInfo').value = record?.contact_info || '';
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
   $('deleteEventButton').hidden = !canDeleteEvent(state.store, record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
   openDialog('eventModal');
@@ -743,9 +743,8 @@ function readEventForm() {
   const org = state.store.organizations.find((item) => item.id === (user.organization_id || state.filters.organization)) || state.store.organizations[0];
   const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
-  const occurrences = schedule_type === 'multi_day'
-    ? [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventMultiStartDate').value, start_time: localIso($('eventMultiStartDate').value, $('eventMultiStartTime').value), end_time: localIso($('eventMultiEndDate').value, $('eventMultiEndTime').value) }]
-    : [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso($('eventDate').value, $('eventEnd').value) }];
+  const endDate = schedule_type === 'multi_day' ? $('eventEndDate').value : $('eventDate').value;
+  const occurrences = [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso(endDate, $('eventEnd').value) }];
   return syncEventRange({
     ...existing, id: existing?.id || createId(), title: cleanSingleLine($('eventTitle').value), event_type: category?.name || 'Schedule',
     organization_id: org?.id || '', organization_name: org?.organization_name || '', category_id: $('eventCategory').value,
@@ -754,7 +753,7 @@ function readEventForm() {
     contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
     admin_notes: existing?.admin_notes || '', rejection_reason: existing?.rejection_reason || '',
     event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: isManager(state.store) ? 'approved' : existing?.approval_status || 'approved', created_by: existing?.created_by || currentUser(state.store).id,
-    created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
+    schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
 }
 
@@ -824,10 +823,12 @@ function applySharedTimes() {
 
 function updateScheduleType() {
   const multiDay = $('eventScheduleType').value === 'multi_day';
-  $('singleScheduleFields').hidden = multiDay;
-  $('multiScheduleSection').hidden = !multiDay;
-  ['eventDate', 'eventStart', 'eventEnd'].forEach((id) => { $(id).required = !multiDay; });
-  ['eventMultiStartDate', 'eventMultiStartTime', 'eventMultiEndDate', 'eventMultiEndTime'].forEach((id) => { $(id).required = multiDay; });
+  if (!multiDay) syncSingleDayEndDate();
+  $('eventEndDate').readOnly = !multiDay;
+}
+
+function syncSingleDayEndDate() {
+  if ($('eventScheduleType').value === 'single_day') $('eventEndDate').value = $('eventDate').value;
 }
 
 function findEventBlock(event) {
@@ -864,12 +865,11 @@ function validateEvent(event) {
   ]);
   if (textError) return textError;
   if (!event.occurrences.length) return 'Add at least one event day.';
-  if (event.occurrences.some((item) => !item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date))) return 'Each event day needs a valid date.';
-  if (event.occurrences.some((item) => !item.start_time || !item.end_time || new Date(item.start_time) >= new Date(item.end_time))) return 'Each event day needs an end time later than its start time.';
-  if (new Set(event.occurrences.map((item) => item.date)).size !== event.occurrences.length) return 'Use one schedule row per date.';
+  if (event.occurrences.some((item) => !item.date || !/^\d{4}-\d{2}-\d{2}$/.test(item.date))) return 'Start date is required.';
+  if (event.occurrences.some((item) => !item.start_time || !item.end_time || new Date(item.start_time) >= new Date(item.end_time))) return 'End date and time must be later than the start date and time.';
   if (!Number.isInteger(event.expected_attendees) || event.expected_attendees < 1 || event.expected_attendees > 99999) return 'Expected attendees must be between 1 and 99999.';
   if (!event.public_description || !event.purpose || !event.contact_person || !event.contact_info) return 'Complete description, purpose, and contact details.';
-  if (!/^\d{12}$/.test(event.contact_info)) return 'Contact number must contain exactly 12 digits.';
+  if (!/^\d{11}$/.test(event.contact_info)) return 'Contact number must contain exactly 11 digits.';
   if (isManager(state.store) && event.organization_id !== currentUser(state.store).organization_id) return 'Organization managers can only manage their assigned organization.';
   return '';
 }
