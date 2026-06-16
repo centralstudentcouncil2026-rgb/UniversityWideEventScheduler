@@ -5,6 +5,7 @@ import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rule
 const $ = (id) => document.getElementById(id);
 const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
+const PUBLIC_STORE_SYNC_INTERVAL_MS = 5000;
 const DEFAULT_ANNOUNCEMENT = {
   title: 'CSC S.Y.N.C. is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
@@ -13,7 +14,7 @@ const LEGACY_DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
-const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', publicViewMode: 'today', resizeTimer: 0, resizeObserver: null, loadTimer: 0, spanLabels: new Set() };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', publicViewMode: 'today', resizeTimer: 0, resizeObserver: null, loadTimer: 0, storeSyncTimer: 0, storeSyncing: false, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -25,6 +26,7 @@ function initPublicCalendar() {
     renderStatuses();
     initializePublicCalendar();
     refreshPublicStore();
+    startPublicStoreSync();
   } catch (error) {
     console.error('CONNECT public calendar failed to load:', error);
     showCalendarError();
@@ -32,6 +34,8 @@ function initPublicCalendar() {
 }
 
 async function refreshPublicStore() {
+  if (state.storeSyncing) return;
+  state.storeSyncing = true;
   const showBlockingLoader = !publicStoreHasContent(state.store);
   setPublicLoading(showBlockingLoader);
   state.loadTimer = setTimeout(() => setPublicLoading(true, 'Still loading calendar data...'), PUBLIC_SLOW_LOAD_MS);
@@ -63,8 +67,16 @@ async function refreshPublicStore() {
   } finally {
     clearTimeout(state.loadTimer);
     setPublicLoading(false);
+    state.storeSyncing = false;
     schedulePublicCalendarResize(0);
   }
+}
+
+function startPublicStoreSync() {
+  if (state.storeSyncTimer) window.clearInterval(state.storeSyncTimer);
+  state.storeSyncTimer = window.setInterval(() => {
+    if (!document.hidden) refreshPublicStore();
+  }, PUBLIC_STORE_SYNC_INTERVAL_MS);
 }
 
 function publicStoreHasContent(store) {

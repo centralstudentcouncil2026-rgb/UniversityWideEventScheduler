@@ -13,6 +13,7 @@ const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'mu
 const WEEK_SLOT_START_MINUTES = 7 * 60;
 const WEEK_SLOT_END_MINUTES = 21 * 60;
 const WEEK_SNAP_MINUTES = 15;
+const STORE_SYNC_INTERVAL_MS = 5000;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
@@ -73,6 +74,8 @@ const state = {
   weekSelection: null,
   resizeObserver: null,
   resizeTimer: 0,
+  storeSyncTimer: 0,
+  storeSyncing: false,
   portalViewMode: 'today',
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
@@ -100,6 +103,7 @@ async function init() {
     initializeCalendar();
     refreshCalendar();
     scheduleMobileAnnouncementPopup();
+    startStoreSync();
     if (notice) showToast(notice, noticeType);
   } catch (error) {
     console.error('CONNECT portal failed to initialize:', error);
@@ -2006,6 +2010,23 @@ async function reloadStore() {
   state.store = (await loadStore()).store;
   renderAll();
   refreshCalendar();
+}
+
+function startStoreSync() {
+  if (state.storeSyncTimer) window.clearInterval(state.storeSyncTimer);
+  state.storeSyncTimer = window.setInterval(syncStoreFromBackend, STORE_SYNC_INTERVAL_MS);
+}
+
+async function syncStoreFromBackend() {
+  if (state.storeSyncing || document.hidden || document.querySelector('dialog[open]')) return;
+  state.storeSyncing = true;
+  try {
+    await reloadStore();
+  } catch (error) {
+    console.warn('CONNECT portal background refresh failed:', error);
+  } finally {
+    state.storeSyncing = false;
+  }
 }
 function openDialog(id) {
   $(id).showModal();
