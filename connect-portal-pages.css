@@ -782,6 +782,8 @@
     order: 2;
     padding-left: 10px;
     padding-right: 24px;
+    text-align: center;
+    text-align-last: center;
   }
 
   .public-shell .public-filter-button {
