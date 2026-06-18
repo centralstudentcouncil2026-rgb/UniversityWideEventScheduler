@@ -352,6 +352,7 @@ declare
   admin_number text;
   admin_password text := current_setting('app.admin_seed_password', true);
   admin_user_id uuid;
+  replacement_admin_id uuid;
   allowed_admins text[] := array[
     'cscadmin1@aup.edu.ph',
     'cscadmin2@aup.edu.ph',
@@ -466,6 +467,31 @@ begin
         suspension_date = null,
         updated_at = now();
   end loop;
+
+  select id into replacement_admin_id
+  from auth.users
+  where lower(email) = allowed_admins[1]
+  limit 1;
+
+  if replacement_admin_id is not null
+     and to_regclass('public.scheduler_state') is not null
+     and exists (
+       select 1
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'scheduler_state'
+         and column_name = 'updated_by'
+     ) then
+    update public.scheduler_state
+    set updated_by = replacement_admin_id
+    where updated_by in (
+      select profile.id
+      from public.profiles profile
+      left join auth.users auth_user on auth_user.id = profile.id
+      where profile.role = 'super_admin'
+        and lower(coalesce(profile.email, profile.username, auth_user.email, '')) <> all (allowed_admins)
+    );
+  end if;
 
   delete from auth.users auth_user
   using public.profiles profile
