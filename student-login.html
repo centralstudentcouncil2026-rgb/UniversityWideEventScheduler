@@ -40,10 +40,31 @@
       <div class="login-footer-links">
         <a href="index.html">Back to public calendar</a>
       </div>
+
+      <form class="auth-form signup-form" id="organizationSignupForm">
+        <h3>Request Organization Account</h3>
+        <label>AUP Email
+          <input id="signupAupEmail" type="email" required autocomplete="email" maxlength="160" placeholder="name@aup.edu.ph">
+        </label>
+        <label>Phone Number
+          <input id="signupPhone" required inputmode="numeric" minlength="11" maxlength="11" pattern="[0-9]{11}">
+        </label>
+        <label>Organization Name
+          <input id="signupOrganization" required maxlength="140">
+        </label>
+        <label>Username
+          <input id="signupUsername" required autocomplete="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9_.\-]+">
+        </label>
+        <label>Password
+          <input id="signupPassword" type="password" minlength="10" maxlength="128" required autocomplete="new-password">
+        </label>
+        <button class="secondary-button" type="submit">Submit for Admin Approval</button>
+      </form>
+      <p class="login-message" id="signupMessage" aria-live="polite"></p>
     </section>
   </main>
 
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="login.js?v=20260616-csc-sync-brand-v1"></script>
+  <script type="module" src="login.js?v=20260618-org-signup-v1"></script>
 </body>
 </html>

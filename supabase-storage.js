@@ -130,14 +130,26 @@ async function refreshSession() {
   return payload;
 }
 
-export async function requestAccount({ username, password, fullName, organizationName }) {
-  return rpc('create_scheduler_account', {
+export async function requestAccount({ username, password, fullName, organizationName, email = '', phoneNumber = '' }) {
+  const payload = {
     p_username: username,
     p_password: password,
     p_full_name: fullName,
     p_requested_role: 'organization_manager',
     p_organization_name: organizationName
-  });
+  };
+  try {
+    return await rpc('create_scheduler_account', {
+      ...payload,
+      p_aup_email: email,
+      p_email: email,
+      p_phone_number: phoneNumber,
+      p_contact_number: phoneNumber
+    });
+  } catch (error) {
+    if (!/parameter|function|schema cache|PGRST202|PGRST203/i.test(error.message || '')) throw error;
+    return rpc('create_scheduler_account', payload);
+  }
 }
 
 export async function decideAccountRequest(id, decision) {

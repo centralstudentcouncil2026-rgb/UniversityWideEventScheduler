@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-revisions-v1';
-import { authenticate, clearSession, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260616-revisions-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260618-org-signup-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -139,6 +139,7 @@ function bindEvents() {
     conflictContinueButton: continueAfterConflict,
     filtersButton: () => openDialog('filtersModal'),
     resetFiltersButton: resetFilters,
+    cancelBlockEditButton: resetBlockedTimeForm,
     notificationsButton: openNotifications,
     markNotificationsReadButton: markAllNotificationsRead,
     dashboardButton: openDashboard,
@@ -1552,6 +1553,7 @@ function syncSingleDayBlockEndDate() {
 function addBlockedTime(event) {
   event.preventDefault();
   if (!canManageBlockedTimes(state.store)) return;
+  const existing = state.store.blockedTimes.find((item) => item.id === $('blockId')?.value);
   const title = cleanSingleLine($('blockTitle').value);
   const reason = cleanMultiline($('blockReason').value);
   const blockType = $('blockType').value;
@@ -1569,10 +1571,11 @@ function addBlockedTime(event) {
   const start = localIso(startDate, $('blockStart').value);
   const end = localIso(endDate, $('blockEnd').value);
   if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
-  const item = { id: createId(), title, block_type: blockType, start_time: start, end_time: end, reason, created_by: currentUser(state.store).id, created_at: new Date().toISOString() };
-  state.store.blockedTimes.push(item);
-  log('blocked_time_created', `Added blocked period "${item.title}".`, item);
-  event.target.reset(); updateBlockTimeFields(); persist('Blocked period added.'); renderBlockedTimes();
+  const item = { ...(existing || {}), id: existing?.id || createId(), title, block_type: blockType, start_time: start, end_time: end, reason, created_by: existing?.created_by || currentUser(state.store).id, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() };
+  if (existing) Object.assign(existing, item);
+  else state.store.blockedTimes.push(item);
+  log(existing ? 'blocked_time_updated' : 'blocked_time_created', `${existing ? 'Updated' : 'Added'} blocked period "${item.title}".`, item);
+  resetBlockedTimeForm(); persist(existing ? 'Blocked period updated.' : 'Blocked period added.'); renderBlockedTimes();
 }
 function renderBlockedTimes() {
   $('blockedTimesList').innerHTML = state.store.blockedTimes.map(blockedTimeHtml).join('') || empty('No blocked periods');
@@ -1580,7 +1583,32 @@ function renderBlockedTimes() {
 
 function blockedTimeHtml(item) {
   const blockType = item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actionButton('block-edit', item.id, 'Edit', 'secondary-button')}${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
+}
+
+function editBlockedTime(id) {
+  const item = state.store.blockedTimes.find((block) => block.id === id);
+  if (!item) return showToast('Blocked period was not found.', 'error');
+  $('blockId').value = item.id;
+  $('blockTitle').value = item.title || '';
+  $('blockType').value = item.block_type || 'single_day';
+  $('blockStartDate').value = dateInput(item.start_time);
+  $('blockStart').value = timeInput(item.start_time);
+  $('blockEndDate').value = dateInput(item.end_time);
+  $('blockEnd').value = timeInput(item.end_time);
+  $('blockReason').value = item.reason || '';
+  updateBlockTimeFields();
+  $('blockSubmitButton').textContent = 'Save Block';
+  $('cancelBlockEditButton').hidden = false;
+  $('blockTitle').focus();
+}
+
+function resetBlockedTimeForm() {
+  $('blockedTimeForm')?.reset();
+  if ($('blockId')) $('blockId').value = '';
+  if ($('blockSubmitButton')) $('blockSubmitButton').textContent = 'Add Block';
+  if ($('cancelBlockEditButton')) $('cancelBlockEditButton').hidden = true;
+  updateBlockTimeFields();
 }
 
 function openCategories() { if (!requirePermission(canManageCategories(state.store), 'This account cannot manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
@@ -1635,7 +1663,25 @@ function organizationHtml(item) {
 
 function openUsers() { if (!requirePermission(canManageAccounts(state.store), 'Only the Manager can manage accounts.')) return; renderUsers(); openDialog('usersModal'); }
 function renderUsers() {
-  $('usersList').innerHTML = state.store.users.map(userHtml).join('') || empty('No accounts');
+  const requests = pendingAccountRequests().map(accountRequestHtml).join('');
+  const accounts = state.store.users.map(userHtml).join('');
+  $('usersList').innerHTML = `${requests}${accounts}` || empty('No accounts');
+}
+
+function pendingAccountRequests() {
+  return (state.store.accountRequests || []).filter((request) => !['approved', 'rejected'].includes(String(request.status || '').toLowerCase()));
+}
+
+function accountRequestHtml(request) {
+  const requestId = request.id || request.request_id;
+  const rows = {
+    'AUP Email': request.aup_email || request.email || '',
+    'Phone Number': request.phone_number || request.contact_number || request.contact || '',
+    'Organization Name': request.organization_name || request.organizationName || '',
+    Username: request.username || '',
+    Submitted: request.created_at ? formatDateTime(request.created_at) : 'Pending'
+  };
+  return `<div class="activity-item account-card pending-account-card"><div class="account-card-head"><div><strong>Pending Organization Account</strong><p>${escapeHtml(request.organization_name || request.username || 'Account request')}</p></div><div class="account-card-actions">${actionButton('account-request-approve', requestId, 'Approve', 'primary-button')}${actionButton('account-request-reject', requestId, 'Reject', 'danger-button')}</div></div><dl class="details-list account-details">${rowsObject(rows)}</dl></div>`;
 }
 
 function userHtml(user) {
@@ -1718,6 +1764,18 @@ async function submitAccountEditForm(event) {
   renderUsers();
 }
 
+async function decidePendingAccountRequest(id, decision) {
+  if (!canManageAccounts(state.store)) return;
+  try {
+    await decideAccountRequest(id, decision);
+    await reloadStore();
+    renderUsers();
+    showToast(decision === 'approved' ? 'Organization account approved.' : 'Organization account rejected.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Account request decision failed.', 'error');
+  }
+}
+
 function applyAccountSuspension(user, suspended) {
   user.suspended_status = Boolean(suspended);
   user.suspension_status = Boolean(suspended);
@@ -1785,12 +1843,15 @@ const LIST_ACTION_PERMISSIONS = {
   'announcement-delete': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
   'announcement-hide': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
   'announcement-show': { allowed: () => canManageAnnouncements(state.store), message: 'This account cannot manage announcements.' },
+  'block-edit': { allowed: () => canManageBlockedTimes(state.store), message: 'This account cannot manage blocked times.' },
   'block-delete': { allowed: () => canManageBlockedTimes(state.store), message: 'This account cannot manage blocked times.' },
   'category-toggle': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
   'category-delete': { allowed: () => canManageCategories(state.store), message: 'This account cannot manage categories.' },
   'account-edit': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
   'account-suspend': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
   'account-delete': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can manage accounts.' },
+  'account-request-approve': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can approve accounts.' },
+  'account-request-reject': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can reject accounts.' },
   'notification-read': { allowed: () => !isPublic(state.store), message: 'Login to manage notifications.' },
   'concern-review': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-resolve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
@@ -1805,6 +1866,7 @@ const LIST_ACTIONS = {
   'announcement-delete': (id) => confirmAction('Delete this announcement?', () => removeById('announcements', id, 'announcement_deleted', 'Announcement deleted.')),
   'announcement-hide': (id) => setAnnouncementVisibility(id, 'hidden'),
   'announcement-show': (id) => setAnnouncementVisibility(id, 'show'),
+  'block-edit': editBlockedTime,
   'block-delete': (id) => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
   'category-toggle': toggleCategory,
   'category-delete': (id) => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
@@ -1812,6 +1874,8 @@ const LIST_ACTIONS = {
   'account-edit': openAccountEditor,
   'account-suspend': suspendAccount,
   'account-delete': deleteAccount,
+  'account-request-approve': (id) => decidePendingAccountRequest(id, 'approved'),
+  'account-request-reject': (id) => decidePendingAccountRequest(id, 'rejected'),
   'notification-read': markNotificationRead,
   'concern-review': reviewConcern,
   'concern-resolve': (id) => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),

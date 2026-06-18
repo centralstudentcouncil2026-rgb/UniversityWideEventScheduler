@@ -244,6 +244,17 @@ where account_type is null;
 create index if not exists profiles_suspension_status_idx on public.profiles(suspension_status);
 create index if not exists profiles_suspension_date_idx on public.profiles(suspension_date);
 
+alter table if exists public.account_requests add column if not exists aup_email text;
+alter table if exists public.account_requests add column if not exists phone_number text;
+alter table if exists public.account_requests add column if not exists contact_number text;
+do $$
+begin
+  if to_regclass('public.account_requests') is not null then
+    create index if not exists account_requests_aup_email_idx on public.account_requests(aup_email);
+    create index if not exists account_requests_phone_number_idx on public.account_requests(phone_number);
+  end if;
+end $$;
+
 create table if not exists public.activity_statuses (
   account_id uuid primary key references auth.users(id) on update cascade on delete cascade,
   account_type text not null check (account_type in ('CSC', 'OIC')),
