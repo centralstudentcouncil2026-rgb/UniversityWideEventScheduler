@@ -574,6 +574,24 @@ end $$;
 do $$
 declare
   state_column name;
+  allowed_admins text[] := array[
+    'cscadmin1@aup.edu.ph',
+    'cscadmin2@aup.edu.ph',
+    'cscadmin3@aup.edu.ph',
+    'cscadmin4@aup.edu.ph'
+  ];
+  manager_permissions jsonb := jsonb_build_object(
+    'enabled', true,
+    'manageAccounts', true,
+    'approveEvents', true,
+    'editAllEvents', true,
+    'deleteAllEvents', true,
+    'manageBlockedTimes', true,
+    'manageAnnouncements', true,
+    'updatePresidentStatus', true,
+    'updateOfficeStatus', true,
+    'manageCategories', true
+  );
 begin
   if to_regclass('public.scheduler_state') is null then
     return;
@@ -594,25 +612,40 @@ begin
 
   execute format(
     $sql$
+      with allowed_admin_users as (
+        select jsonb_agg(jsonb_build_object(
+          'id', auth_user.id::text,
+          'username', lower(auth_user.email),
+          'email', lower(auth_user.email),
+          'full_name', coalesce(profile.full_name, auth_user.raw_user_meta_data->>'full_name', 'CSC Admin'),
+          'role', 'super_admin',
+          'account_preset', 'manager',
+          'account_type', 'CSC',
+          'permissions', $2,
+          'suspension_status', false,
+          'suspended_status', false,
+          'created_at', coalesce(profile.created_at, auth_user.created_at, now()),
+          'updated_at', now()
+        )) as users
+        from auth.users auth_user
+        left join public.profiles profile on profile.id = auth_user.id
+        where lower(auth_user.email) = any ($1)
+      ),
+      current_non_admin_users as (
+        select coalesce(jsonb_agg(user_item), '[]'::jsonb) as users
+        from jsonb_array_elements(coalesce((select %1$I from public.scheduler_state limit 1)->'users', '[]'::jsonb)) as user_item
+        where coalesce(user_item->>'role', '') <> 'super_admin'
+      )
       update public.scheduler_state
       set %1$I = jsonb_set(
         %1$I,
         '{users}',
-        coalesce((
-          select jsonb_agg(user_item)
-          from jsonb_array_elements(coalesce(%1$I->'users', '[]'::jsonb)) as user_item
-          where coalesce(user_item->>'role', '') <> 'super_admin'
-             or lower(coalesce(user_item->>'email', user_item->>'username', '')) in (
-               'cscadmin1@aup.edu.ph',
-               'cscadmin2@aup.edu.ph',
-               'cscadmin3@aup.edu.ph',
-               'cscadmin4@aup.edu.ph'
-             )
-        ), '[]'::jsonb),
+        (select current_non_admin_users.users || coalesce(allowed_admin_users.users, '[]'::jsonb)
+         from current_non_admin_users, allowed_admin_users),
         true
       )
       where %1$I ? 'users'
     $sql$,
     state_column
-  );
+  ) using allowed_admins, manager_permissions;
 end $$;
