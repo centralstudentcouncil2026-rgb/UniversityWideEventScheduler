@@ -429,6 +429,42 @@ begin
       where id = admin_user_id;
     end if;
 
+    if to_regclass('auth.identities') is not null then
+      delete from auth.identities
+      where provider = 'email'
+        and (
+          user_id = admin_user_id
+          or lower(coalesce(identity_data->>'email', '')) = admin_email
+        );
+
+      if exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'auth'
+          and table_name = 'identities'
+          and column_name = 'provider_id'
+      ) then
+        execute
+          'insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, now(), now(), now())'
+        using
+          admin_user_id::text,
+          admin_user_id,
+          admin_email,
+          jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+          'email';
+      else
+        execute
+          'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+           values ($1, $2, $3, $4, now(), now(), now())'
+        using
+          admin_user_id::text,
+          admin_user_id,
+          jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+          'email';
+      end if;
+    end if;
+
     insert into public.profiles (
       id,
       username,
