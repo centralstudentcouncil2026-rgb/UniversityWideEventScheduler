@@ -11,6 +11,10 @@ const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_ANNOUNCEMENT_LOGIN_FLAG = 'connect_show_mobile_announcements_after_login';
 
+document.querySelectorAll('[data-auth-tab]').forEach((button) => {
+  button.addEventListener('click', () => selectAuthTab(button.dataset.authTab));
+});
+
 function cleanUsername(value) {
   return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -24,6 +28,21 @@ function setSignupMessage(text, type = 'error') {
   if (!signupMessage) return;
   signupMessage.textContent = text;
   signupMessage.className = `login-message ${type}`;
+}
+
+function selectAuthTab(name) {
+  document.querySelectorAll('[data-auth-tab]').forEach((button) => {
+    const active = button.dataset.authTab === name;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('[data-auth-panel]').forEach((panel) => {
+    const active = panel.dataset.authPanel === name;
+    panel.classList.toggle('active', active);
+    panel.hidden = !active;
+  });
+  const focusTarget = name === 'signup' ? document.getElementById('signupAupEmail') : document.getElementById('loginUsername');
+  focusTarget?.focus();
 }
 
 function roleAllowed(store) {
