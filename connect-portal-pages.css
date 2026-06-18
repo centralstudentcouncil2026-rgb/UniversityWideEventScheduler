@@ -296,7 +296,8 @@
 
 .login-card {
   border-top: 8px solid #facc15;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
 }
 
@@ -903,6 +904,16 @@
 }
 
 @media (max-width: 768px) {
+  .login-page.auth-screen {
+    height: auto;
+    justify-content: flex-start;
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .public-actions-row {
     display: none;
   }
