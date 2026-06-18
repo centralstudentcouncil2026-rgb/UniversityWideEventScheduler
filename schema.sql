@@ -352,6 +352,7 @@ declare
   admin_number text;
   admin_password text := current_setting('app.admin_seed_password', true);
   admin_user_id uuid;
+  identity_id_type text;
   replacement_admin_id uuid;
   allowed_admins text[] := array[
     'cscadmin1@aup.edu.ph',
@@ -430,6 +431,13 @@ begin
     end if;
 
     if to_regclass('auth.identities') is not null then
+      select data_type into identity_id_type
+      from information_schema.columns
+      where table_schema = 'auth'
+        and table_name = 'identities'
+        and column_name = 'id'
+      limit 1;
+
       delete from auth.identities
       where provider = 'email'
         and (
@@ -444,24 +452,47 @@ begin
           and table_name = 'identities'
           and column_name = 'provider_id'
       ) then
-        execute
-          'insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, now(), now(), now())'
-        using
-          admin_user_id::text,
-          admin_user_id,
-          admin_email,
-          jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
-          'email';
+        if identity_id_type = 'uuid' then
+          execute
+            'insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+             values ($1, $2, $3, $4, $5, now(), now(), now())'
+          using
+            admin_user_id,
+            admin_user_id,
+            admin_email,
+            jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+            'email';
+        else
+          execute
+            'insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+             values ($1, $2, $3, $4, $5, now(), now(), now())'
+          using
+            admin_user_id::text,
+            admin_user_id,
+            admin_email,
+            jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+            'email';
+        end if;
       else
-        execute
-          'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-           values ($1, $2, $3, $4, now(), now(), now())'
-        using
-          admin_user_id::text,
-          admin_user_id,
-          jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
-          'email';
+        if identity_id_type = 'uuid' then
+          execute
+            'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+             values ($1, $2, $3, $4, now(), now(), now())'
+          using
+            admin_user_id,
+            admin_user_id,
+            jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+            'email';
+        else
+          execute
+            'insert into auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+             values ($1, $2, $3, $4, now(), now(), now())'
+          using
+            admin_user_id::text,
+            admin_user_id,
+            jsonb_build_object('sub', admin_user_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+            'email';
+        end if;
       end if;
     end if;
 
