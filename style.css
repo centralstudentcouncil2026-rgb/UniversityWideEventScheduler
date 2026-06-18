@@ -196,10 +196,16 @@ button {
 }
 
 .auth-tab-panel {
+  max-height: min(58vh, 520px);
   min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .signup-form {
+  padding-bottom: 4px;
   padding-top: 0;
 }
 
@@ -1647,6 +1653,10 @@ body.is-super-admin .check-row.super-admin-only {
     padding: 20px;
   }
 
+  .auth-tab-panel {
+    max-height: calc(100svh - 250px);
+  }
+
   .topbar {
     align-items: center;
     display: grid;
@@ -1984,6 +1994,10 @@ body.is-super-admin .check-row.super-admin-only {
     font-size: 13px;
     min-height: 38px;
     padding: 7px 8px;
+  }
+
+  .auth-tab-panel {
+    max-height: calc(100svh - 220px);
   }
 
   .auth-form {
