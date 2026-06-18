@@ -27,8 +27,8 @@
       <h2>Admin Login</h2>
 
       <form class="auth-form" id="pageLoginForm">
-        <label>Username
-          <input id="loginUsername" required autocomplete="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9_.\-]+" autofocus>
+        <label>Admin Email
+          <input id="loginUsername" type="email" required autocomplete="username" maxlength="80" autofocus>
         </label>
         <label>Password
           <input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128">
@@ -44,6 +44,6 @@
   </main>
 
   <script src="../supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="../login.js?v=20260616-csc-sync-brand-v1"></script>
+  <script type="module" src="../login.js?v=20260618-admin-allowlist-v1"></script>
 </body>
 </html>

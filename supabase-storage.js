@@ -106,9 +106,11 @@ export async function saveStore(store) {
 }
 
 export async function authenticate(username, password) {
+  const login = username.trim().toLowerCase();
+  const email = login.includes('@') ? login : `${login}@core.local`;
   const payload = await request('/auth/v1/token?grant_type=password', {
     method: 'POST',
-    body: JSON.stringify({ email: `${username.trim().toLowerCase()}@core.local`, password })
+    body: JSON.stringify({ email, password })
   });
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
   localStorage.removeItem(SESSION_KEY);

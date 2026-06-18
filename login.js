@@ -1,11 +1,12 @@
-import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260607-security-v1';
-import { currentUser, isManager, isPublic, userPermission } from './app-rules.js?v=20260607-security-v1';
+import { authenticate, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260618-admin-allowlist-v1';
+import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260618-admin-allowlist-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
 const form = document.getElementById('pageLoginForm');
 const message = document.getElementById('loginMessage');
 const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_ANNOUNCEMENT_LOGIN_FLAG = 'connect_show_mobile_announcements_after_login';
 
 function cleanUsername(value) {
@@ -21,7 +22,7 @@ function roleAllowed(store) {
   const user = currentUser(store);
   if (!userPermission(user, 'enabled')) return false;
   if (loginType === 'student') return isManager(store);
-  if (loginType === 'admin') return !isPublic(store) && user.role !== 'organization_manager';
+  if (loginType === 'admin') return isAllowedAdminAccount(user);
   return !isPublic(store);
 }
 
@@ -29,7 +30,11 @@ function roleError(store) {
   if (!userPermission(currentUser(store), 'enabled')) return 'This account is disabled. Contact the CSC S.Y.N.C. manager.';
   return loginType === 'student'
     ? 'This login is for student organizations only.'
-    : 'This login is for administrators only.';
+    : `This login is restricted to ${ADMIN_ACCESS_EMAILS.join(', ')}.`;
+}
+
+function loginFormatAllowed(username) {
+  return loginType === 'admin' ? EMAIL_PATTERN.test(username) : USERNAME_PATTERN.test(username);
 }
 
 if (form) form.addEventListener('submit', async (event) => {
@@ -38,8 +43,8 @@ if (form) form.addEventListener('submit', async (event) => {
   const password = document.getElementById('loginPassword').value;
   const button = form.querySelector('button[type="submit"]');
 
-  if (!USERNAME_PATTERN.test(username) || !password) {
-    setMessage('Enter a valid username and password.', 'error');
+  if (!loginFormatAllowed(username) || !password) {
+    setMessage(loginType === 'admin' ? 'Enter an allowed admin email and password.' : 'Enter a valid username and password.', 'error');
     return;
   }
 

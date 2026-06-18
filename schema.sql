@@ -327,3 +327,199 @@ create index if not exists notifications_is_read_idx on public.notifications(is_
 create index if not exists notifications_type_idx on public.notifications(notification_type);
 create index if not exists notifications_reference_id_idx on public.notifications(reference_id);
 create index if not exists notifications_created_at_idx on public.notifications(created_at);
+
+-- Admin access lockdown
+-- Run this in Supabase SQL after the base CONNECT schema exists. It keeps only
+-- these admin dashboard accounts. Before running the DO block, set the admin
+-- seed password for the current SQL session with:
+--   select set_config('app.admin_seed_password', '<admin-password>', false);
+
+create extension if not exists pgcrypto with schema extensions;
+
+alter table if exists public.profiles add column if not exists username text;
+alter table if exists public.profiles add column if not exists full_name text;
+alter table if exists public.profiles add column if not exists role text;
+alter table if exists public.profiles add column if not exists permissions jsonb not null default '{}'::jsonb;
+alter table if exists public.profiles add column if not exists account_preset text;
+alter table if exists public.profiles add column if not exists account_type text;
+alter table if exists public.profiles add column if not exists email text;
+alter table if exists public.profiles add column if not exists updated_at timestamptz not null default now();
+alter table if exists public.profiles add column if not exists created_at timestamptz not null default now();
+
+do $$
+declare
+  admin_email text;
+  admin_number text;
+  admin_password text := current_setting('app.admin_seed_password', true);
+  admin_user_id uuid;
+  allowed_admins text[] := array[
+    'cscadmin1@aup.edu.ph',
+    'cscadmin2@aup.edu.ph',
+    'cscadmin3@aup.edu.ph',
+    'cscadmin4@aup.edu.ph'
+  ];
+  manager_permissions jsonb := jsonb_build_object(
+    'enabled', true,
+    'manageAccounts', true,
+    'approveEvents', true,
+    'editAllEvents', true,
+    'deleteAllEvents', true,
+    'manageBlockedTimes', true,
+    'manageAnnouncements', true,
+    'updatePresidentStatus', true,
+    'updateOfficeStatus', true,
+    'manageCategories', true
+  );
+begin
+  if coalesce(admin_password, '') = '' then
+    raise exception 'Set app.admin_seed_password before running the admin access lockdown SQL.';
+  end if;
+
+  foreach admin_email in array allowed_admins loop
+    admin_number := substring(admin_email from 'cscadmin([0-9]+)@aup\.edu\.ph');
+    select id into admin_user_id
+    from auth.users
+    where lower(email) = admin_email
+    limit 1;
+
+    if admin_user_id is null then
+      admin_user_id := gen_random_uuid();
+      insert into auth.users (
+        instance_id,
+        id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at,
+        confirmation_token,
+        email_change,
+        email_change_token_new,
+        recovery_token
+      )
+      values (
+        '00000000-0000-0000-0000-000000000000',
+        admin_user_id,
+        'authenticated',
+        'authenticated',
+        admin_email,
+        extensions.crypt(admin_password, extensions.gen_salt('bf')),
+        now(),
+        jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')),
+        jsonb_build_object('full_name', 'CSC Admin ' || admin_number),
+        now(),
+        now(),
+        '',
+        '',
+        '',
+        ''
+      );
+    else
+      update auth.users
+      set encrypted_password = extensions.crypt(admin_password, extensions.gen_salt('bf')),
+          email_confirmed_at = coalesce(email_confirmed_at, now()),
+          raw_app_meta_data = jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')),
+          raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('full_name', 'CSC Admin ' || admin_number),
+          updated_at = now()
+      where id = admin_user_id;
+    end if;
+
+    insert into public.profiles (
+      id,
+      username,
+      full_name,
+      role,
+      permissions,
+      account_preset,
+      account_type,
+      email,
+      suspension_status,
+      created_at,
+      updated_at
+    )
+    values (
+      admin_user_id,
+      admin_email,
+      'CSC Admin ' || admin_number,
+      'super_admin',
+      manager_permissions,
+      'manager',
+      'CSC',
+      admin_email,
+      false,
+      now(),
+      now()
+    )
+    on conflict (id) do update
+    set username = excluded.username,
+        full_name = excluded.full_name,
+        role = excluded.role,
+        permissions = excluded.permissions,
+        account_preset = excluded.account_preset,
+        account_type = excluded.account_type,
+        email = excluded.email,
+        suspension_status = false,
+        suspension_date = null,
+        updated_at = now();
+  end loop;
+
+  delete from auth.users auth_user
+  using public.profiles profile
+  where auth_user.id = profile.id
+    and profile.role = 'super_admin'
+    and lower(coalesce(profile.email, profile.username, auth_user.email, '')) <> all (allowed_admins);
+
+  delete from public.profiles
+  where role = 'super_admin'
+    and lower(coalesce(email, username, '')) <> all (allowed_admins);
+end $$;
+
+do $$
+declare
+  state_column name;
+begin
+  if to_regclass('public.scheduler_state') is null then
+    return;
+  end if;
+
+  select column_name into state_column
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'scheduler_state'
+    and data_type = 'jsonb'
+    and column_name in ('state', 'store', 'data')
+  order by case column_name when 'state' then 1 when 'store' then 2 else 3 end
+  limit 1;
+
+  if state_column is null then
+    return;
+  end if;
+
+  execute format(
+    $sql$
+      update public.scheduler_state
+      set %1$I = jsonb_set(
+        %1$I,
+        '{users}',
+        coalesce((
+          select jsonb_agg(user_item)
+          from jsonb_array_elements(coalesce(%1$I->'users', '[]'::jsonb)) as user_item
+          where coalesce(user_item->>'role', '') <> 'super_admin'
+             or lower(coalesce(user_item->>'email', user_item->>'username', '')) in (
+               'cscadmin1@aup.edu.ph',
+               'cscadmin2@aup.edu.ph',
+               'cscadmin3@aup.edu.ph',
+               'cscadmin4@aup.edu.ph'
+             )
+        ), '[]'::jsonb),
+        true
+      )
+      where %1$I ? 'users'
+    $sql$,
+    state_column
+  );
+end $$;

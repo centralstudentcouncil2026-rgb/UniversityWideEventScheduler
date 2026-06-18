@@ -1,6 +1,13 @@
 export const PUBLIC_USER = { id: 'public', full_name: 'Public Viewer', role: 'public_viewer', organization_id: null };
 export const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'];
 export const EVENT_STATUSES = ['planned', 'finalized', 'postponed', 'cancelled', 'disabled', 'completed'];
+export const ADMIN_ACCESS_EMAILS = [
+  'cscadmin1@aup.edu.ph',
+  'cscadmin2@aup.edu.ph',
+  'cscadmin3@aup.edu.ph',
+  'cscadmin4@aup.edu.ph'
+];
+const ADMIN_ACCESS_EMAIL_SET = new Set(ADMIN_ACCESS_EMAILS);
 
 export function currentUser(store) {
   if (store.currentUserId === 'public') return PUBLIC_USER;
@@ -17,6 +24,17 @@ export function isManager(store) {
 
 export function isSuperAdmin(store) {
   return currentUser(store).role === 'super_admin';
+}
+
+export function accountLoginEmail(user) {
+  const email = String(user?.email || '').trim().toLowerCase();
+  if (email) return email;
+  const username = String(user?.username || '').trim().toLowerCase();
+  return username.includes('@') ? username : '';
+}
+
+export function isAllowedAdminAccount(user) {
+  return user?.role === 'super_admin' && ADMIN_ACCESS_EMAIL_SET.has(accountLoginEmail(user));
 }
 
 export function userPermission(user, permission) {

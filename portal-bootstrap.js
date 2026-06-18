@@ -1,5 +1,5 @@
 try {
-  await import('./portal-guard.js?v=20260607-security-v1');
+  await import('./portal-guard.js?v=20260618-admin-allowlist-v1');
 } catch (error) {
   console.error('CONNECT portal guard failed:', error);
   window.location.replace('index.html');
