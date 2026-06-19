@@ -1,7 +1,7 @@
-import { authenticatedEmail, authenticatedUserId, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-admin-auth-v1';
-import { currentUser, ensureAllowedAdminStore, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260619-admin-auth-v1';
+import { authenticatedEmail, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-admin-session-v1';
+import { currentUser, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260619-admin-session-v1';
 
-const store = ensureAllowedAdminStore(await loadAuthenticatedStore(), authenticatedEmail(), authenticatedUserId());
+const store = await loadAuthenticatedStore();
 const user = currentUser(store);
 
 if (isPublic(store) || (!isAllowedAdminEmail(authenticatedEmail()) && !userPermission(user, 'enabled')) || (isSuperAdmin(store) && !isAllowedAdminAccount(user))) {

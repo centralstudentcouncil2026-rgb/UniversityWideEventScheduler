@@ -1,4 +1,5 @@
 import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260619-db-display-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260619-admin-session-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -66,7 +67,7 @@ async function rpc(name, body = {}, authenticated = false) {
 
 export async function loadStore() {
   try {
-    const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
+    const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token))));
     rememberEventIds(store);
     return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
@@ -87,9 +88,15 @@ export async function loadPublicStore() {
 
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
-  const store = normalizeStore(await rpc('get_scheduler_store', {}, true));
+  const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, true)));
   rememberEventIds(store);
   return store;
+}
+
+function enforceAuthenticatedIdentity(store) {
+  const email = authenticatedEmail();
+  if (!email) return store;
+  return ensureAllowedAdminStore(store, email, authenticatedUserId());
 }
 
 export async function saveStore(store) {

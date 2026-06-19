@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-admin-auth-v1';
-import { ADMIN_ACCESS_EMAILS, currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-admin-auth-v1';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-admin-session-v1';
+import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-admin-session-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
@@ -90,10 +90,8 @@ if (form) form.addEventListener('submit', async (event) => {
   setMessage('Checking your account...', 'success');
 
   try {
-    const authPayload = await authenticate(username, password);
-    const store = loginType === 'admin'
-      ? ensureAllowedAdminStore(await loadAuthenticatedStore(), username, authPayload?.user?.id)
-      : await loadAuthenticatedStore();
+    await authenticate(username, password);
+    const store = await loadAuthenticatedStore();
 
     if (!roleAllowed(store)) {
       clearSession();
