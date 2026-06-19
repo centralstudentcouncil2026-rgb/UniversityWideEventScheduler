@@ -39,6 +39,7 @@ export function isAllowedAdminAccount(user) {
 
 export function userPermission(user, permission) {
   if (!user || user.role === 'public_viewer') return false;
+  if (isAllowedAdminAccount(user)) return true;
   if (permission === 'enabled') return user.permissions?.enabled !== false;
   return Boolean(user.permissions?.[permission]);
 }

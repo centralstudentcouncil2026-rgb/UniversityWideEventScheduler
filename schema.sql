@@ -416,6 +416,10 @@ create index if not exists notifications_created_at_idx on public.notifications(
 -- these admin dashboard accounts. Before running the DO block, set the admin
 -- seed password for the current SQL session with:
 --   select set_config('app.admin_seed_password', '<admin-password>', false);
+--
+-- To reset the four CSC admin passwords, run this before the DO block in the
+-- Supabase SQL editor with the password value you want to seed:
+--   select set_config('app.admin_seed_password', '<admin-password>', false);
 
 create extension if not exists pgcrypto with schema extensions;
 

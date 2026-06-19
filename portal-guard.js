@@ -1,10 +1,10 @@
-import { clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-db-display-v1';
-import { currentUser, isAllowedAdminAccount, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260618-admin-allowlist-v1';
+import { clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-admin-lockout-v1';
+import { currentUser, isAllowedAdminAccount, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260619-admin-lockout-v1';
 
 const store = await loadAuthenticatedStore();
 const user = currentUser(store);
 
-if (isPublic(store) || !userPermission(user, 'enabled') || (isSuperAdmin(store) && !isAllowedAdminAccount(user))) {
+if (isPublic(store) || (!isAllowedAdminAccount(user) && !userPermission(user, 'enabled')) || (isSuperAdmin(store) && !isAllowedAdminAccount(user))) {
   clearSession();
   window.location.replace('index.html');
 } else {

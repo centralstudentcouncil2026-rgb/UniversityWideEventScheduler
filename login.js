@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-db-display-v1';
-import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260618-admin-allowlist-v1';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-admin-lockout-v1';
+import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-admin-lockout-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
@@ -47,17 +47,18 @@ function selectAuthTab(name) {
 
 function roleAllowed(store) {
   const user = currentUser(store);
+  if (loginType === 'admin') return isAllowedAdminAccount(user);
   if (!userPermission(user, 'enabled')) return false;
   if (loginType === 'student') return isManager(store);
-  if (loginType === 'admin') return isAllowedAdminAccount(user);
   return !isPublic(store);
 }
 
 function roleError(store) {
+  if (loginType === 'admin') return `This login is restricted to ${ADMIN_ACCESS_EMAILS.join(', ')}.`;
   if (!userPermission(currentUser(store), 'enabled')) return 'This account is disabled. Contact the CSC S.Y.N.C. manager.';
   return loginType === 'student'
     ? 'This login is for student organizations only.'
-    : `This login is restricted to ${ADMIN_ACCESS_EMAILS.join(', ')}.`;
+    : 'This login is restricted.';
 }
 
 function loginFormatAllowed(username) {

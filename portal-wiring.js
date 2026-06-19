@@ -1,4 +1,4 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260619-db-display-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260619-admin-lockout-v1';
 import { currentUser } from './app-rules.js?v=20260607-security-v1';
 
 document.addEventListener('click', (event) => {
