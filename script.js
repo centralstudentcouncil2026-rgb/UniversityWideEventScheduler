@@ -433,7 +433,7 @@ function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.
   });
   const blocks = state.store.blockedTimes.map((block) => ({
     id: block.id,
-    title: canManageBlockedTimes(state.store) ? block.title : 'Unavailable',
+    title: block.title || 'Blocked university period',
     start: block.start_time,
     end: block.end_time,
     backgroundColor: '#071C3D',
@@ -1007,8 +1007,8 @@ function createScheduleRevision(original, candidate) {
 function openDetails(props) {
   state.selectedDetails = props; const record = props.record;
   if (props.type === 'block') {
-    $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = 'Blocked university period';
-    $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: canManageBlockedTimes(state.store) ? record.reason : 'Unavailable' });
+    $('detailsTitle').textContent = record.title || 'Blocked university period'; $('detailsMeta').textContent = 'Blocked university period';
+    $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: record.reason || 'No reason provided.' });
     ['detailsDeleteButton', 'detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
@@ -1583,7 +1583,10 @@ function renderBlockedTimes() {
 
 function blockedTimeHtml(item) {
   const blockType = item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actionButton('block-edit', item.id, 'Edit', 'secondary-button')}${actionButton('block-delete', item.id, 'Remove', 'danger-button')}</div>`;
+  const actions = canManageBlockedTimes(state.store)
+    ? `${actionButton('block-edit', item.id, 'Edit', 'secondary-button')}${actionButton('block-delete', item.id, 'Remove', 'danger-button')}`
+    : '';
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actions}</div>`;
 }
 
 function editBlockedTime(id) {
@@ -1609,6 +1612,30 @@ function resetBlockedTimeForm() {
   if ($('blockSubmitButton')) $('blockSubmitButton').textContent = 'Add Block';
   if ($('cancelBlockEditButton')) $('cancelBlockEditButton').hidden = true;
   updateBlockTimeFields();
+}
+
+async function removeBlockedTime(id) {
+  if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return;
+  const item = state.store.blockedTimes.find((block) => block.id === id);
+  if (!item) return;
+  state.store.blockedTimes = state.store.blockedTimes.filter((block) => block.id !== id);
+  log('blocked_time_removed', 'Blocked period removed.', item);
+  try {
+    await persist('Blocked period removed.');
+    try {
+      await deleteRecord('blockedTimes', id);
+    } catch (error) {
+      console.warn('CONNECT blocked-period table cleanup failed after store removal:', error);
+    }
+    resetBlockedTimeForm();
+    renderBlockedTimes();
+    refreshCalendar();
+  } catch (error) {
+    state.store.blockedTimes.push(item);
+    showToast(error.message, 'error');
+    renderBlockedTimes();
+    refreshCalendar();
+  }
 }
 
 function openCategories() { if (!requirePermission(canManageCategories(state.store), 'This account cannot manage categories.')) return; renderCategories(); openDialog('categoriesModal'); }
@@ -1915,7 +1942,7 @@ const LIST_ACTIONS = {
   'announcement-hide': (id) => setAnnouncementVisibility(id, 'hidden'),
   'announcement-show': (id) => setAnnouncementVisibility(id, 'show'),
   'block-edit': editBlockedTime,
-  'block-delete': (id) => confirmAction('Remove this blocked period?', () => removeById('blockedTimes', id, 'blocked_time_removed', 'Blocked period removed.')),
+  'block-delete': (id) => confirmAction('Remove this blocked period?', () => removeBlockedTime(id)),
   'category-toggle': toggleCategory,
   'category-delete': (id) => confirmAction('Delete this category?', () => removeById('categories', id, 'category_deleted', 'Category deleted.')),
   'organization-delete': confirmOrganizationDelete,

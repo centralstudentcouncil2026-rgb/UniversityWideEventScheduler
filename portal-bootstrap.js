@@ -7,7 +7,7 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260619-db-display-v1');
+  await import('./script.js?v=20260619-block-remove-v1');
   await import('./portal-wiring.js?v=20260619-db-display-v1');
 } else {
   window.location.replace('index.html');
