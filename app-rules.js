@@ -118,14 +118,14 @@ export function canEditEvent(store, event) {
   if (!event) return canCreateEvents(store);
   const user = currentUser(store);
   if (!userPermission(user, 'enabled')) return false;
-  return (isSuperAdmin(store) && hasPermission(store, 'editAllEvents')) || (isManager(store) && user.organization_id === event.organization_id);
+  return (isSuperAdmin(store) && hasPermission(store, 'editAllEvents')) || (isManager(store) && user.organization_id === event.organization_id && event.created_by === user.id);
 }
 
 export function canDeleteEvent(store, event) {
   if (!event) return false;
   const user = currentUser(store);
   if (!userPermission(user, 'enabled')) return false;
-  return (isSuperAdmin(store) && hasPermission(store, 'deleteAllEvents')) || (isManager(store) && user.organization_id === event.organization_id);
+  return (isSuperAdmin(store) && hasPermission(store, 'deleteAllEvents')) || (isManager(store) && user.organization_id === event.organization_id && event.created_by === user.id);
 }
 
 export function isPublicEvent(event) {

@@ -7,7 +7,7 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260619-admin-session-v1');
+  await import('./script.js?v=20260619-detail-actions-v1');
   await import('./portal-wiring.js?v=20260619-admin-session-v1');
 } else {
   window.location.replace('index.html');

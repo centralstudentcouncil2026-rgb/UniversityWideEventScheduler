@@ -6,7 +6,7 @@ import {
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260619-admin-session-v1';
+} from './app-rules.js?v=20260619-detail-actions-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -1009,7 +1009,7 @@ function openDetails(props) {
   if (props.type === 'block') {
     $('detailsTitle').textContent = record.title || 'Blocked university period'; $('detailsMeta').textContent = 'Blocked university period';
     $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: record.reason || 'No reason provided.' });
-    ['detailsDeleteButton', 'detailsCancelButton', 'detailsEditButton', 'detailsApproveButton', 'detailsRejectButton'].forEach((id) => $(id).hidden = true);
+    setDetailsActionVisibility({ delete: false, cancel: false, edit: false, approve: false, reject: false });
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
     const selectedOccurrence = props.occurrence || eventOccurrences(record)[0];
@@ -1039,10 +1039,33 @@ function openDetails(props) {
       Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
     });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
-    $('detailsEditButton').hidden = !canEditEvent(state.store, record); $('detailsDeleteButton').hidden = !canDeleteEvent(state.store, record); $('detailsCancelButton').hidden = !canEditEvent(state.store, record) || record.event_status === 'cancelled';
-    $('detailsApproveButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'approved'; $('detailsRejectButton').hidden = !canApproveEvents(state.store) || record.approval_status === 'rejected';
+    const needsAdminReview = record.approval_status === 'pending' && record.created_by !== currentUser(state.store).id;
+    setDetailsActionVisibility({
+      delete: canDeleteEvent(state.store, record),
+      cancel: canEditEvent(state.store, record) && record.event_status !== 'cancelled',
+      edit: canEditEvent(state.store, record),
+      approve: canApproveEvents(state.store) && needsAdminReview,
+      reject: canApproveEvents(state.store) && needsAdminReview
+    });
   }
   openDialog('detailsModal');
+}
+
+function setDetailsActionVisibility(visibility) {
+  const pairs = {
+    detailsDeleteButton: Boolean(visibility.delete),
+    detailsCancelButton: Boolean(visibility.cancel),
+    detailsEditButton: Boolean(visibility.edit),
+    detailsApproveButton: Boolean(visibility.approve),
+    detailsRejectButton: Boolean(visibility.reject)
+  };
+  Object.entries(pairs).forEach(([id, visible]) => {
+    const button = $(id);
+    if (!button) return;
+    button.hidden = !visible;
+    button.disabled = !visible;
+    button.classList.toggle('action-hidden', !visible);
+  });
 }
 
 function handleCalendarEventClick(info) {
@@ -1156,6 +1179,9 @@ async function deleteEvent(event) {
 function reviewSelectedEvent(status) { const event = state.selectedDetails?.record; if (event) reviewEvent(event, status); }
 function reviewEvent(event, status) {
   if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return;
+  if (event.approval_status !== 'pending' || event.created_by === currentUser(state.store).id) {
+    return showToast('This schedule does not need admin approval.', 'error');
+  }
   if (status === 'approved') {
     const block = findEventBlock(event);
     if (block) return showConflict('Approval Blocked', 'This request overlaps an admin-blocked period.', [block], false);
@@ -1531,7 +1557,9 @@ function eventRequestHtml(item) {
   const conflictText = conflictCount ? `Warning: ${conflictCount} schedule conflict(s)` : 'No schedule conflict warning';
   const reviewText = item.approval_date ? `<p>${escapeHtml(formatDateTime(item.approval_date))} - ${escapeHtml(item.admin_recommendation || 'No recommendation added.')}</p>` : '';
   const requestType = item.revision_of ? 'Revision Request' : 'Schedule Request';
-  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(requestType)} - ${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${reviewText}${actionButton('event-view', item.id, 'Details', 'secondary-button')}${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}</div>`;
+  const needsReview = item.approval_status === 'pending' && item.created_by !== currentUser(state.store).id;
+  const actions = `${actionButton('event-view', item.id, 'Details', 'secondary-button')}${needsReview ? `${actionButton('event-approve', item.id, 'Approve', 'primary-button')}${actionButton('event-reject', item.id, 'Reject', 'secondary-button')}` : ''}`;
+  return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.approval_status)}">${escapeHtml(cap(item.approval_status))}</span></strong><p>${escapeHtml(requestType)} - ${escapeHtml(item.organization_name)} - ${escapeHtml(item.venue)} - ${eventOccurrences(item).length} scheduled day(s)</p><p>${escapeHtml(conflictText)}</p>${reviewText}${actions}</div>`;
 }
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); updateBlockTimeFields(); openDialog('blockedTimesModal'); }

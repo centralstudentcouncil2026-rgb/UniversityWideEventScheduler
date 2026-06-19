@@ -1020,6 +1020,10 @@ body.is-public .public-only {
   display: initial !important;
 }
 
+.action-hidden {
+  display: none !important;
+}
+
 body.is-manager label.restricted-only,
 body.is-manager label.manager-only,
 body.is-super-admin label.restricted-only,
