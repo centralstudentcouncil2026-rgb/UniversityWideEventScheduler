@@ -122,6 +122,14 @@ export async function authenticate(username, password) {
   return payload;
 }
 
+export function authenticatedEmail() {
+  return String(session()?.user?.email || '').trim().toLowerCase();
+}
+
+export function authenticatedUserId() {
+  return session()?.user?.id || '';
+}
+
 async function refreshSession() {
   const refreshToken = session()?.refresh_token;
   if (!refreshToken) throw new Error('Your session has expired. Please log in again.');

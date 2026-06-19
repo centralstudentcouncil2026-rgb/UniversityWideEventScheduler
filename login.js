@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-admin-lockout-v1';
-import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-admin-lockout-v1';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260619-admin-auth-v1';
+import { ADMIN_ACCESS_EMAILS, currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-admin-auth-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';
@@ -62,7 +62,7 @@ function roleError(store) {
 }
 
 function loginFormatAllowed(username) {
-  return loginType === 'admin' ? EMAIL_PATTERN.test(username) : isAupEmail(username);
+  return loginType === 'admin' ? isAllowedAdminEmail(username) : isAupEmail(username);
 }
 
 function isAupEmail(value) {
@@ -90,8 +90,10 @@ if (form) form.addEventListener('submit', async (event) => {
   setMessage('Checking your account...', 'success');
 
   try {
-    await authenticate(username, password);
-    const store = await loadAuthenticatedStore();
+    const authPayload = await authenticate(username, password);
+    const store = loginType === 'admin'
+      ? ensureAllowedAdminStore(await loadAuthenticatedStore(), username, authPayload?.user?.id)
+      : await loadAuthenticatedStore();
 
     if (!roleAllowed(store)) {
       clearSession();

@@ -8,6 +8,18 @@ export const ADMIN_ACCESS_EMAILS = [
   'cscadmin4@aup.edu.ph'
 ];
 const ADMIN_ACCESS_EMAIL_SET = new Set(ADMIN_ACCESS_EMAILS);
+const ADMIN_PERMISSIONS = {
+  enabled: true,
+  manageAccounts: true,
+  approveEvents: true,
+  editAllEvents: true,
+  deleteAllEvents: true,
+  manageBlockedTimes: true,
+  manageAnnouncements: true,
+  updatePresidentStatus: true,
+  updateOfficeStatus: true,
+  manageCategories: true
+};
 
 export function currentUser(store) {
   if (store.currentUserId === 'public') return PUBLIC_USER;
@@ -33,8 +45,44 @@ export function accountLoginEmail(user) {
   return username.includes('@') ? username : '';
 }
 
+export function isAllowedAdminEmail(email) {
+  return ADMIN_ACCESS_EMAIL_SET.has(String(email || '').trim().toLowerCase());
+}
+
 export function isAllowedAdminAccount(user) {
-  return user?.role === 'super_admin' && ADMIN_ACCESS_EMAIL_SET.has(accountLoginEmail(user));
+  return user?.role === 'super_admin' && isAllowedAdminEmail(accountLoginEmail(user));
+}
+
+export function ensureAllowedAdminStore(store, email, id = '') {
+  const adminEmail = String(email || '').trim().toLowerCase();
+  if (!isAllowedAdminEmail(adminEmail)) return store;
+  const localPart = adminEmail.split('@')[0] || 'cscadmin';
+  const fallbackId = id || `admin-${localPart}`;
+  let user = store.users.find((item) =>
+    item.id === id
+    || accountLoginEmail(item) === adminEmail
+    || String(item.username || '').trim().toLowerCase() === adminEmail
+  );
+  if (!user) {
+    user = { id: fallbackId, username: adminEmail, email: adminEmail, full_name: `CSC Admin ${localPart.replace('cscadmin', '') || ''}`.trim() };
+    store.users.push(user);
+  }
+  Object.assign(user, {
+    id: user.id || fallbackId,
+    username: adminEmail,
+    email: adminEmail,
+    aup_email: adminEmail,
+    full_name: user.full_name || `CSC Admin ${localPart.replace('cscadmin', '') || ''}`.trim(),
+    role: 'super_admin',
+    account_preset: 'manager',
+    account_type: 'CSC',
+    suspended_status: false,
+    suspension_status: false,
+    deleted_at: '',
+    permissions: { ...(user.permissions || {}), ...ADMIN_PERMISSIONS }
+  });
+  store.currentUserId = user.id;
+  return store;
 }
 
 export function userPermission(user, permission) {
