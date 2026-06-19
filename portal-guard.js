@@ -1,4 +1,4 @@
-import { clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-supabase-only-v1';
+import { clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260619-db-display-v1';
 import { currentUser, isAllowedAdminAccount, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260618-admin-allowlist-v1';
 
 const store = await loadAuthenticatedStore();

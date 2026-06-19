@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-revisions-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260619-supabase-only-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260619-db-display-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260619-db-display-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -1675,8 +1675,8 @@ function pendingAccountRequests() {
 function accountRequestHtml(request) {
   const requestId = request.id || request.request_id;
   const rows = {
-    'AUP Email': request.aup_email || request.email || '',
-    'Phone Number': request.phone_number || request.contact_number || request.contact || '',
+    'AUP Email': accountRequestEmail(request),
+    'Phone Number': accountRequestPhone(request),
     'Organization Name': request.organization_name || request.organizationName || '',
     Name: request.full_name || request.name || '',
     Submitted: request.created_at ? formatDateTime(request.created_at) : 'Pending'
@@ -1692,7 +1692,7 @@ function userHtml(user) {
     Role: roleLabel(user.account_preset || user.role),
     Organization: organization ? organization.organization_name : 'No organization',
     Email: accountEmail(user),
-    'Contact Number': user.contact_number || user.contact || 'Not provided',
+    'Contact Number': accountPhone(user),
     'Account Status': status,
     'Creation Date': user.created_at ? formatDateTime(user.created_at) : 'Not recorded'
   };
@@ -1701,10 +1701,27 @@ function userHtml(user) {
 }
 
 function accountEmail(user) {
-  if (user.email && !user.email.endsWith('@core.local')) return user.email;
-  if (user.aup_email) return user.aup_email;
+  const email = firstAccountValue(user.email, user.aup_email, user.email_address, user.auth_email, user.user_email, user.raw_user_meta_data?.email);
+  if (email && !email.endsWith('@core.local')) return email;
   if (user.role === 'organization_manager') return 'Not provided';
-  return user.email || (user.username ? `${user.username}@core.local` : 'Not provided');
+  return email || (user.username ? `${user.username}@core.local` : 'Not provided');
+}
+
+function accountPhone(user) {
+  return firstAccountValue(user.contact_number, user.phone_number, user.mobile_number, user.contact, user.phone, user.telephone, user.raw_user_meta_data?.phone_number, user.raw_user_meta_data?.contact_number) || 'Not provided';
+}
+
+function accountRequestEmail(request) {
+  return firstAccountValue(request.aup_email, request.email, request.email_address, request.auth_email, request.user_email, request.raw_user_meta_data?.email);
+}
+
+function accountRequestPhone(request) {
+  return firstAccountValue(request.phone_number, request.contact_number, request.mobile_number, request.contact, request.phone, request.telephone, request.raw_user_meta_data?.phone_number, request.raw_user_meta_data?.contact_number);
+}
+
+function firstAccountValue(...values) {
+  const value = values.find((item) => item != null && String(item).trim() !== '');
+  return value == null ? '' : String(value).trim();
 }
 
 function accountStatus(user) {
@@ -1726,7 +1743,7 @@ function openAccountEditor(id) {
   fillSelect('accountEditRole', Object.entries(ACCOUNT_PRESETS).map(([value, preset]) => [value, preset.label]), user.account_preset || 'organization');
   fillSelect('accountEditOrganization', [['', 'No organization'], ...state.store.organizations.map((org) => [org.id, org.organization_name])], user.organization_id || '');
   $('accountEditEmail').value = accountEmail(user).endsWith('@core.local') ? '' : accountEmail(user);
-  $('accountEditContact').value = user.contact_number || user.contact || '';
+  $('accountEditContact').value = accountPhone(user) === 'Not provided' ? '' : accountPhone(user);
   $('accountEditStatus').value = (user.suspended_status || user.suspension_status) ? 'suspended' : 'active';
   $('accountEditCreated').value = user.created_at ? formatDateTime(user.created_at) : 'Not recorded';
   openDialog('accountEditModal');
@@ -1752,7 +1769,9 @@ async function submitAccountEditForm(event) {
   user.full_name = fullName;
   user.organization_id = $('accountEditOrganization').value;
   user.email = email;
+  user.aup_email = email;
   user.contact_number = contact;
+  user.phone_number = contact;
   applyAccountSuspension(user, $('accountEditStatus').value === 'suspended');
   if (user.id === currentUser(state.store).id && ((user.suspended_status || user.suspension_status) || !user.permissions?.enabled || !user.permissions?.manageAccounts || user.role !== 'super_admin')) {
     Object.assign(user, previous);
@@ -1783,12 +1802,12 @@ async function decidePendingAccountRequest(id, decision) {
 
 async function applyApprovedAccountRequestDetails(request) {
   const requestUsername = cleanSingleLine(request.username || '').toLowerCase();
-  const requestEmail = cleanSingleLine(request.aup_email || request.email || '').toLowerCase();
-  const requestPhone = String(request.phone_number || request.contact_number || request.contact || '').replace(/\D/g, '');
+  const requestEmail = cleanSingleLine(accountRequestEmail(request)).toLowerCase();
+  const requestPhone = String(accountRequestPhone(request)).replace(/\D/g, '');
   if (!requestEmail && !requestPhone) return;
   const user = state.store.users.find((item) =>
     String(item.username || '').toLowerCase() === requestUsername
-    || String(item.email || '').toLowerCase() === requestEmail
+    || String(accountEmail(item)).toLowerCase() === requestEmail
     || (request.organization_name && item.organization_id && state.store.organizations.find((org) => org.id === item.organization_id && normalizedName(org.organization_name) === normalizedName(request.organization_name)))
   );
   if (!user) return;
@@ -1796,7 +1815,10 @@ async function applyApprovedAccountRequestDetails(request) {
     user.email = requestEmail;
     user.aup_email = requestEmail;
   }
-  if (requestPhone) user.contact_number = requestPhone;
+  if (requestPhone) {
+    user.contact_number = requestPhone;
+    user.phone_number = requestPhone;
+  }
   user.updated_at = new Date().toISOString();
   log('account_request_details_saved', `Saved contact details for "${user.full_name || user.username}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number });
   await persist('Account contact details saved.');

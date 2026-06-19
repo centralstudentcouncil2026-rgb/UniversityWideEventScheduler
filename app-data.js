@@ -108,13 +108,33 @@ function normalizeUser(user = {}) {
   const { password_hash: _passwordHash, ...safeUser } = user;
   const preset = safeUser.account_preset || presetForRole(safeUser.role);
   const presetConfig = ACCOUNT_PRESETS[preset] || ACCOUNT_PRESETS.organization;
+  const email = firstNonBlank(
+    safeUser.email,
+    safeUser.aup_email,
+    safeUser.email_address,
+    safeUser.auth_email,
+    safeUser.user_email,
+    safeUser.raw_user_meta_data?.email
+  );
+  const contactNumber = firstNonBlank(
+    safeUser.contact_number,
+    safeUser.phone_number,
+    safeUser.mobile_number,
+    safeUser.contact,
+    safeUser.phone,
+    safeUser.telephone,
+    safeUser.raw_user_meta_data?.phone_number,
+    safeUser.raw_user_meta_data?.contact_number
+  );
   return {
     ...safeUser,
     role: safeUser.role || presetConfig.role,
     account_preset: preset,
     account_type: ACCOUNT_TYPES.includes(safeUser.account_type) ? safeUser.account_type : defaultAccountType(preset),
-    email: safeUser.email || '',
-    contact_number: safeUser.contact_number || safeUser.contact || '',
+    email,
+    aup_email: safeUser.aup_email || email,
+    contact_number: contactNumber,
+    phone_number: safeUser.phone_number || contactNumber,
     suspended_status: Boolean(safeUser.suspended_status || safeUser.suspension_status),
     suspension_status: Boolean(safeUser.suspension_status || safeUser.suspended_status),
     suspension_date: safeUser.suspension_date || '',
@@ -122,6 +142,11 @@ function normalizeUser(user = {}) {
     updated_at: safeUser.updated_at || safeUser.created_at || new Date().toISOString(),
     permissions: { ...presetConfig.permissions, ...(safeUser.permissions || {}) }
   };
+}
+
+function firstNonBlank(...values) {
+  const value = values.find((item) => item != null && String(item).trim() !== '');
+  return value == null ? '' : String(value).trim();
 }
 
 function defaultAccountType(preset) {

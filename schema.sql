@@ -37,6 +37,78 @@
 -- The authoritative SQL is stored in the Supabase migration history for
 -- project lcmyqhyxtipzovmgbdtf.
 
+-- Latest account display sync update
+-- Run this when profile email/contact values exist in public.profiles but the
+-- admin Accounts tab still shows blank values. It copies profile/auth contact
+-- values into the browser-facing scheduler_state JSON users array.
+alter table if exists public.profiles add column if not exists email text;
+alter table if exists public.profiles add column if not exists contact_number text;
+alter table if exists public.profiles add column if not exists phone_number text;
+
+do $$
+declare
+  state_column text;
+begin
+  if to_regclass('public.scheduler_state') is null then
+    return;
+  end if;
+
+  select column_name into state_column
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'scheduler_state'
+    and data_type = 'jsonb'
+    and column_name in ('state', 'store', 'data')
+  order by case column_name when 'state' then 1 when 'store' then 2 else 3 end
+  limit 1;
+
+  if state_column is null or to_regclass('public.profiles') is null then
+    return;
+  end if;
+
+  execute format(
+    $sql$
+      with profile_contacts as (
+        select
+          profile.id::text as id,
+          lower(coalesce(nullif(profile.email, ''), auth_user.email, '')) as email,
+          coalesce(nullif(profile.contact_number, ''), nullif(profile.phone_number, ''), '') as contact_number,
+          lower(coalesce(nullif(profile.username, ''), '')) as username
+        from public.profiles profile
+        left join auth.users auth_user on auth_user.id = profile.id
+      ),
+      expanded_users as (
+        select
+          scheduler_state.ctid as row_id,
+          coalesce(jsonb_agg(
+            case
+              when profile_contacts.id is null then user_item
+              else user_item || jsonb_strip_nulls(jsonb_build_object(
+                'email', nullif(profile_contacts.email, ''),
+                'aup_email', case when profile_contacts.email like '%%@aup.edu.ph' then profile_contacts.email else null end,
+                'contact_number', nullif(profile_contacts.contact_number, ''),
+                'phone_number', nullif(profile_contacts.contact_number, '')
+              ))
+            end
+          ), '[]'::jsonb) as users
+        from public.scheduler_state scheduler_state
+        cross join lateral jsonb_array_elements(coalesce(scheduler_state.%1$I->'users', '[]'::jsonb)) as user_item
+        left join profile_contacts
+          on profile_contacts.id = user_item->>'id'
+          or profile_contacts.username = lower(coalesce(user_item->>'username', ''))
+          or profile_contacts.email = lower(coalesce(user_item->>'email', ''))
+          or profile_contacts.email = lower(coalesce(user_item->>'aup_email', ''))
+        group by scheduler_state.ctid
+      )
+      update public.scheduler_state scheduler_state
+      set %1$I = jsonb_set(scheduler_state.%1$I, '{users}', expanded_users.users, true)
+      from expanded_users
+      where scheduler_state.ctid = expanded_users.row_id
+    $sql$,
+    state_column
+  );
+end $$;
+
 -- Admin dashboard schedule module migration reference
 -- Apply in Supabase when moving from the compact JSON store to relational
 -- schedule tables, or use the constraints below inside save_scheduler_store()
