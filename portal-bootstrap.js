@@ -7,8 +7,8 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260619-org-contact-save-v1');
-  await import('./portal-wiring.js?v=20260607-security-v1');
+  await import('./script.js?v=20260619-supabase-only-v1');
+  await import('./portal-wiring.js?v=20260619-supabase-only-v1');
 } else {
   window.location.replace('index.html');
 }

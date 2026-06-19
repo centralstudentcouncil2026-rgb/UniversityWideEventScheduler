@@ -1,9 +1,8 @@
-import { emptyPublicStore, normalizeStore } from './app-data.js?v=20260616-revisions-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260616-revisions-v1';
+import { emptyPublicStore } from './app-data.js?v=20260616-revisions-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260619-supabase-only-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260616-revisions-v1';
 
 const $ = (id) => document.getElementById(id);
-const PUBLIC_STORE_CACHE_KEY = 'connect_public_scheduler_store_v1';
 const PUBLIC_SLOW_LOAD_MS = 6500;
 const PUBLIC_STORE_SYNC_INTERVAL_MS = 5000;
 const DEFAULT_ANNOUNCEMENT = {
@@ -20,7 +19,7 @@ document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
 function initPublicCalendar() {
   try {
-    state.store = cachedPublicStore() || emptyPublicStore();
+    state.store = emptyPublicStore();
     state.eventSignature = publicStoreSignature(state.store);
     renderAnnouncements();
     renderStatuses();
@@ -52,7 +51,6 @@ async function refreshPublicStore() {
     const calendarChanged = nextSignature !== state.eventSignature;
     state.store = result.store;
     state.eventSignature = nextSignature;
-    cachePublicStore(result.store);
     renderAnnouncements();
     renderStatuses();
     renderOrganizationFilter();
@@ -105,23 +103,6 @@ function publicStoreSignature(store) {
     ].join('|'))
     .sort()
     .join('||');
-}
-
-function cachedPublicStore() {
-  try {
-    const cached = JSON.parse(localStorage.getItem(PUBLIC_STORE_CACHE_KEY) || 'null');
-    return cached && cached.store ? normalizeStore(cached.store) : null;
-  } catch {
-    return null;
-  }
-}
-
-function cachePublicStore(store) {
-  try {
-    localStorage.setItem(PUBLIC_STORE_CACHE_KEY, JSON.stringify({ storedAt: new Date().toISOString(), store }));
-  } catch {
-    // The public cache is an optimization only. Ignore storage quota/private-mode failures.
-  }
 }
 
 function setPublicLoading(isLoading, label = 'Loading calendar...') {

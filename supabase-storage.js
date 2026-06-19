@@ -33,11 +33,7 @@ async function cleanupRemovedEvents(store) {
 
 function session() {
   try {
-    const stored = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
-    if (stored && localStorage.getItem(SESSION_KEY)) {
-      sessionStorage.setItem(SESSION_KEY, stored);
-      localStorage.removeItem(SESSION_KEY);
-    }
+    const stored = sessionStorage.getItem(SESSION_KEY);
     return JSON.parse(stored || 'null');
   } catch {
     return null;
@@ -123,7 +119,6 @@ export async function authenticate(username, password) {
     });
   }
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
-  localStorage.removeItem(SESSION_KEY);
   return payload;
 }
 
@@ -136,7 +131,6 @@ async function refreshSession() {
     skipRefresh: true
   });
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
-  localStorage.removeItem(SESSION_KEY);
   return payload;
 }
 
@@ -192,5 +186,4 @@ export async function deleteRecord(collection, id) {
 
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(SESSION_KEY);
 }
