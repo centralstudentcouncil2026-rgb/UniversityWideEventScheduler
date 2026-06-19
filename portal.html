@@ -85,7 +85,7 @@
 
   <dialog class="modal" id="loginModal"><form class="modal-card" id="loginForm"><div class="modal-header"><div><h3>Account Access</h3></div><button type="button" class="icon-button" data-close="loginModal">&times;</button></div><div class="activity-item"><strong>Role-specific access only.</strong></div><div class="modal-actions"><button class="secondary-button" type="button" data-close="loginModal">Close</button><button class="primary-button" type="button" id="modalLogoutButton">Sign Out</button></div></form></dialog>
 
-  <dialog class="modal" id="registerModal"><form class="modal-card" id="registerForm"><div class="modal-header"><div><h3>Request an Organization Account</h3></div><button type="button" class="icon-button" data-close="registerModal">&times;</button></div><div class="form-grid"><label>Full Name<input id="registerFullName" required maxlength="120"></label><label>Username<input id="registerUsername" required autocomplete="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9_.\-]+"></label><label>Password<input id="registerPassword" type="password" minlength="10" maxlength="128" required autocomplete="new-password"></label><label class="full-span" id="registerOrganizationWrap">Organization Name<input id="registerOrganizationName" required maxlength="140"></label></div><div class="modal-actions"><button class="primary-button">Submit for Approval</button></div></form></dialog>
+  <dialog class="modal" id="registerModal"><form class="modal-card" id="registerForm"><div class="modal-header"><div><h3>Request an Organization Account</h3></div><button type="button" class="icon-button" data-close="registerModal">&times;</button></div><div class="form-grid"><label>Full Name<input id="registerFullName" required maxlength="120"></label><label>AUP Email<input id="registerAupEmail" type="email" required autocomplete="email" maxlength="160" placeholder="name@aup.edu.ph"></label><label>Phone Number<input id="registerPhone" required inputmode="numeric" minlength="11" maxlength="11" pattern="[0-9]{11}"></label><label>Username<input id="registerUsername" required autocomplete="name" minlength="2" maxlength="120"></label><label>Password<input id="registerPassword" type="password" minlength="10" maxlength="128" required autocomplete="new-password"></label><label class="full-span" id="registerOrganizationWrap">Organization Name<input id="registerOrganizationName" required maxlength="140"></label></div><div class="modal-actions"><button class="primary-button">Submit for Approval</button></div></form></dialog>
 
   <dialog class="modal reservation-modal" id="eventModal"><form class="modal-card" id="eventForm"><div class="modal-header"><div><h3 id="eventModalTitle">Post University Event</h3></div><button type="button" class="icon-button" data-close="eventModal">&times;</button></div>
     <input type="hidden" id="eventId">
@@ -140,6 +140,6 @@
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260618-org-signup-v1"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260619-org-contact-save-v1"></script>
 </body>
 </html>

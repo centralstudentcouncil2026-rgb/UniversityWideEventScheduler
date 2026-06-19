@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260616-revisions-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260618-org-signup-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260619-org-contact-save-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -1678,7 +1678,7 @@ function accountRequestHtml(request) {
     'AUP Email': request.aup_email || request.email || '',
     'Phone Number': request.phone_number || request.contact_number || request.contact || '',
     'Organization Name': request.organization_name || request.organizationName || '',
-    Username: request.username || '',
+    Name: request.full_name || request.name || '',
     Submitted: request.created_at ? formatDateTime(request.created_at) : 'Pending'
   };
   return `<div class="activity-item account-card pending-account-card"><div class="account-card-head"><div><strong>Pending Organization Account</strong><p>${escapeHtml(request.organization_name || request.username || 'Account request')}</p></div><div class="account-card-actions">${actionButton('account-request-approve', requestId, 'Approve', 'primary-button')}${actionButton('account-request-reject', requestId, 'Reject', 'danger-button')}</div></div><dl class="details-list account-details">${rowsObject(rows)}</dl></div>`;
@@ -1701,6 +1701,9 @@ function userHtml(user) {
 }
 
 function accountEmail(user) {
+  if (user.email && !user.email.endsWith('@core.local')) return user.email;
+  if (user.aup_email) return user.aup_email;
+  if (user.role === 'organization_manager') return 'Not provided';
   return user.email || (user.username ? `${user.username}@core.local` : 'Not provided');
 }
 
@@ -1766,14 +1769,37 @@ async function submitAccountEditForm(event) {
 
 async function decidePendingAccountRequest(id, decision) {
   if (!canManageAccounts(state.store)) return;
+  const request = state.store.accountRequests.find((item) => (item.id || item.request_id) === id);
   try {
     await decideAccountRequest(id, decision);
     await reloadStore();
+    if (decision === 'approved' && request) await applyApprovedAccountRequestDetails(request);
     renderUsers();
     showToast(decision === 'approved' ? 'Organization account approved.' : 'Organization account rejected.', 'success');
   } catch (error) {
     showToast(error.message || 'Account request decision failed.', 'error');
   }
+}
+
+async function applyApprovedAccountRequestDetails(request) {
+  const requestUsername = cleanSingleLine(request.username || '').toLowerCase();
+  const requestEmail = cleanSingleLine(request.aup_email || request.email || '').toLowerCase();
+  const requestPhone = String(request.phone_number || request.contact_number || request.contact || '').replace(/\D/g, '');
+  if (!requestEmail && !requestPhone) return;
+  const user = state.store.users.find((item) =>
+    String(item.username || '').toLowerCase() === requestUsername
+    || String(item.email || '').toLowerCase() === requestEmail
+    || (request.organization_name && item.organization_id && state.store.organizations.find((org) => org.id === item.organization_id && normalizedName(org.organization_name) === normalizedName(request.organization_name)))
+  );
+  if (!user) return;
+  if (requestEmail) {
+    user.email = requestEmail;
+    user.aup_email = requestEmail;
+  }
+  if (requestPhone) user.contact_number = requestPhone;
+  user.updated_at = new Date().toISOString();
+  log('account_request_details_saved', `Saved contact details for "${user.full_name || user.username}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number });
+  await persist('Account contact details saved.');
 }
 
 function applyAccountSuspension(user, suspended) {
@@ -2085,20 +2111,24 @@ async function logout() {
 }
 async function registerAccount(event) {
   event.preventDefault();
-  const username = cleanSingleLine($('registerUsername').value).toLowerCase();
+  const username = cleanSingleLine($('registerUsername').value);
   const password = $('registerPassword').value;
   const fullName = cleanSingleLine($('registerFullName').value);
+  const email = cleanSingleLine($('registerAupEmail').value).toLowerCase();
+  const phoneNumber = String($('registerPhone').value || '').replace(/\D/g, '');
   const organizationName = cleanSingleLine($('registerOrganizationName').value);
-  if (!USERNAME_PATTERN.test(username)) return showToast('Username can use 3-32 letters, numbers, dots, hyphens, or underscores.', 'error');
+  if (!email.endsWith('@aup.edu.ph')) return showToast('Use your AUP email address.', 'error');
+  if (!/^\d{11}$/.test(phoneNumber)) return showToast('Phone number must be exactly 11 digits.', 'error');
   if (password.length < 10 || password.length > 128) return showToast('Password must be 10 to 128 characters.', 'error');
-  if (!fullName || !organizationName) return showToast('Full name and organization name are required.', 'error');
+  if (!fullName || !username || !organizationName) return showToast('Name, username, and organization name are required.', 'error');
   const textError = firstTextLimitError([
     [fullName, TEXT_LIMITS.fullName, 'Full name'],
+    [username, TEXT_LIMITS.fullName, 'Username'],
     [organizationName, TEXT_LIMITS.organizationName, 'Organization name']
   ]);
   if (textError) return showToast(textError, 'error');
   try {
-    await requestAccount({ username, password, fullName, organizationName });
+    await requestAccount({ username, password, fullName, organizationName, email, phoneNumber });
     event.target.reset(); updateRegistrationFields(); closeDialog('registerModal');
     showToast('Account request submitted for admin approval.', 'success');
   } catch (error) { showToast(error.message, 'error'); }

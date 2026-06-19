@@ -157,8 +157,10 @@ export async function requestAccount({ username, password, fullName, organizatio
       p_contact_number: phoneNumber
     });
   } catch (error) {
-    if (!/parameter|function|schema cache|PGRST202|PGRST203/i.test(error.message || '')) throw error;
-    return rpc('create_scheduler_account', payload);
+    if (/parameter|function|schema cache|PGRST202|PGRST203/i.test(error.message || '')) {
+      throw new Error('Organization sign-up needs the latest Supabase SQL update before AUP email and phone can be saved.');
+    }
+    throw error;
   }
 }
 
