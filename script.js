@@ -1012,10 +1012,14 @@ function createScheduleRevision(original, candidate) {
 
 function openDetails(props) {
   state.selectedDetails = props; const record = props.record;
-  if (props.type === 'block') {
+  if (isBlockDetail(props)) {
     $('detailsTitle').textContent = record.title || 'Blocked university period'; $('detailsMeta').textContent = 'Blocked university period';
     $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: record.reason || 'No reason provided.' });
-    setDetailsActionVisibility({ delete: false, cancel: false, edit: false, approve: false, reject: false });
+    const canManageBlock = canManageBlockedTimes(state.store) && (
+      state.store.blockedTimes.some((block) => block.id === record.id)
+      || state.store.events.some((event) => event.id === record.id)
+    );
+    setDetailsActionVisibility({ delete: canManageBlock, cancel: false, edit: canManageBlock, approve: false, reject: false });
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
     const selectedOccurrence = props.occurrence || eventOccurrences(record)[0];
@@ -1045,16 +1049,20 @@ function openDetails(props) {
       Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
     });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
-    const needsAdminReview = record.approval_status === 'pending' && record.created_by !== currentUser(state.store).id;
     setDetailsActionVisibility({
       delete: canDeleteEvent(state.store, record),
-      cancel: canEditEvent(state.store, record) && record.event_status !== 'cancelled',
+      cancel: false,
       edit: canEditEvent(state.store, record),
-      approve: canApproveEvents(state.store) && needsAdminReview,
-      reject: canApproveEvents(state.store) && needsAdminReview
+      approve: false,
+      reject: false
     });
   }
   openDialog('detailsModal');
+}
+
+function isBlockDetail(details) {
+  const record = details?.record || {};
+  return details?.type === 'block' || record.record_type === 'blocked_time' || record.block_source === 'admin';
 }
 
 function setDetailsActionVisibility(visibility) {
@@ -1139,11 +1147,38 @@ function handlePublicDialogKeyDown(event) {
   if (event.key === 'Escape') closePublicDayDialog();
 }
 
-function editSelectedEvent() { const event = state.selectedDetails?.record; if (!event) return; closeDialog('detailsModal'); openEventModal({ start: new Date(event.start_time), end: new Date(event.end_time) }, event); }
+function editSelectedEvent() {
+  const details = state.selectedDetails;
+  const record = details?.record;
+  if (!record) return;
+  closeDialog('detailsModal');
+  if (isBlockDetail(details)) {
+    if (state.store.blockedTimes.some((block) => block.id === record.id)) {
+      openBlockedTimes();
+      editBlockedTime(record.id);
+    } else {
+      openEventModal({ start: new Date(record.start_time), end: new Date(record.end_time) }, record);
+    }
+    return;
+  }
+  openEventModal({ start: new Date(record.start_time), end: new Date(record.end_time) }, record);
+}
 function cancelSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmAction(`Cancel "${event.title}"?`, () => cancelEvent(event)); }
 function cancelEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmAction(`Cancel "${event.title}"?`, () => { cancelEvent(event); closeDialog('eventModal'); }); }
 function cancelEvent(event) { event.event_status = 'cancelled'; event.updated_at = new Date().toISOString(); log('event_cancelled', `${currentUser(state.store).full_name} cancelled "${event.title}".`, event); closeDialog('detailsModal'); persist('Event cancelled.'); }
-function deleteSelectedEvent() { const event = state.selectedDetails?.record; if (event) confirmDeleteEvent(event); }
+function deleteSelectedEvent() {
+  const details = state.selectedDetails;
+  const record = details?.record;
+  if (!record) return;
+  if (isBlockDetail(details)) {
+    const remove = state.store.blockedTimes.some((block) => block.id === record.id)
+      ? () => removeBlockedTime(record.id)
+      : () => deleteEvent(record);
+    confirmAction(`Remove "${record.title || 'Blocked university period'}"?`, remove);
+    return;
+  }
+  confirmDeleteEvent(record);
+}
 function deleteEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmDeleteEvent(event); }
 function confirmDeleteEvent(event) { if (!requirePermission(canDeleteEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
 async function deleteEvent(event) {
