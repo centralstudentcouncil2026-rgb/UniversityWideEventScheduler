@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-separated-actions-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260622-separated-actions-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-schedule-org-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260622-schedule-org-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-separated-actions-v1';
+} from './app-rules.js?v=20260622-schedule-org-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -804,7 +804,7 @@ function readEventForm() {
   const user = currentUser(state.store);
   const scheduleSource = existing?.schedule_source || (isSuperAdmin(state.store) ? 'admin' : 'organization');
   const requiresApproval = scheduleSource !== 'admin';
-  const org = state.store.organizations.find((item) => item.id === (user.organization_id || state.filters.organization)) || state.store.organizations[0];
+  const org = resolveScheduleOrganization(existing, user);
   const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
   const endDate = schedule_type === 'multi_day' ? $('eventEndDate').value : $('eventDate').value;
@@ -822,6 +822,82 @@ function readEventForm() {
     event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: approvalStatusForSave(existing), created_by: existing?.created_by || currentUser(state.store).id,
     schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
+}
+
+function resolveScheduleOrganization(existing, user) {
+  if (isManager(state.store)) return resolveUserOrganization(user);
+  const targetId = existing?.organization_id || state.filters.organization || user.organization_id;
+  const selected = findOrganization({ id: targetId, name: existing?.organization_name || userOrganizationName(user) });
+  if (selected) return selected;
+  return resolveAdminOrganization(user)
+    || state.store.organizations[0]
+    || null;
+}
+
+function resolveUserOrganization(user) {
+  const existing = findOrganization({ id: user.organization_id, name: userOrganizationName(user) });
+  if (existing) {
+    if (!user.organization_id) user.organization_id = existing.id;
+    return existing;
+  }
+  const organizationName = userOrganizationName(user) || accountRequestOrganizationName(user);
+  if (!organizationName) return null;
+  const organization = {
+    id: user.organization_id || createId(),
+    organization_name: organizationName,
+    organization_type: user.organization_type || user.requested_role || 'Organization',
+    created_at: user.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  user.organization_id = organization.id;
+  state.store.organizations.push(organization);
+  return organization;
+}
+
+function accountRequestOrganizationName(user) {
+  const email = normalizedName(accountEmail(user));
+  const username = normalizedName(user.username);
+  const request = (state.store.accountRequests || []).find((item) =>
+    (username && normalizedName(item.username) === username)
+    || (email && normalizedName(accountRequestEmail(item)) === email)
+    || (user.id && item.user_id === user.id)
+  );
+  return firstAccountValue(request?.organization_name, request?.organizationName, request?.organization);
+}
+
+function resolveAdminOrganization(user) {
+  if (!isSuperAdmin(state.store)) return null;
+  const existing = findOrganization({ id: user.organization_id, name: userOrganizationName(user) || 'Central Student Council' });
+  if (existing) return existing;
+  const organization = {
+    id: user.organization_id || 'central-student-council',
+    organization_name: userOrganizationName(user) || 'Central Student Council',
+    organization_type: 'CSC',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  state.store.organizations.push(organization);
+  return organization;
+}
+
+function findOrganization({ id = '', name = '' } = {}) {
+  const normalized = normalizedName(name);
+  return state.store.organizations.find((org) =>
+    (id && org.id === id)
+    || (normalized && normalizedName(org.organization_name || org.name) === normalized)
+  );
+}
+
+function userOrganizationName(user) {
+  return firstAccountValue(
+    user.organization_name,
+    user.organizationName,
+    user.organization,
+    user.org_name,
+    user.orgName,
+    user.raw_user_meta_data?.organization_name,
+    user.raw_user_meta_data?.organizationName
+  );
 }
 
 function resubmitsRejectedSchedule(existing) {
@@ -936,7 +1012,10 @@ function submitEventForm(event) {
 }
 
 function validateEvent(event) {
-  if (!event.title || !event.organization_id || !event.category_id || !event.venue) return 'Complete event title, category, venue, and organization.';
+  if (!event.title) return 'Complete event title.';
+  if (!event.category_id) return 'Choose a schedule category.';
+  if (!event.venue) return 'Complete the venue.';
+  if (!event.organization_id || !event.organization_name) return 'This account is not assigned to an organization. Please approve or assign the organization in Accounts first.';
   const textError = firstTextLimitError([
     [event.title, TEXT_LIMITS.eventTitle, 'Event title'],
     [event.venue, TEXT_LIMITS.venue, 'Venue'],
