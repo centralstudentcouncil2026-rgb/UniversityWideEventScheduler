@@ -205,6 +205,7 @@ function validateAnnouncementsForPersistence(store) {
 
 function validateBlockedTimesForPersistence(store) {
   (store.blockedTimes || []).forEach((block) => {
+    if (block.record_type !== 'blocked_time') throw new Error('Blocked period requires a blocked-time record identifier.');
     if (!block.title || !['single_day', 'multi_day'].includes(block.block_type)) throw new Error('Blocked period requires a title and block type.');
     if (!block.start_time || !block.end_time || new Date(block.end_time) <= new Date(block.start_time)) throw new Error('Blocked-period end date and time must be later than start date and time.');
     if (String(block.reason || '').length > 500) throw new Error('Blocked-period reason is too long.');
@@ -223,6 +224,11 @@ function validateActivityStatusesForPersistence(store) {
 function validateSchedulesForPersistence(store) {
   const allowedCategoryIds = new Set(SCHEDULE_CATEGORIES.map(([id]) => id));
   (store.events || []).filter((event) => Number(event.schedule_schema_version || 0) >= 2).forEach((event) => {
+    if (event.record_type !== 'schedule') throw new Error('Schedule requires a schedule record identifier.');
+    if (!['admin', 'organization'].includes(event.schedule_source)) throw new Error('Schedule source must be admin or organization.');
+    if (typeof event.requires_approval !== 'boolean') throw new Error('Schedule requires an approval identifier.');
+    if (event.schedule_source === 'admin' && (event.requires_approval || event.approval_status !== 'approved')) throw new Error('Admin-created schedules must be approved automatically.');
+    if (event.schedule_source === 'organization' && !event.revision_of && !['pending', 'approved', 'rejected'].includes(event.approval_status)) throw new Error('Organization schedules require an approval status.');
     if (!event.title || !event.category_id || !allowedCategoryIds.has(event.category_id) || !event.venue) throw new Error('Schedule requires title, allowed category, and venue.');
     if (!Number.isInteger(Number(event.expected_attendees)) || Number(event.expected_attendees) < 1) throw new Error('Schedule expected attendees must be at least 1.');
     if (!['basic', 'internal'].includes(event.privacy_level)) throw new Error('Schedule privacy level must be Public or Admin only.');
@@ -252,6 +258,10 @@ function normalizeEvent(event) {
   const lastOccurrence = occurrences[occurrences.length - 1] || {};
   return {
     ...event,
+    record_type: 'schedule',
+    schedule_source: normalizeScheduleSource(event),
+    created_by_role: event.created_by_role || event.createdByRole || normalizeScheduleSource(event),
+    requires_approval: normalizeScheduleSource(event) !== 'admin',
     privacy_level: String(event.private_notes || '').includes(INTERNAL_PRIVACY_MARKER) ? 'internal' : event.privacy_level || 'basic',
     private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
@@ -270,6 +280,13 @@ function normalizeEvent(event) {
   };
 }
 
+function normalizeScheduleSource(event = {}) {
+  const source = String(event.schedule_source || event.source || event.created_by_role || event.createdByRole || '').trim().toLowerCase();
+  if (source === 'admin' || source === 'super_admin' || source === 'csc') return 'admin';
+  if (source === 'organization' || source === 'org' || source === 'organization_manager' || source === 'oic') return 'organization';
+  return event.approval_status === 'approved' && event.approval_date ? 'admin' : 'organization';
+}
+
 function validateAccountsForPersistence(store) {
   (store.users || []).forEach((user) => {
     if (user.suspended_status && !user.suspension_date) throw new Error('Suspended accounts require a suspension date.');
@@ -284,6 +301,10 @@ function normalizeBlockedTime(block = {}) {
   const sameDay = String(start).slice(0, 10) === String(end).slice(0, 10);
   return {
     ...block,
+    record_type: 'blocked_time',
+    block_source: 'admin',
+    created_by_role: block.created_by_role || block.createdByRole || 'admin',
+    requires_approval: false,
     block_type: block.block_type || (sameDay ? 'single_day' : 'multi_day'),
     reason: block.reason || '',
     created_by: block.created_by || block.createdBy || 'unknown',

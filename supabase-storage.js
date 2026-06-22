@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260619-db-display-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260619-schedule-identifiers-v1';
 import { ensureAllowedAdminStore } from './app-rules.js?v=20260619-detail-actions-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
@@ -101,11 +101,136 @@ function enforceAuthenticatedIdentity(store) {
 
 export async function saveStore(store) {
   await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
+  const tableFailures = await syncRecordTables(store);
   const deleteFailures = await cleanupRemovedEvents(store);
+  if (tableFailures.length) {
+    console.warn('CONNECT relational table sync reported errors after store save:', tableFailures);
+  }
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
   }
-  return { deleteFailures };
+  return { deleteFailures, tableFailures };
+}
+
+async function syncRecordTables(store) {
+  if (!session()?.access_token) return [];
+  const failures = [];
+  await syncOrganizationsTable(store).catch((error) => failures.push({ table: 'schedule_organizations', error }));
+  await syncSchedulesTable(store).catch((error) => failures.push({ table: 'schedules', error }));
+  await syncBlockedTimesTable(store).catch((error) => failures.push({ table: 'blocked_times', error }));
+  return failures;
+}
+
+async function syncOrganizationsTable(store) {
+  const organizations = (store.organizations || [])
+    .filter((org) => org.id && (org.organization_name || org.name))
+    .map((org) => ({
+      id: org.id,
+      organization_name: org.organization_name || org.name,
+      organization_type: org.organization_type || org.type || 'Organization',
+      updated_at: org.updated_at || new Date().toISOString()
+    }));
+  if (!organizations.length) return;
+  await request('/rest/v1/schedule_organizations?on_conflict=id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(organizations)
+  }, true);
+}
+
+async function syncSchedulesTable(store) {
+  const schedules = (store.events || [])
+    .filter((event) => event.id && event.record_type === 'schedule')
+    .map((event) => ({
+      id: event.id,
+      organization_id: event.organization_id || null,
+      category_id: event.category_id,
+      title: event.title,
+      venue: event.venue,
+      schedule_type: event.schedule_type || (Array.isArray(event.occurrences) && event.occurrences.length > 1 ? 'multi_day' : 'single_day'),
+      start_time: event.start_time,
+      end_time: event.end_time,
+      expected_attendees: Number(event.expected_attendees || 1),
+      privacy_level: event.privacy_level || 'basic',
+      contact_person: event.contact_person,
+      contact_info: event.contact_info,
+      public_description: event.public_description,
+      purpose: event.purpose,
+      schedule_schema_version: Number(event.schedule_schema_version || 2),
+      approval_status: event.approval_status || 'pending',
+      admin_recommendation: event.admin_recommendation || null,
+      approval_date: event.approval_date || null,
+      notification_status: event.notification_status || null,
+      revision_of: event.revision_of || null,
+      original_schedule_id: event.original_schedule_id || null,
+      revision_status: event.revision_status || null,
+      revision_created_at: event.revision_created_at || null,
+      revision_submitted_at: event.revision_submitted_at || null,
+      revision_history: event.revision_history || [],
+      event_status: event.event_status || 'planned',
+      record_type: 'schedule',
+      schedule_source: event.schedule_source || 'organization',
+      created_by_role: event.created_by_role || event.schedule_source || 'organization',
+      requires_approval: Boolean(event.requires_approval),
+      created_by: uuidOrNull(event.created_by),
+      created_at: event.created_at,
+      updated_at: event.updated_at
+    }));
+  if (schedules.length) {
+    await request('/rest/v1/schedules?on_conflict=id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(schedules)
+    }, true);
+  }
+
+  for (const event of (store.events || []).filter((item) => item.id && item.record_type === 'schedule')) {
+    const occurrences = Array.isArray(event.occurrences) ? event.occurrences : [];
+    await request(`/rest/v1/schedule_occurrences?schedule_id=eq.${encodeURIComponent(event.id)}`, { method: 'DELETE' }, true);
+    if (!occurrences.length) continue;
+    await request('/rest/v1/schedule_occurrences', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(occurrences.map((occurrence) => ({
+        id: occurrence.id || undefined,
+        schedule_id: event.id,
+        date: occurrence.date || String(occurrence.start_time || '').slice(0, 10),
+        start_time: occurrence.start_time,
+        end_time: occurrence.end_time
+      })))
+    }, true);
+  }
+}
+
+async function syncBlockedTimesTable(store) {
+  const blocks = (store.blockedTimes || [])
+    .filter((block) => block.id && block.record_type === 'blocked_time')
+    .map((block) => ({
+      id: block.id,
+      title: block.title,
+      block_type: block.block_type,
+      start_time: block.start_time,
+      end_time: block.end_time,
+      reason: block.reason || null,
+      record_type: 'blocked_time',
+      block_source: 'admin',
+      created_by_role: 'admin',
+      requires_approval: false,
+      created_by: uuidOrNull(block.created_by),
+      created_at: block.created_at,
+      updated_at: block.updated_at || block.created_at
+    }));
+  if (!blocks.length) return;
+  await request('/rest/v1/blocked_times?on_conflict=id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(blocks)
+  }, true);
+}
+
+function uuidOrNull(value) {
+  const text = String(value || '');
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text) ? text : null;
 }
 
 export async function authenticate(username, password) {
@@ -178,7 +303,7 @@ export async function decideAccountRequest(id, decision) {
 }
 
 const DELETE_COLLECTION_ALIASES = {
-  events: ['events', 'reservations', 'scheduler_events', 'calendar_events'],
+  events: ['events', 'schedules', 'reservations', 'scheduler_events', 'calendar_events'],
   blockedTimes: ['blocked_times', 'blockedTimes'],
   activityLogs: ['activity_logs', 'activityLogs'],
   accountRequests: ['account_requests', 'accountRequests']

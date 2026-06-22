@@ -175,6 +175,10 @@ create table if not exists public.schedules (
   revision_submitted_at timestamptz,
   revision_history jsonb not null default '[]'::jsonb,
   event_status text not null default 'planned',
+  record_type text not null default 'schedule' check (record_type = 'schedule'),
+  schedule_source text not null default 'organization' check (schedule_source in ('admin', 'organization')),
+  created_by_role text not null default 'organization' check (created_by_role in ('admin', 'organization')),
+  requires_approval boolean not null default true,
   created_by uuid references auth.users(id) on update cascade on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -192,7 +196,20 @@ alter table if exists public.schedules add column if not exists revision_status 
 alter table if exists public.schedules add column if not exists revision_created_at timestamptz;
 alter table if exists public.schedules add column if not exists revision_submitted_at timestamptz;
 alter table if exists public.schedules add column if not exists revision_history jsonb not null default '[]'::jsonb;
+alter table if exists public.schedules add column if not exists record_type text not null default 'schedule';
+alter table if exists public.schedules add column if not exists schedule_source text not null default 'organization';
+alter table if exists public.schedules add column if not exists created_by_role text not null default 'organization';
+alter table if exists public.schedules add column if not exists requires_approval boolean not null default true;
 alter table if exists public.schedules alter column approval_status set default 'pending';
+
+update public.schedules
+set record_type = 'schedule',
+    schedule_source = case when approval_status = 'approved' and coalesce(requires_approval, true) = false then 'admin' else schedule_source end,
+    created_by_role = case when schedule_source = 'admin' then 'admin' else 'organization' end,
+    requires_approval = case when schedule_source = 'admin' then false else true end
+where record_type is distinct from 'schedule'
+   or schedule_source is null
+   or created_by_role is null;
 
 create index if not exists schedules_category_id_idx on public.schedules(category_id);
 create index if not exists schedules_organization_id_idx on public.schedules(organization_id);
@@ -205,6 +222,9 @@ create index if not exists schedules_notification_status_idx on public.schedules
 create index if not exists schedules_revision_of_idx on public.schedules(revision_of);
 create index if not exists schedules_original_schedule_id_idx on public.schedules(original_schedule_id);
 create index if not exists schedules_revision_status_idx on public.schedules(revision_status);
+create index if not exists schedules_record_type_idx on public.schedules(record_type);
+create index if not exists schedules_schedule_source_idx on public.schedules(schedule_source);
+create index if not exists schedules_requires_approval_idx on public.schedules(requires_approval);
 
 alter table if exists public.schedules add column if not exists admin_recommendation text;
 alter table if exists public.schedules add column if not exists approval_date timestamptz;
@@ -234,8 +254,42 @@ begin
     alter table public.schedules drop constraint if exists schedules_revision_status_check;
     alter table public.schedules
       add constraint schedules_revision_status_check check (revision_status is null or revision_status in ('pending', 'approved', 'rejected'));
+    alter table public.schedules drop constraint if exists schedules_record_type_check;
+    alter table public.schedules
+      add constraint schedules_record_type_check check (record_type = 'schedule');
+    alter table public.schedules drop constraint if exists schedules_schedule_source_check;
+    alter table public.schedules
+      add constraint schedules_schedule_source_check check (schedule_source in ('admin', 'organization'));
+    alter table public.schedules drop constraint if exists schedules_created_by_role_check;
+    alter table public.schedules
+      add constraint schedules_created_by_role_check check (created_by_role in ('admin', 'organization'));
+    alter table public.schedules drop constraint if exists schedules_admin_approval_check;
+    alter table public.schedules
+      add constraint schedules_admin_approval_check check (
+        schedule_source <> 'admin'
+        or (requires_approval = false and approval_status = 'approved')
+      );
   end if;
 end $$;
+
+create table if not exists public.schedule_occurrences (
+  id uuid primary key default gen_random_uuid(),
+  schedule_id uuid not null references public.schedules(id) on update cascade on delete cascade,
+  date date not null,
+  start_time timestamptz not null,
+  end_time timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint schedule_occurrences_valid_time_range check (end_time > start_time)
+);
+
+create index if not exists schedule_occurrences_schedule_id_idx on public.schedule_occurrences(schedule_id);
+create index if not exists schedule_occurrences_date_idx on public.schedule_occurrences(date);
+create index if not exists schedule_occurrences_start_time_idx on public.schedule_occurrences(start_time);
+
+grant select, insert, update, delete on public.schedule_organizations to authenticated;
+grant select, insert, update, delete on public.schedules to authenticated;
+grant select, insert, update, delete on public.schedule_occurrences to authenticated;
+grant select on public.schedule_organizations, public.schedules, public.schedule_occurrences to anon;
 
 create table if not exists public.schedule_revisions (
   revision_id uuid primary key default gen_random_uuid(),
@@ -260,8 +314,13 @@ create table if not exists public.blocked_times (
   start_time timestamptz not null,
   end_time timestamptz not null,
   reason text,
+  record_type text not null default 'blocked_time' check (record_type = 'blocked_time'),
+  block_source text not null default 'admin' check (block_source = 'admin'),
+  created_by_role text not null default 'admin' check (created_by_role = 'admin'),
+  requires_approval boolean not null default false,
   created_by uuid references auth.users(id) on update cascade on delete set null,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   constraint blocked_times_valid_time_range check (end_time > start_time),
   constraint blocked_times_reason_length check (reason is null or char_length(reason) <= 500)
 );
@@ -271,10 +330,18 @@ create index if not exists blocked_times_start_time_idx on public.blocked_times(
 create index if not exists blocked_times_end_time_idx on public.blocked_times(end_time);
 create index if not exists blocked_times_created_by_idx on public.blocked_times(created_by);
 
+grant select, insert, update, delete on public.blocked_times to authenticated;
+grant select on public.blocked_times to anon;
+
 -- Migration/update helpers for an existing blocked_times table.
 alter table if exists public.blocked_times add column if not exists block_type text;
 alter table if exists public.blocked_times add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;
 alter table if exists public.blocked_times add column if not exists created_at timestamptz not null default now();
+alter table if exists public.blocked_times add column if not exists updated_at timestamptz not null default now();
+alter table if exists public.blocked_times add column if not exists record_type text not null default 'blocked_time';
+alter table if exists public.blocked_times add column if not exists block_source text not null default 'admin';
+alter table if exists public.blocked_times add column if not exists created_by_role text not null default 'admin';
+alter table if exists public.blocked_times add column if not exists requires_approval boolean not null default false;
 
 update public.blocked_times
 set block_type = case
@@ -283,6 +350,39 @@ set block_type = case
   else 'multi_day'
 end
 where block_type is null;
+
+update public.blocked_times
+set record_type = 'blocked_time',
+    block_source = 'admin',
+    created_by_role = 'admin',
+    requires_approval = false,
+    updated_at = coalesce(updated_at, created_at, now())
+where record_type is distinct from 'blocked_time'
+   or block_source is distinct from 'admin'
+   or created_by_role is distinct from 'admin'
+   or requires_approval is distinct from false;
+
+do $$
+begin
+  if to_regclass('public.blocked_times') is not null then
+    alter table public.blocked_times drop constraint if exists blocked_times_record_type_check;
+    alter table public.blocked_times
+      add constraint blocked_times_record_type_check check (record_type = 'blocked_time');
+    alter table public.blocked_times drop constraint if exists blocked_times_block_source_check;
+    alter table public.blocked_times
+      add constraint blocked_times_block_source_check check (block_source = 'admin');
+    alter table public.blocked_times drop constraint if exists blocked_times_created_by_role_check;
+    alter table public.blocked_times
+      add constraint blocked_times_created_by_role_check check (created_by_role = 'admin');
+    alter table public.blocked_times drop constraint if exists blocked_times_requires_approval_check;
+    alter table public.blocked_times
+      add constraint blocked_times_requires_approval_check check (requires_approval = false);
+  end if;
+end $$;
+
+create index if not exists blocked_times_record_type_idx on public.blocked_times(record_type);
+create index if not exists blocked_times_block_source_idx on public.blocked_times(block_source);
+create index if not exists blocked_times_requires_approval_idx on public.blocked_times(requires_approval);
 
 alter table if exists public.profiles add column if not exists account_type text;
 alter table if exists public.profiles add column if not exists contact_number text;

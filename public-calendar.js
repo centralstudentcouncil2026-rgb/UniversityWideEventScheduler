@@ -1,5 +1,5 @@
-import { emptyPublicStore } from './app-data.js?v=20260619-db-display-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260619-admin-session-v1';
+import { emptyPublicStore } from './app-data.js?v=20260619-schedule-identifiers-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260619-schedule-identifiers-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260619-detail-actions-v1';
 
 const $ = (id) => document.getElementById(id);

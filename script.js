@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260619-db-display-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260619-admin-session-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260619-schedule-identifiers-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260619-schedule-identifiers-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -791,13 +791,15 @@ function openEventModal(range, record = null) {
 function readEventForm() {
   const existing = state.store.events.find((event) => event.id === $('eventId').value);
   const user = currentUser(state.store);
+  const scheduleSource = existing?.schedule_source || (isSuperAdmin(state.store) ? 'admin' : 'organization');
+  const requiresApproval = scheduleSource !== 'admin';
   const org = state.store.organizations.find((item) => item.id === (user.organization_id || state.filters.organization)) || state.store.organizations[0];
   const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
   const endDate = schedule_type === 'multi_day' ? $('eventEndDate').value : $('eventDate').value;
   const occurrences = [{ id: existing?.occurrences?.[0]?.id || createId(), date: $('eventDate').value, start_time: localIso($('eventDate').value, $('eventStart').value), end_time: localIso(endDate, $('eventEnd').value) }];
   return syncEventRange({
-    ...existing, id: existing?.id || createId(), title: cleanSingleLine($('eventTitle').value), event_type: category?.name || 'Schedule',
+    ...existing, id: existing?.id || createId(), record_type: 'schedule', schedule_source: scheduleSource, created_by_role: scheduleSource, requires_approval: requiresApproval, title: cleanSingleLine($('eventTitle').value), event_type: category?.name || 'Schedule',
     organization_id: org?.id || '', organization_name: org?.organization_name || '', category_id: $('eventCategory').value,
     venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
@@ -989,6 +991,10 @@ function createScheduleRevision(original, candidate) {
   return {
     ...candidate,
     id: revisionId,
+    record_type: 'schedule',
+    schedule_source: 'organization',
+    created_by_role: 'organization',
+    requires_approval: true,
     revision_of: original.id,
     original_schedule_id: original.id,
     revision_status: 'pending',
@@ -1599,7 +1605,7 @@ function addBlockedTime(event) {
   const start = localIso(startDate, $('blockStart').value);
   const end = localIso(endDate, $('blockEnd').value);
   if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
-  const item = { ...(existing || {}), id: existing?.id || createId(), title, block_type: blockType, start_time: start, end_time: end, reason, created_by: existing?.created_by || currentUser(state.store).id, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() };
+  const item = { ...(existing || {}), id: existing?.id || createId(), record_type: 'blocked_time', block_source: 'admin', created_by_role: 'admin', requires_approval: false, title, block_type: blockType, start_time: start, end_time: end, reason, created_by: existing?.created_by || currentUser(state.store).id, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() };
   if (existing) Object.assign(existing, item);
   else state.store.blockedTimes.push(item);
   log(existing ? 'blocked_time_updated' : 'blocked_time_created', `${existing ? 'Updated' : 'Added'} blocked period "${item.title}".`, item);
