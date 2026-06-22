@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260622-attendee-normalization-v1';
-import { currentUser } from './app-rules.js?v=20260622-attendee-normalization-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260622-logout-login-v1';
+import { currentUser } from './app-rules.js?v=20260622-logout-login-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');
@@ -8,15 +8,17 @@ document.addEventListener('click', (event) => {
   if (target.id === 'logoutButton') {
     event.preventDefault();
     event.stopPropagation();
+    const loginHref = loginAreaHref();
     clearSession();
-    window.location.href = 'index.html';
+    window.location.href = loginHref;
   }
 
   if (target.id === 'modalLogoutButton') {
     event.preventDefault();
     event.stopPropagation();
+    const loginHref = loginAreaHref();
     clearSession();
-    window.location.href = 'index.html';
+    window.location.href = loginHref;
   }
 
   if (target.id === 'profileButton') {
@@ -24,6 +26,11 @@ document.addEventListener('click', (event) => {
     event.stopPropagation();
   }
 }, true);
+
+function loginAreaHref() {
+  const user = window.CONNECT_AUTHENTICATED_USER || currentUser(window.CONNECT_BOOTSTRAP_STORE || { users: [], currentUserId: 'public' });
+  return user?.role === 'super_admin' ? 'admin-login.html' : 'org/index.html';
+}
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hydratePortalExtras);
 else queueMicrotask(hydratePortalExtras);

@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-attendee-normalization-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-attendee-normalization-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-logout-login-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-logout-login-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-attendee-normalization-v1';
+} from './app-rules.js?v=20260622-logout-login-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -2427,10 +2427,9 @@ async function login(event) {
   } catch (error) { showToast(error.message, 'error'); }
 }
 async function logout() {
+  const loginHref = isSuperAdmin(state.store) ? 'admin-login.html' : 'org/index.html';
   clearSession();
-  await reloadStore();
-  closeSidebar();
-  showToast('Continuing as Public Viewer.', 'success');
+  window.location.href = loginHref;
 }
 async function registerAccount(event) {
   event.preventDefault();
