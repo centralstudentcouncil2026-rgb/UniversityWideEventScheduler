@@ -1206,3 +1206,70 @@ begin
     state_column
   ) using allowed_admins, manager_permissions;
 end $$;
+
+-- Organization account approval and schedule ownership hardening.
+-- Re-run the account request trigger so approved accounts become enabled and
+-- pending/rejected accounts remain blocked from the organization dashboard.
+update public.account_requests
+set status = status,
+    updated_at = now()
+where true;
+
+create or replace function public.enforce_organization_schedule_owner()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, auth
+as $$
+declare
+  account public.profiles%rowtype;
+  account_enabled boolean;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  select * into account
+  from public.profiles
+  where id = auth.uid();
+
+  account_enabled := coalesce((account.permissions ->> 'enabled')::boolean, false);
+  if not found or not account_enabled then
+    raise exception 'This account is not approved or is disabled.';
+  end if;
+
+  if account.role = 'super_admin' then
+    return new;
+  end if;
+
+  if account.role <> 'organization_manager' or nullif(account.organization_id, '') is null then
+    raise exception 'This account is not assigned to an organization.';
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.created_by := auth.uid();
+    new.organization_id := account.organization_id;
+    new.schedule_source := 'organization';
+    new.created_by_role := 'organization';
+    new.requires_approval := true;
+    new.approval_status := 'pending';
+  elsif old.created_by is distinct from auth.uid()
+     or old.organization_id is distinct from account.organization_id then
+    raise exception 'Organization accounts can only edit their own schedules.';
+  else
+    new.created_by := old.created_by;
+    new.organization_id := old.organization_id;
+    new.schedule_source := 'organization';
+    new.created_by_role := 'organization';
+    new.requires_approval := true;
+    new.approval_status := old.approval_status;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists schedules_enforce_organization_owner on public.schedules;
+create trigger schedules_enforce_organization_owner
+  before insert or update on public.schedules
+  for each row
+  execute function public.enforce_organization_schedule_owner();
