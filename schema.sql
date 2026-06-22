@@ -482,6 +482,15 @@ where account_type is null;
 create index if not exists profiles_suspension_status_idx on public.profiles(suspension_status);
 create index if not exists profiles_suspension_date_idx on public.profiles(suspension_date);
 
+grant select on public.profiles to authenticated;
+alter table if exists public.profiles enable row level security;
+drop policy if exists profiles_authenticated_select on public.profiles;
+create policy profiles_authenticated_select
+  on public.profiles
+  for select
+  to authenticated
+  using (true);
+
 alter table if exists public.account_requests add column if not exists aup_email text;
 alter table if exists public.account_requests add column if not exists phone_number text;
 alter table if exists public.account_requests add column if not exists contact_number text;

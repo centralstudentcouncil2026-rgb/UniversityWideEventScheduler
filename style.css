@@ -489,6 +489,19 @@ button {
   padding-top: 0;
 }
 
+.sidebar-tabs {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+.sidebar-tab {
+  line-height: 1.2;
+  min-height: 42px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .section-label {
   color: var(--aup-muted);
   display: block;
@@ -1902,9 +1915,32 @@ body.is-super-admin .check-row.super-admin-only {
     margin-top: 2px;
   }
 
-  .public-day-panel {
-    top: 64px;
-    width: 100vw;
+  .public-day-panel,
+  .public-day-dialog {
+    left: 50%;
+    max-height: calc(100dvh - 24px);
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: calc(100vw - 20px);
+  }
+
+  .public-day-panel.open,
+  .public-day-dialog.open {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .admin-tabs-panel {
+    padding-bottom: 12px;
+  }
+
+  .sidebar-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  }
+
+  .sidebar-tab {
+    font-size: clamp(12px, 3.4vw, 14px);
+    min-height: 40px;
+    padding-inline: 10px;
   }
 
   .form-grid {

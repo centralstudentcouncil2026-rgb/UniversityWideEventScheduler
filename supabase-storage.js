@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-public-blocks-v2';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-public-blocks-v2';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-accounts-tabs-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-accounts-tabs-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -68,6 +68,7 @@ async function rpc(name, body = {}, authenticated = false) {
 export async function loadStore() {
   try {
     const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token))));
+    if (session()?.access_token) await mergeAuthenticatedProfiles(store);
     rememberEventIds(store);
     return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
@@ -118,8 +119,63 @@ async function mergePublicBlockedTimes(store) {
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
   const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, true)));
+  await mergeAuthenticatedProfiles(store);
   rememberEventIds(store);
   return store;
+}
+
+async function mergeAuthenticatedProfiles(store) {
+  try {
+    const profiles = await request('/rest/v1/profiles?select=*&order=created_at.asc', {}, true);
+    if (!Array.isArray(profiles) || !profiles.length) return;
+    profiles.forEach((profile) => mergeProfileUser(store, profile));
+  } catch (error) {
+    console.warn('CONNECT profile account merge unavailable:', error);
+  }
+}
+
+function mergeProfileUser(store, profile) {
+  if (!profile?.id) return;
+  if (!Array.isArray(store.users)) store.users = [];
+  const existing = store.users.find((user) =>
+    user.id === profile.id
+    || String(user.email || '').toLowerCase() === String(profile.email || '').toLowerCase()
+    || String(user.username || '').toLowerCase() === String(profile.username || '').toLowerCase()
+  );
+  const next = {
+    id: profile.id,
+    username: profile.username || profile.email || existing?.username || '',
+    full_name: profile.full_name || existing?.full_name || profile.username || profile.email || 'Account',
+    role: profile.role || existing?.role || 'organization_manager',
+    account_preset: profile.account_preset || existing?.account_preset || (profile.role === 'super_admin' ? 'manager' : 'organization'),
+    account_type: profile.account_type || existing?.account_type || (profile.role === 'super_admin' ? 'CSC' : 'OIC'),
+    organization_id: profile.organization_id || existing?.organization_id || '',
+    email: profile.email || existing?.email || '',
+    aup_email: profile.email || existing?.aup_email || '',
+    contact_number: profile.contact_number || profile.phone_number || existing?.contact_number || '',
+    phone_number: profile.phone_number || profile.contact_number || existing?.phone_number || '',
+    suspended_status: Boolean(profile.suspension_status || existing?.suspended_status),
+    suspension_status: Boolean(profile.suspension_status || existing?.suspension_status),
+    suspension_date: profile.suspension_date || existing?.suspension_date || '',
+    deletion_logs: profile.deletion_logs || existing?.deletion_logs || [],
+    modification_logs: profile.modification_logs || existing?.modification_logs || [],
+    created_at: profile.created_at || existing?.created_at || new Date().toISOString(),
+    updated_at: profile.updated_at || existing?.updated_at || profile.created_at || new Date().toISOString(),
+    permissions: { ...(existing?.permissions || {}), ...jsonObject(profile.permissions) }
+  };
+  if (existing) Object.assign(existing, next);
+  else store.users.push(next);
+}
+
+function jsonObject(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function enforceAuthenticatedIdentity(store) {
