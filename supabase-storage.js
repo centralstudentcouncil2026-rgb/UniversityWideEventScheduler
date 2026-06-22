@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-schedule-db-sync-v1';
-import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-schedule-db-sync-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-attendee-normalization-v1';
+import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-attendee-normalization-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -319,7 +319,7 @@ async function syncSchedulesTable(store) {
       schedule_type: event.schedule_type || (Array.isArray(event.occurrences) && event.occurrences.length > 1 ? 'multi_day' : 'single_day'),
       start_time: event.start_time,
       end_time: event.end_time,
-      expected_attendees: Number(event.expected_attendees || 1),
+      expected_attendees: normalizedAttendeeCount(event.expected_attendees),
       privacy_level: event.privacy_level || 'basic',
       contact_person: event.contact_person,
       contact_info: event.contact_info,
@@ -400,6 +400,11 @@ async function syncBlockedTimesTable(store) {
 function uuidOrNull(value) {
   const text = String(value || '');
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text) ? text : null;
+}
+
+function normalizedAttendeeCount(value) {
+  const count = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isInteger(count) && count >= 1 ? count : 1;
 }
 
 export async function authenticate(username, password) {

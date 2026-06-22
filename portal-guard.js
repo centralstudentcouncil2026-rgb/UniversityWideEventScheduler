@@ -1,5 +1,5 @@
-import { authenticatedEmail, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260622-schedule-db-sync-v1';
-import { currentUser, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260622-schedule-db-sync-v1';
+import { authenticatedEmail, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260622-attendee-normalization-v1';
+import { currentUser, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260622-attendee-normalization-v1';
 
 const store = await loadAuthenticatedStore();
 const user = currentUser(store);
