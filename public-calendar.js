@@ -1,6 +1,6 @@
-import { emptyPublicStore } from './app-data.js?v=20260619-schedule-identifiers-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260619-schedule-identifiers-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260619-detail-actions-v1';
+import { emptyPublicStore } from './app-data.js?v=20260622-public-blocks-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260622-public-blocks-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260622-public-blocks-v1';
 
 const $ = (id) => document.getElementById(id);
 const PUBLIC_SLOW_LOAD_MS = 6500;
@@ -256,7 +256,8 @@ function publicEvents(viewType = state.calendar?.view.type) {
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
     .filter(matchesSelectedOrganization)
   const dateCounts = publicDateEventCounts(approvedEvents);
-  return approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts, viewType)), []);
+  const scheduleItems = approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts, viewType)), []);
+  return scheduleItems.concat(publicBlockedCalendarItems(viewType));
 }
 
 function matchesSelectedOrganization(event) {
@@ -386,6 +387,26 @@ function renderAnnouncements() {
   $('announcementPreview').innerHTML = announcements.map(announcementHtml).join('') || announcementHtml(DEFAULT_ANNOUNCEMENT);
 }
 
+function publicBlockedCalendarItems(viewType = state.calendar?.view.type) {
+  return (state.store.blockedTimes || [])
+    .filter((block) => block.start_time && block.end_time)
+    .map((block) => {
+      const isMultiDay = dateOnly(block.start_time) !== dateOnly(block.end_time);
+      return {
+        id: `${block.id}::public-block`,
+        title: block.title || 'Blocked university period',
+        start: isMultiDay ? dateOnly(block.start_time) : block.start_time,
+        end: isMultiDay ? nextDate(dateOnly(block.end_time)) : block.end_time,
+        allDay: isMultiDay,
+        display: 'block',
+        backgroundColor: '#071C3D',
+        borderColor: '#F4B400',
+        classNames: ['event-blocked', 'public-blocked-event', viewType === 'multiMonthYear' ? 'event-year-span' : null].filter(Boolean),
+        extendedProps: { type: 'block', block, panelDate: dateOnly(block.start_time), accentColor: '#F4B400' }
+      };
+    });
+}
+
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
@@ -421,7 +442,7 @@ function openPublicDayDialog(date, anchorEl) {
   const dialog = $('publicDayDialog');
 
   $('publicDayTitle').textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  $('publicDayCount').textContent = `${items.length} public event${items.length === 1 ? '' : 's'}`;
+  $('publicDayCount').textContent = `${items.length} calendar item${items.length === 1 ? '' : 's'}`;
   $('publicDayEvents').innerHTML = items.map(publicDayEventHtml).join('') || '<p class="empty-text">No public events scheduled for this date.</p>';
   positionPublicDayDialog(dialog, anchorEl);
   dialog.classList.add('open');
@@ -429,19 +450,25 @@ function openPublicDayDialog(date, anchorEl) {
 }
 
 function publicDayItems(date) {
-  return state.store.events
+  const events = state.store.events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
     .filter(matchesSelectedOrganization)
     .reduce((results, event) => {
       const matchingOccurrences = eventOccurrences(event)
         .filter((occurrence) => occurrence.date === date)
-        .map((occurrence) => ({ event, occurrence }));
+        .map((occurrence) => ({ type: 'event', event, occurrence }));
       return results.concat(matchingOccurrences);
-    }, [])
+    }, []);
+  const blocks = (state.store.blockedTimes || [])
+    .filter((block) => blockOverlapsDate(block, date))
+    .map((block) => ({ type: 'block', block, occurrence: { start_time: block.start_time, end_time: block.end_time } }));
+  return events.concat(blocks)
     .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
 }
 
-function publicDayEventHtml({ event, occurrence }) {
+function publicDayEventHtml(item) {
+  if (item.type === 'block') return publicBlockedDayHtml(item.block);
+  const { event, occurrence } = item;
   const details = {
     Organization: event.organization_name,
     Category: publicCategoryName(event),
@@ -454,6 +481,21 @@ function publicDayEventHtml({ event, occurrence }) {
     Purpose: event.purpose
   };
   return `<article class="public-day-event" style="border-left-color:${escapeHtml(eventPrimaryColor(event))};--event-accent-color:${escapeHtml(eventAccentColor(event))}"><strong>${escapeHtml(event.title)}</strong><dl class="public-event-details">${detailRows(details)}</dl></article>`;
+}
+
+function publicBlockedDayHtml(block) {
+  const details = {
+    Type: 'Blocked university period',
+    Schedule: `${formatPublicDateTime(block.start_time)} to ${formatTime(block.end_time)}`,
+    Reason: block.reason || 'No reason provided.'
+  };
+  return `<article class="public-day-event public-blocked-card"><strong>${escapeHtml(block.title || 'Blocked university period')}</strong><dl class="public-event-details">${detailRows(details)}</dl></article>`;
+}
+
+function blockOverlapsDate(block, date) {
+  const start = new Date(`${date}T00:00:00`);
+  const end = new Date(`${date}T23:59:59.999`);
+  return new Date(block.start_time) <= end && new Date(block.end_time) >= start;
 }
 
 function publicCategoryName(event) {
@@ -469,13 +511,9 @@ function detailRows(data) {
 }
 
 function positionPublicDayDialog(dialog, anchorEl) {
-  if (!dialog || !anchorEl || window.innerWidth <= 640) return;
-  const anchorRect = anchorEl.getBoundingClientRect();
-  const width = Math.min(360, window.innerWidth - 32);
-  const left = Math.min(Math.max(anchorRect.left, 16), window.innerWidth - width - 16);
-  const top = Math.min(Math.max(anchorRect.bottom + 8, 16), window.innerHeight - 260);
-  dialog.style.setProperty('--dialog-left', `${left}px`);
-  dialog.style.setProperty('--dialog-top', `${top}px`);
+  if (!dialog) return;
+  dialog.style.removeProperty('--dialog-left');
+  dialog.style.removeProperty('--dialog-top');
 }
 
 function handlePublicDialogPointerDown(event) {
@@ -534,6 +572,10 @@ function nextDate(dateString) {
   const date = new Date(`${dateString}T12:00:00`);
   date.setDate(date.getDate() + 1);
   return date.toISOString().slice(0, 10);
+}
+
+function dateOnly(value) {
+  return String(value || '').slice(0, 10);
 }
 
 function hashText(value) {

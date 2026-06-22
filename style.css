@@ -619,24 +619,31 @@ body.is-public .view-selector {
   min-width: 112px;
 }
 
-.public-day-panel {
+.public-day-panel,
+.public-day-dialog {
   background: #fff;
-  border-left: 1px solid var(--aup-border);
-  bottom: 0;
-  box-shadow: -12px 0 30px rgba(0, 33, 71, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 14px;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+  left: 50%;
+  max-height: min(78vh, 680px);
+  opacity: 0;
   overflow-y: auto;
   padding: 20px;
   position: fixed;
-  right: 0;
-  top: 72px;
-  transform: translateX(105%);
-  transition: transform 180ms ease;
-  width: min(390px, 100vw);
-  z-index: 30;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+  visibility: hidden;
+  width: min(460px, calc(100vw - 28px));
+  z-index: 80;
 }
 
-.public-day-panel.open {
-  transform: translateX(0);
+.public-day-panel.open,
+.public-day-dialog.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  visibility: visible;
 }
 
 .public-day-header {
@@ -664,6 +671,12 @@ body.is-public .view-selector {
   border-left: 6px solid var(--aup-blue);
   border-radius: 8px;
   padding: 12px;
+}
+
+.public-blocked-card {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  border-left-color: #071C3D;
 }
 
 .public-day-event strong {
