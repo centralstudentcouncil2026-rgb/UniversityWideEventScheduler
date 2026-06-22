@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-organization-assignment-v1';
-import { ensureAllowedAdminStore, isAllowedAdminEmail } from './app-rules.js?v=20260622-organization-assignment-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-schedule-db-sync-v1';
+import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-schedule-db-sync-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -263,6 +263,10 @@ export async function saveStore(store) {
   const deleteFailures = await cleanupRemovedEvents(store);
   if (tableFailures.length) {
     console.warn('CONNECT relational table sync reported errors after store save:', tableFailures);
+    const details = tableFailures
+      .map((failure) => `${failure.table}: ${failure.error?.message || 'Unknown error'}`)
+      .join(' ');
+    throw new Error(`Database record sync failed. ${details}`);
   }
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
@@ -275,13 +279,17 @@ async function syncRecordTables(store) {
   const failures = [];
   await syncOrganizationsTable(store).catch((error) => failures.push({ table: 'schedule_organizations', error }));
   await syncSchedulesTable(store).catch((error) => failures.push({ table: 'schedules', error }));
-  await syncBlockedTimesTable(store).catch((error) => failures.push({ table: 'blocked_times', error }));
+  if (isSuperAdmin(store)) {
+    await syncBlockedTimesTable(store).catch((error) => failures.push({ table: 'blocked_times', error }));
+  }
   return failures;
 }
 
 async function syncOrganizationsTable(store) {
+  const user = currentUser(store);
   const organizations = (store.organizations || [])
     .filter((org) => org.id && (org.organization_name || org.name))
+    .filter((org) => isSuperAdmin(store) || org.id === user.organization_id)
     .map((org) => ({
       id: org.id,
       organization_name: org.organization_name || org.name,
@@ -289,7 +297,7 @@ async function syncOrganizationsTable(store) {
       updated_at: org.updated_at || new Date().toISOString()
     }));
   if (!organizations.length) return;
-  await request('/rest/v1/schedule_organizations?on_conflict=id', {
+  await request('/rest/v1/schedule_organizations?on_conflict=organization_name', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(organizations)
@@ -297,8 +305,11 @@ async function syncOrganizationsTable(store) {
 }
 
 async function syncSchedulesTable(store) {
-  const schedules = (store.events || [])
+  const user = currentUser(store);
+  const ownedSchedules = (store.events || [])
     .filter((event) => uuidOrNull(event.id) && event.record_type === 'schedule')
+    .filter((event) => isSuperAdmin(store) || event.created_by === user.id);
+  const schedules = ownedSchedules
     .map((event) => ({
       id: event.id,
       organization_id: event.organization_id || null,
@@ -342,7 +353,7 @@ async function syncSchedulesTable(store) {
     }, true);
   }
 
-  for (const event of (store.events || []).filter((item) => uuidOrNull(item.id) && item.record_type === 'schedule')) {
+  for (const event of ownedSchedules) {
     const occurrences = Array.isArray(event.occurrences) ? event.occurrences : [];
     await request(`/rest/v1/schedule_occurrences?schedule_id=eq.${encodeURIComponent(event.id)}`, { method: 'DELETE' }, true);
     if (!occurrences.length) continue;

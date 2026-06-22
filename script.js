@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-organization-assignment-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-organization-assignment-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-schedule-db-sync-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-schedule-db-sync-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-organization-assignment-v1';
+} from './app-rules.js?v=20260622-schedule-db-sync-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -303,6 +303,7 @@ function renderRole() {
   document.body.classList.toggle('is-public', isPublic(state.store));
   if ($('profileName')) $('profileName').textContent = user.full_name;
   if ($('profileInitials')) $('profileInitials').textContent = initials(user.full_name);
+  if ($('dashboardButton')) $('dashboardButton').textContent = isManager(state.store) ? 'Schedule Status' : 'Dashboard';
   Object.entries(PORTAL_TOOL_VISIBILITY).forEach(([id, allowed]) => setHidden(id, !allowed(state.store)));
   if (state.calendar && isPublic(state.store) && state.calendar.view.type !== 'dayGridMonth') state.calendar.changeView('dayGridMonth');
   if (!isPublic(state.store)) closePublicDayDialog();
@@ -431,8 +432,8 @@ function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.
   const visibleEvents = state.store.events.filter((event) => {
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
-    if (event.revision_of) return event.organization_id === user.organization_id && event.approval_status === 'pending';
-    return event.organization_id === user.organization_id || (event.approval_status === 'approved' && isPublicEvent(event));
+    if (event.approval_status !== 'approved') return event.created_by === user.id;
+    return event.organization_id === user.organization_id || isPublicEvent(event);
   }).filter(matchesFilters);
   const weekLineLayout = state.calendar?.view.type === 'timeGridWeek' ? buildWeekLineLayout(visibleEvents) : new Map();
   const events = visibleEvents.flatMap((event) => {
@@ -1062,9 +1063,9 @@ function openAgreementOrPersist(candidate) {
 }
 
 function updateAgreementButton() { $('agreementSubmitButton').disabled = !$('agreeRules').checked || !$('agreePrivacy').checked; $('agreementWarning').hidden = !$('agreementSubmitButton').disabled; }
-function finishAgreement() { if (!$('agreementSubmitButton').disabled && state.pendingEvent) { closeDialog('agreementModal'); saveEvent(state.pendingEvent); } }
+function finishAgreement() { if (!$('agreementSubmitButton').disabled && state.pendingEvent) { closeDialog('agreementModal'); void saveEvent(state.pendingEvent); } }
 
-function saveEvent(candidate) {
+async function saveEvent(candidate) {
   if (!requirePermission(canEditEvent(state.store, candidate), 'You cannot save this event.')) return;
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
   const existing = existingIndex >= 0 ? state.store.events[existingIndex] : null;
@@ -1079,7 +1080,13 @@ function saveEvent(candidate) {
     });
     log('schedule_revision_submitted', `${currentUser(state.store).full_name} submitted a revision for "${existing.title}".`, revision);
     state.pendingCalendarDate = revision.occurrences[0]?.date || dateInput(revision.start_time);
-    closeDialog('eventModal'); state.pendingEvent = null; persist('Schedule revision submitted for approval.');
+    const saved = await persist('Schedule revision submitted for approval.');
+    if (saved) {
+      closeDialog('eventModal');
+      state.pendingEvent = null;
+    } else {
+      await reloadStore().catch(() => {});
+    }
     return;
   }
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
@@ -1096,7 +1103,13 @@ function saveEvent(candidate) {
   }
   log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
   state.pendingCalendarDate = candidate.occurrences[0]?.date || dateInput(candidate.start_time);
-  closeDialog('eventModal'); state.pendingEvent = null; persist('Event saved.');
+  const saved = await persist(isManager(state.store) && candidate.approval_status === 'pending' ? 'Schedule submitted for admin approval.' : 'Schedule saved.');
+  if (saved) {
+    closeDialog('eventModal');
+    state.pendingEvent = null;
+  } else {
+    await reloadStore().catch(() => {});
+  }
 }
 
 function createScheduleRevision(original, candidate) {
@@ -1718,9 +1731,33 @@ function addConcern(event) {
 }
 
 function openDashboard() { if (!requirePermission(!isPublic(state.store), 'Login to view a dashboard.')) return; renderDashboard(); openDialog('dashboardModal'); }
-function renderDashboard() { const user = currentUser(state.store); const events = isSuperAdmin(state.store) ? state.store.events : state.store.events.filter((item) => item.organization_id === user.organization_id); const upcoming = events.filter((item) => new Date(item.start_time) >= new Date() && eventIsActive(item)); const metrics = isSuperAdmin(state.store) ? [['All posted events', events.length], ['Upcoming programs', upcoming.length], ['Blocked periods', state.store.blockedTimes.length], ['Announcements', activeAnnouncements(state.store).length], ['Open concerns', state.store.concerns.filter((item) => !['resolved', 'rejected'].includes(item.status)).length], ['Conflict warnings', events.filter((item) => item.conflict_event_ids?.length).length], ['Organizations', state.store.organizations.length]] : [['Upcoming events', upcoming.length], ['Submitted events', events.length], ['Postponed / cancelled', events.filter((item) => ['postponed', 'cancelled'].includes(item.event_status)).length], ['Raised concerns', state.store.concerns.filter((item) => item.organization_id === user.organization_id).length], ['Announcements', activeAnnouncements(state.store).length], ['Blocked periods', state.store.blockedTimes.length]];
-  $('dashboardTitle').textContent = isSuperAdmin(state.store) ? 'Admin Dashboard' : 'Organization Dashboard'; $('dashboardGrid').innerHTML = metrics.map(([label, value]) => `<div class="metric"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`).join('');
-  $('dashboardList').innerHTML = upcoming.slice(0, 8).map((item) => `<div class="activity-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.venue)} - ${escapeHtml(formatDateTime(item.start_time))}</p></div>`).join('') || empty('No upcoming events');
+function renderDashboard() {
+  const user = currentUser(state.store);
+  const events = isSuperAdmin(state.store)
+    ? state.store.events
+    : state.store.events.filter((item) => item.organization_id === user.organization_id);
+  const upcoming = events.filter((item) => new Date(item.start_time) >= new Date() && eventIsActive(item));
+  const ownSchedules = isSuperAdmin(state.store) ? events : events.filter((item) => item.created_by === user.id);
+  const pending = ownSchedules.filter((item) => item.approval_status === 'pending');
+  const approved = ownSchedules.filter((item) => item.approval_status === 'approved');
+  const rejected = ownSchedules.filter((item) => item.approval_status === 'rejected');
+  const metrics = isSuperAdmin(state.store)
+    ? [['All posted events', events.length], ['Upcoming programs', upcoming.length], ['Blocked periods', state.store.blockedTimes.length], ['Announcements', activeAnnouncements(state.store).length], ['Open concerns', state.store.concerns.filter((item) => !['resolved', 'rejected'].includes(item.status)).length], ['Conflict warnings', events.filter((item) => item.conflict_event_ids?.length).length], ['Organizations', state.store.organizations.length]]
+    : [['Pending approval', pending.length], ['Approved schedules', approved.length], ['Changes requested', rejected.length], ['My submissions', ownSchedules.length], ['Announcements', activeAnnouncements(state.store).length], ['Blocked periods', state.store.blockedTimes.length]];
+  $('dashboardTitle').textContent = isSuperAdmin(state.store) ? 'Admin Dashboard' : 'Schedule Status';
+  $('dashboardGrid').innerHTML = metrics.map(([label, value]) => `<div class="metric"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`).join('');
+  const statusItems = isSuperAdmin(state.store) ? upcoming : ownSchedules;
+  $('dashboardList').innerHTML = statusItems
+    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+    .slice(0, 12)
+    .map(scheduleStatusHtml)
+    .join('') || empty(isSuperAdmin(state.store) ? 'No upcoming events' : 'No submitted schedules');
+}
+
+function scheduleStatusHtml(event) {
+  const status = event.approval_status || 'pending';
+  const recommendation = event.admin_recommendation || event.rejection_reason || '';
+  return `<div class="activity-item"><strong>${escapeHtml(event.title)} <span class="status-pill ${classToken(status)}">${escapeHtml(cap(status))}</span></strong><p>${escapeHtml(formatDateTime(event.start_time))} - ${escapeHtml(event.venue)}</p><p>${escapeHtml(event.privacy_level === 'internal' ? 'Admin only' : 'Public after approval')}</p>${recommendation ? `<p>Admin note: ${escapeHtml(recommendation)}</p>` : ''}</div>`;
 }
 
 function openEventRequests() { if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return; renderEventRequests(); openDialog('eventRequestsModal'); }
