@@ -1,5 +1,5 @@
 try {
-  await import('./portal-guard.js?v=20260619-admin-session-v1');
+  await import('./portal-guard.js?v=20260622-detail-actions-v2');
 } catch (error) {
   console.error('CONNECT portal guard failed:', error);
   window.location.replace('index.html');
@@ -7,8 +7,8 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260619-schedule-identifiers-v1');
-  await import('./portal-wiring.js?v=20260619-admin-session-v1');
+  await import('./script.js?v=20260622-detail-actions-v2');
+  await import('./portal-wiring.js?v=20260622-detail-actions-v2');
 } else {
   window.location.replace('index.html');
 }

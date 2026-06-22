@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260619-schedule-identifiers-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260619-detail-actions-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-detail-actions-v2';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-detail-actions-v2';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
