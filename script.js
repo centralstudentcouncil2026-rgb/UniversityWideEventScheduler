@@ -2006,7 +2006,7 @@ async function decidePendingAccountRequest(id, decision) {
     try {
       await decideAccountRequest(id, decision);
     } catch (error) {
-      await updateAccountRequestStatus(id, decision);
+      await updateAccountRequestStatus(id, decision, request);
     }
     if (request) {
       request.status = decision;

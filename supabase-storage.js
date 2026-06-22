@@ -414,12 +414,51 @@ export async function decideAccountRequest(id, decision) {
   return rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
 }
 
-export async function updateAccountRequestStatus(id, decision) {
-  return request(`/rest/v1/account_requests?id=eq.${encodeURIComponent(id)}`, {
+export async function updateAccountRequestStatus(id, decision, accountRequest = null) {
+  const response = await request(`/rest/v1/account_requests?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ status: decision, updated_at: new Date().toISOString() })
   }, true);
+  const requestRow = accountRequest || (Array.isArray(response) ? response[0] : null);
+  if (requestRow) await upsertProfileFromAccountRequest({ ...requestRow, id }, decision);
+  return response;
+}
+
+async function upsertProfileFromAccountRequest(accountRequest, decision) {
+  const userId = accountRequest.user_id;
+  if (!userId) return;
+  const enabled = decision === 'approved';
+  const email = accountRequest.aup_email || accountRequest.email || '';
+  const phone = accountRequest.phone_number || accountRequest.contact_number || '';
+  const profile = {
+    id: userId,
+    username: accountRequest.username || email,
+    full_name: accountRequest.full_name || accountRequest.name || accountRequest.username || email || 'Organization Account',
+    role: 'organization_manager',
+    permissions: { enabled },
+    account_preset: 'organization',
+    account_type: 'OIC',
+    organization_id: accountRequest.organization_id || organizationKey(accountRequest.organization_name),
+    email,
+    contact_number: phone,
+    phone_number: phone,
+    updated_at: new Date().toISOString()
+  };
+  if (enabled) profile.created_at = accountRequest.created_at || new Date().toISOString();
+  await request('/rest/v1/profiles?on_conflict=id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(profile)
+  }, true);
+}
+
+function organizationKey(name) {
+  return String(name || 'organization')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'organization';
 }
 
 const DELETE_COLLECTION_ALIASES = {

@@ -664,6 +664,125 @@ create policy account_requests_delete_admin
 grant select, insert, update on public.account_requests to anon, authenticated;
 grant delete on public.account_requests to authenticated;
 
+create or replace function public.account_request_org_id(p_organization_name text)
+returns text
+language sql
+immutable
+as $$
+  select coalesce(
+    nullif(trim(both '-' from lower(regexp_replace(coalesce(p_organization_name, ''), '[^a-zA-Z0-9]+', '-', 'g'))), ''),
+    'organization'
+  )
+$$;
+
+create or replace function public.sync_account_request_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  profile_user_id uuid;
+  org_id text;
+  profile_enabled boolean;
+begin
+  if new.status not in ('pending', 'approved', 'rejected') then
+    new.status := 'pending';
+  end if;
+
+  org_id := public.account_request_org_id(new.organization_name);
+  profile_enabled := new.status = 'approved';
+
+  insert into public.schedule_organizations (
+    id,
+    organization_name,
+    organization_type,
+    created_at,
+    updated_at
+  )
+  values (
+    org_id,
+    coalesce(nullif(new.organization_name, ''), 'Organization'),
+    'Organization',
+    now(),
+    now()
+  )
+  on conflict (id) do update
+  set organization_name = excluded.organization_name,
+      updated_at = now();
+
+  profile_user_id := new.user_id;
+
+  if profile_user_id is null then
+    select id into profile_user_id
+    from public.profiles
+    where lower(coalesce(email, '')) = lower(coalesce(new.aup_email, new.email, ''))
+       or lower(coalesce(username, '')) = lower(coalesce(new.username, ''))
+    limit 1;
+  end if;
+
+  if profile_user_id is null then
+    profile_user_id := gen_random_uuid();
+    new.user_id := profile_user_id;
+  end if;
+
+  insert into public.profiles (
+    id,
+    username,
+    full_name,
+    role,
+    permissions,
+    account_preset,
+    account_type,
+    organization_id,
+    email,
+    contact_number,
+    phone_number,
+    created_at,
+    updated_at
+  )
+  values (
+    profile_user_id,
+    coalesce(nullif(new.username, ''), coalesce(new.aup_email, new.email, 'organization')),
+    coalesce(nullif(new.full_name, ''), nullif(new.username, ''), coalesce(new.aup_email, new.email, 'Organization Account')),
+    'organization_manager',
+    jsonb_build_object('enabled', profile_enabled),
+    'organization',
+    'OIC',
+    org_id,
+    coalesce(new.aup_email, new.email),
+    coalesce(new.phone_number, new.contact_number),
+    coalesce(new.phone_number, new.contact_number),
+    coalesce(new.created_at, now()),
+    now()
+  )
+  on conflict (id) do update
+  set username = excluded.username,
+      full_name = excluded.full_name,
+      role = 'organization_manager',
+      permissions = coalesce(public.profiles.permissions, '{}'::jsonb) || jsonb_build_object('enabled', profile_enabled),
+      account_preset = 'organization',
+      account_type = 'OIC',
+      organization_id = excluded.organization_id,
+      email = excluded.email,
+      contact_number = excluded.contact_number,
+      phone_number = excluded.phone_number,
+      updated_at = now();
+
+  return new;
+end $$;
+
+drop trigger if exists account_requests_sync_profile on public.account_requests;
+create trigger account_requests_sync_profile
+  before insert or update of status, username, full_name, organization_name, aup_email, email, phone_number, contact_number, user_id
+  on public.account_requests
+  for each row
+  execute function public.sync_account_request_profile();
+
+update public.account_requests
+set updated_at = now()
+where true;
+
 create table if not exists public.activity_statuses (
   account_id uuid primary key references auth.users(id) on update cascade on delete cascade,
   account_type text not null check (account_type in ('CSC', 'OIC')),
