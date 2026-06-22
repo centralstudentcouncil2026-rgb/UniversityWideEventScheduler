@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-account-identity-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-account-identity-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-organization-assignment-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-organization-assignment-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-account-identity-v1';
+} from './app-rules.js?v=20260622-organization-assignment-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -835,15 +835,27 @@ function resolveScheduleOrganization(existing, user) {
 }
 
 function resolveUserOrganization(user) {
-  const existing = findOrganization({ id: user.organization_id, name: userOrganizationName(user) });
-  if (existing) {
-    if (!user.organization_id) user.organization_id = existing.id;
-    return existing;
-  }
   const organizationName = userOrganizationName(user) || accountRequestOrganizationName(user);
   if (!organizationName) return null;
-  const organization = {
-    id: user.organization_id || createId(),
+  const assignedId = user.organization_id || organizationIdentifier(organizationName);
+  let organization = findOrganization({ id: assignedId });
+  if (!organization) {
+    const matchingName = findOrganization({ name: organizationName });
+    if (matchingName) {
+      matchingName.id = assignedId;
+      matchingName.organization_name = organizationName;
+      matchingName.updated_at = new Date().toISOString();
+      organization = matchingName;
+    }
+  }
+  if (organization) {
+    user.organization_id = assignedId;
+    user.organization_name = organization.organization_name || organizationName;
+    user.organizationName = user.organization_name;
+    return organization;
+  }
+  organization = {
+    id: assignedId,
     organization_name: organizationName,
     organization_type: user.organization_type || user.requested_role || 'Organization',
     created_at: user.created_at || new Date().toISOString(),
@@ -852,6 +864,15 @@ function resolveUserOrganization(user) {
   user.organization_id = organization.id;
   state.store.organizations.push(organization);
   return organization;
+}
+
+function organizationIdentifier(name) {
+  return String(name || 'organization')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'organization';
 }
 
 function accountRequestOrganizationName(user) {
@@ -2047,7 +2068,7 @@ async function applyApprovedAccountRequestDetails(request) {
     let organization = findOrganization({ id: user.organization_id, name: requestOrganizationName });
     if (!organization) {
       organization = {
-        id: request.organization_id || `org-${createId()}`,
+        id: request.organization_id || organizationIdentifier(requestOrganizationName),
         organization_name: requestOrganizationName,
         organization_type: 'Student Organization',
         created_at: request.created_at || new Date().toISOString(),
