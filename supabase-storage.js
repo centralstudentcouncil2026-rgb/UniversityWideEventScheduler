@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-account-fields-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-account-fields-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-account-identity-v1';
+import { ensureAllowedAdminStore, isAllowedAdminEmail } from './app-rules.js?v=20260622-account-identity-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -67,8 +67,11 @@ async function rpc(name, body = {}, authenticated = false) {
 
 export async function loadStore() {
   try {
-    const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token))));
-    if (session()?.access_token) await mergeAuthenticatedProfiles(store);
+    const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
+    if (session()?.access_token) {
+      await mergeAuthenticatedProfiles(store);
+      enforceAuthenticatedIdentity(store);
+    }
     rememberEventIds(store);
     return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
@@ -118,8 +121,9 @@ async function mergePublicBlockedTimes(store) {
 
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
-  const store = enforceAuthenticatedIdentity(normalizeStore(await rpc('get_scheduler_store', {}, true)));
+  const store = normalizeStore(await rpc('get_scheduler_store', {}, true));
   await mergeAuthenticatedProfiles(store);
+  enforceAuthenticatedIdentity(store);
   rememberEventIds(store);
   return store;
 }
@@ -244,8 +248,13 @@ function jsonObject(value) {
 
 function enforceAuthenticatedIdentity(store) {
   const email = authenticatedEmail();
+  const userId = authenticatedUserId();
   if (!email) return store;
-  return ensureAllowedAdminStore(store, email, authenticatedUserId());
+  if (isAllowedAdminEmail(email)) return ensureAllowedAdminStore(store, email, userId);
+
+  const user = store.users.find((item) => item.id === userId);
+  if (user) store.currentUserId = user.id;
+  return store;
 }
 
 export async function saveStore(store) {
