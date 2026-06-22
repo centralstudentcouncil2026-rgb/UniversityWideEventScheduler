@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-org-account-type-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-org-account-type-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-account-fields-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-account-fields-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -146,19 +146,53 @@ async function mergeAuthenticatedProfiles(store) {
 function mergeAccountRequest(store, accountRequest) {
   if (!accountRequest?.id) return;
   if (!Array.isArray(store.accountRequests)) store.accountRequests = [];
+  if (!Array.isArray(store.users)) store.users = [];
   const existing = store.accountRequests.find((item) => (item.id || item.request_id) === accountRequest.id);
+  const organizationName = accountRequest.organization_name || accountRequest.organizationName || existing?.organization_name || existing?.organizationName || '';
+  const contactNumber = accountRequest.contact_number || accountRequest.phone_number || existing?.contact_number || existing?.phone_number || '';
   const next = {
     ...existing,
     ...accountRequest,
     id: accountRequest.id,
     request_id: accountRequest.id,
-    organizationName: accountRequest.organization_name || existing?.organizationName || '',
+    organization_name: organizationName,
+    organizationName,
     aup_email: accountRequest.aup_email || accountRequest.email || existing?.aup_email || '',
     phone_number: accountRequest.phone_number || accountRequest.contact_number || existing?.phone_number || '',
-    contact_number: accountRequest.contact_number || accountRequest.phone_number || existing?.contact_number || ''
+    contact_number: contactNumber
   };
   if (existing) Object.assign(existing, next);
   else store.accountRequests.push(next);
+
+  const requestEmail = String(next.aup_email || '').toLowerCase();
+  const requestUsername = String(accountRequest.username || '').toLowerCase();
+  const profile = store.users.find((user) =>
+    user.id === accountRequest.user_id
+    || (requestEmail && String(user.email || '').toLowerCase() === requestEmail)
+    || (requestUsername && String(user.username || '').toLowerCase() === requestUsername)
+  );
+  if (!profile) return;
+
+  if (organizationName) {
+    profile.organization_name = organizationName;
+    profile.organizationName = organizationName;
+    profile.organization_id = profile.organization_id || accountRequest.organization_id || organizationKey(organizationName);
+    const organization = (store.organizations || []).find((item) => item.id === profile.organization_id);
+    if (!organization) {
+      if (!Array.isArray(store.organizations)) store.organizations = [];
+      store.organizations.push({
+        id: profile.organization_id,
+        organization_name: organizationName,
+        organization_type: 'Student Organization',
+        created_at: accountRequest.created_at || new Date().toISOString(),
+        updated_at: accountRequest.updated_at || new Date().toISOString()
+      });
+    }
+  }
+  if (contactNumber) {
+    profile.contact_number = contactNumber;
+    profile.phone_number = contactNumber;
+  }
 }
 
 function mergeProfileUser(store, profile) {
