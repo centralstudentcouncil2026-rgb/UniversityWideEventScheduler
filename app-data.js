@@ -266,6 +266,7 @@ function normalizeEvent(event) {
     privacy_level: String(event.private_notes || '').includes(INTERNAL_PRIVACY_MARKER) ? 'internal' : event.privacy_level || 'basic',
     private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
+    expected_attendees: normalizedExpectedAttendees(event.expected_attendees),
     occurrences,
     start_time: firstOccurrence.start_time || event.start_time,
     end_time: lastOccurrence.end_time || event.end_time,
@@ -279,6 +280,11 @@ function normalizeEvent(event) {
     revision_submitted_at: event.revision_submitted_at || '',
     revision_history: Array.isArray(event.revision_history) ? event.revision_history : []
   };
+}
+
+function normalizedExpectedAttendees(value) {
+  const attendees = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isInteger(attendees) && attendees >= 1 ? attendees : 1;
 }
 
 function normalizeScheduleSource(event = {}) {
