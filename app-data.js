@@ -267,6 +267,7 @@ function normalizeEvent(event) {
     private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
     schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
     expected_attendees: normalizedExpectedAttendees(event.expected_attendees),
+    schedule_schema_version: isCurrentScheduleRecord(event) ? 2 : 1,
     occurrences,
     start_time: firstOccurrence.start_time || event.start_time,
     end_time: lastOccurrence.end_time || event.end_time,
@@ -280,6 +281,17 @@ function normalizeEvent(event) {
     revision_submitted_at: event.revision_submitted_at || '',
     revision_history: Array.isArray(event.revision_history) ? event.revision_history : []
   };
+}
+
+function isCurrentScheduleRecord(event = {}) {
+  return Number(event.schedule_schema_version || 0) >= 2
+    && Boolean(event.title && event.category_id && event.venue)
+    && Number.isInteger(Number(event.expected_attendees))
+    && Number(event.expected_attendees) >= 1
+    && ['basic', 'internal'].includes(event.privacy_level || 'basic')
+    && Boolean(event.contact_person)
+    && /^\d{11}$/.test(String(event.contact_info || ''))
+    && Boolean(event.public_description && event.purpose);
 }
 
 function normalizedExpectedAttendees(value) {

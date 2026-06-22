@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-attendee-legacy-v1';
-import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-attendee-legacy-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-legacy-schedule-isolation-v1';
+import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-legacy-schedule-isolation-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -308,6 +308,7 @@ async function syncSchedulesTable(store) {
   const user = currentUser(store);
   const ownedSchedules = (store.events || [])
     .filter((event) => uuidOrNull(event.id) && event.record_type === 'schedule')
+    .filter(isRelationalScheduleReady)
     .filter((event) => isSuperAdmin(store) || event.created_by === user.id);
   const schedules = ownedSchedules
     .map((event) => ({
@@ -405,6 +406,18 @@ function uuidOrNull(value) {
 function normalizedAttendeeCount(value) {
   const count = Number.parseInt(String(value ?? '').trim(), 10);
   return Number.isInteger(count) && count >= 1 ? count : 1;
+}
+
+function isRelationalScheduleReady(event = {}) {
+  return Number(event.schedule_schema_version || 0) >= 2
+    && Boolean(event.title && event.category_id && event.venue)
+    && normalizedAttendeeCount(event.expected_attendees) >= 1
+    && ['basic', 'internal'].includes(event.privacy_level || 'basic')
+    && Boolean(event.contact_person)
+    && /^\d{11}$/.test(String(event.contact_info || ''))
+    && Boolean(event.public_description && event.purpose)
+    && Boolean(event.start_time && event.end_time)
+    && new Date(event.end_time) > new Date(event.start_time);
 }
 
 export async function authenticate(username, password) {
