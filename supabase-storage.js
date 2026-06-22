@@ -1,8 +1,10 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-legacy-schedule-isolation-v1';
-import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-legacy-schedule-isolation-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-whole-day-realtime-v1';
+import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
+const STORE_SYNC_SIGNAL_KEY = 'csc-sync-store-version';
+const STORE_SYNC_CHANNEL = 'csc-sync-store';
 let lastEventIds = new Set();
 
 function currentEventIds(store) {
@@ -271,7 +273,19 @@ export async function saveStore(store) {
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
   }
+  broadcastStoreSync();
   return { deleteFailures, tableFailures };
+}
+
+function broadcastStoreSync() {
+  try {
+    localStorage.setItem(STORE_SYNC_SIGNAL_KEY, String(Date.now()));
+  } catch {}
+  try {
+    const channel = new BroadcastChannel(STORE_SYNC_CHANNEL);
+    channel.postMessage({ updated_at: Date.now() });
+    channel.close();
+  } catch {}
 }
 
 async function syncRecordTables(store) {

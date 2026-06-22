@@ -368,7 +368,7 @@ create index if not exists schedule_revisions_submitted_at_idx on public.schedul
 create table if not exists public.blocked_times (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  block_type text not null check (block_type in ('single_day', 'multi_day')),
+  block_type text not null check (block_type in ('single_day', 'whole_day', 'multi_day')),
   start_time timestamptz not null,
   end_time timestamptz not null,
   reason text,
@@ -442,7 +442,7 @@ begin
             )::uuid
           end as id,
           coalesce(nullif(block_item->>'title', ''), 'Blocked university period') as title,
-          case when block_item->>'block_type' in ('single_day', 'multi_day') then block_item->>'block_type' else 'single_day' end as block_type,
+          case when block_item->>'block_type' in ('single_day', 'whole_day', 'multi_day') then block_item->>'block_type' else 'single_day' end as block_type,
           (block_item->>'start_time')::timestamptz as start_time,
           (block_item->>'end_time')::timestamptz as end_time,
           nullif(block_item->>'reason', '') as reason,
@@ -541,6 +541,9 @@ begin
     alter table public.blocked_times drop constraint if exists blocked_times_record_type_check;
     alter table public.blocked_times
       add constraint blocked_times_record_type_check check (record_type = 'blocked_time');
+    alter table public.blocked_times drop constraint if exists blocked_times_block_type_check;
+    alter table public.blocked_times
+      add constraint blocked_times_block_type_check check (block_type in ('single_day', 'whole_day', 'multi_day'));
     alter table public.blocked_times drop constraint if exists blocked_times_block_source_check;
     alter table public.blocked_times
       add constraint blocked_times_block_source_check check (block_source = 'admin');

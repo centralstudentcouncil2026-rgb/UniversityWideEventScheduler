@@ -207,7 +207,7 @@ function validateAnnouncementsForPersistence(store) {
 function validateBlockedTimesForPersistence(store) {
   (store.blockedTimes || []).forEach((block) => {
     if (block.record_type !== 'blocked_time') throw new Error('Blocked period requires a blocked-time record identifier.');
-    if (!block.title || !['single_day', 'multi_day'].includes(block.block_type)) throw new Error('Blocked period requires a title and block type.');
+    if (!block.title || !['single_day', 'whole_day', 'multi_day'].includes(block.block_type)) throw new Error('Blocked period requires a title and block type.');
     if (!block.start_time || !block.end_time || new Date(block.end_time) <= new Date(block.start_time)) throw new Error('Blocked-period end date and time must be later than start date and time.');
     if (String(block.reason || '').length > 500) throw new Error('Blocked-period reason is too long.');
     if (!block.created_by || !block.created_at) throw new Error('Blocked period requires creator and created date.');

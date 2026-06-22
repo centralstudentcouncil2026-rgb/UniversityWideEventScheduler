@@ -1,19 +1,19 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-legacy-schedule-isolation-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-legacy-schedule-isolation-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-whole-day-realtime-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-whole-day-realtime-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-legacy-schedule-isolation-v1';
+} from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
 const WEEK_SLOT_START_MINUTES = 7 * 60;
 const WEEK_SLOT_END_MINUTES = 21 * 60;
 const WEEK_SNAP_MINUTES = 15;
-const STORE_SYNC_INTERVAL_MS = 5000;
+const STORE_SYNC_INTERVAL_MS = 3000;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
@@ -76,6 +76,7 @@ const state = {
   resizeTimer: 0,
   storeSyncTimer: 0,
   storeSyncing: false,
+  storeSyncChannel: null,
   portalViewMode: 'today',
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
@@ -443,17 +444,21 @@ function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.
       ? connectedMonthEvents(event, eventColor, accentColor, viewType)
       : occurrenceCalendarEvents(event, eventColor, accentColor, weekLineLayout);
   });
-  const blocks = state.store.blockedTimes.map((block) => ({
+  const blocks = state.store.blockedTimes.map((block) => {
+    const wholeDay = block.block_type === 'whole_day';
+    return {
     id: block.id,
     title: block.title || 'Blocked university period',
-    start: block.start_time,
-    end: block.end_time,
+    start: wholeDay ? dateInput(block.start_time) : block.start_time,
+    end: wholeDay ? dateInput(block.end_time) : block.end_time,
+    allDay: wholeDay,
     backgroundColor: '#071C3D',
     borderColor: '#F4B400',
     editable: state.calendar?.view.type !== 'multiMonthYear' && canManageBlockedTimes(state.store),
     classNames: ['event-blocked', 'event-super-admin-block'],
     extendedProps: { type: 'block', record: block }
-  }));
+    };
+  });
   return [...events, ...blocks];
 }
 
@@ -1780,14 +1785,27 @@ function eventRequestHtml(item) {
 
 function openBlockedTimes() { if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return; renderBlockedTimes(); updateBlockTimeFields(); openDialog('blockedTimesModal'); }
 function updateBlockTimeFields() {
-  const multiDay = $('blockType')?.value === 'multi_day';
+  const blockType = $('blockType')?.value;
+  const multiDay = blockType === 'multi_day';
+  const wholeDay = blockType === 'whole_day';
   $('blockTimeFields')?.classList.toggle('is-multi-day', multiDay);
   const endDateLabel = $('blockEndDateLabel');
   if (endDateLabel) endDateLabel.hidden = !multiDay;
   if ($('blockStartDateLabelText')) $('blockStartDateLabelText').textContent = multiDay ? 'Start Date' : 'Date';
   $('blockEndDate').required = multiDay;
   $('blockEndDate').readOnly = !multiDay;
-  if (!multiDay) syncSingleDayBlockEndDate();
+  const startTimeLabel = $('blockStart')?.closest('label');
+  const endTimeLabel = $('blockEnd')?.closest('label');
+  if (startTimeLabel) startTimeLabel.hidden = wholeDay;
+  if (endTimeLabel) endTimeLabel.hidden = wholeDay;
+  $('blockStart').required = !wholeDay;
+  $('blockEnd').required = !wholeDay;
+  if (wholeDay) {
+    $('blockStart').value = '00:00';
+    $('blockEnd').value = '00:00';
+  } else if (!multiDay) {
+    syncSingleDayBlockEndDate();
+  }
 }
 
 function syncSingleDayBlockEndDate() {
@@ -1809,11 +1827,11 @@ function addBlockedTime(event) {
     [reason, TEXT_LIMITS.blockReason, 'Blocked-period reason']
   ]);
   if (textError) return showToast(textError, 'error');
-  if (!['single_day', 'multi_day'].includes(blockType)) return showToast('Choose a valid block type.', 'error');
+  if (!['single_day', 'whole_day', 'multi_day'].includes(blockType)) return showToast('Choose a valid block type.', 'error');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return showToast('Use valid blocked-period dates.', 'error');
-  if (!$('blockStart').value || !$('blockEnd').value) return showToast('Choose start and end times for the blocked period.', 'error');
-  const start = localIso(startDate, $('blockStart').value);
-  const end = localIso(endDate, $('blockEnd').value);
+  if (blockType !== 'whole_day' && (!$('blockStart').value || !$('blockEnd').value)) return showToast('Choose start and end times for the blocked period.', 'error');
+  const start = blockType === 'whole_day' ? localIso(startDate, '00:00') : localIso(startDate, $('blockStart').value);
+  const end = blockType === 'whole_day' ? localIso(nextDateInput(startDate), '00:00') : localIso(endDate, $('blockEnd').value);
   if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
   const item = { ...(existing || {}), id: existing?.id || createId(), record_type: 'blocked_time', block_source: 'admin', created_by_role: 'admin', requires_approval: false, title, block_type: blockType, start_time: start, end_time: end, reason, created_by: existing?.created_by || currentUser(state.store).id, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() };
   if (existing) Object.assign(existing, item);
@@ -1826,7 +1844,7 @@ function renderBlockedTimes() {
 }
 
 function blockedTimeHtml(item) {
-  const blockType = item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
+  const blockType = item.block_type === 'whole_day' ? 'Whole Day' : item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
   const actions = canManageBlockedTimes(state.store)
     ? `${actionButton('block-edit', item.id, 'Edit', 'secondary-button')}${actionButton('block-delete', item.id, 'Remove', 'danger-button')}`
     : '';
@@ -2468,6 +2486,10 @@ async function reloadStore() {
 function startStoreSync() {
   if (state.storeSyncTimer) window.clearInterval(state.storeSyncTimer);
   state.storeSyncTimer = window.setInterval(syncStoreFromBackend, STORE_SYNC_INTERVAL_MS);
+  if (!state.storeSyncChannel && typeof BroadcastChannel !== 'undefined') {
+    state.storeSyncChannel = new BroadcastChannel('csc-sync-store');
+    state.storeSyncChannel.addEventListener('message', () => { if (!document.hidden) syncStoreFromBackend(); });
+  }
 }
 
 async function syncStoreFromBackend() {

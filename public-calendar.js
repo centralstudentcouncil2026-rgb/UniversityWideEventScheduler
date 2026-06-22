@@ -1,10 +1,10 @@
-import { emptyPublicStore } from './app-data.js?v=20260622-public-center-blocks-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260622-public-center-blocks-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260622-public-center-blocks-v1';
+import { emptyPublicStore } from './app-data.js?v=20260622-whole-day-realtime-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260622-whole-day-realtime-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 const $ = (id) => document.getElementById(id);
 const PUBLIC_SLOW_LOAD_MS = 6500;
-const PUBLIC_STORE_SYNC_INTERVAL_MS = 5000;
+const PUBLIC_STORE_SYNC_INTERVAL_MS = 3000;
 const DEFAULT_ANNOUNCEMENT = {
   title: 'CSC S.Y.N.C. is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
@@ -13,7 +13,7 @@ const LEGACY_DEFAULT_ANNOUNCEMENT = {
   title: 'CONNECT is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CONNECT.'
 };
-const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', publicViewMode: 'today', resizeTimer: 0, resizeObserver: null, loadTimer: 0, storeSyncTimer: 0, storeSyncing: false, spanLabels: new Set() };
+const state = { store: null, eventSignature: '', calendar: null, selectedDate: '', selectedOrganizationId: '', publicViewMode: 'today', resizeTimer: 0, resizeObserver: null, loadTimer: 0, storeSyncTimer: 0, storeSyncing: false, storeSyncChannel: null, spanLabels: new Set() };
 
 document.addEventListener('DOMContentLoaded', initPublicCalendar);
 
@@ -75,6 +75,10 @@ function startPublicStoreSync() {
   state.storeSyncTimer = window.setInterval(() => {
     if (!document.hidden) refreshPublicStore();
   }, PUBLIC_STORE_SYNC_INTERVAL_MS);
+  if (!state.storeSyncChannel && typeof BroadcastChannel !== 'undefined') {
+    state.storeSyncChannel = new BroadcastChannel('csc-sync-store');
+    state.storeSyncChannel.addEventListener('message', () => { if (!document.hidden) refreshPublicStore(); });
+  }
 }
 
 function publicStoreHasContent(store) {
@@ -402,13 +406,14 @@ function publicBlockedCalendarItems(viewType = state.calendar?.view.type) {
   return publicBlockRecords(state.store)
     .filter((block) => block.start_time && block.end_time)
     .map((block) => {
-      const isMultiDay = dateOnly(block.start_time) !== dateOnly(block.end_time);
+      const wholeDay = block.block_type === 'whole_day';
+      const isMultiDay = !wholeDay && dateOnly(block.start_time) !== dateOnly(block.end_time);
       return {
         id: `${block.id}::public-block`,
         title: block.title || 'Blocked university period',
-        start: isMultiDay ? dateOnly(block.start_time) : block.start_time,
-        end: isMultiDay ? nextDate(dateOnly(block.end_time)) : block.end_time,
-        allDay: isMultiDay,
+        start: wholeDay || isMultiDay ? dateOnly(block.start_time) : block.start_time,
+        end: wholeDay ? dateOnly(block.end_time) : isMultiDay ? nextDate(dateOnly(block.end_time)) : block.end_time,
+        allDay: wholeDay || isMultiDay,
         display: 'block',
         backgroundColor: '#071C3D',
         borderColor: '#F4B400',
@@ -526,8 +531,9 @@ function publicBlockedDayHtml(block) {
 
 function blockOverlapsDate(block, date) {
   const start = new Date(`${date}T00:00:00`);
-  const end = new Date(`${date}T23:59:59.999`);
-  return new Date(block.start_time) <= end && new Date(block.end_time) >= start;
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return new Date(block.start_time) < end && new Date(block.end_time) > start;
 }
 
 function publicCategoryName(event) {

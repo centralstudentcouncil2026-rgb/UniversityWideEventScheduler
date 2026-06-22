@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260622-legacy-schedule-isolation-v1';
-import { currentUser } from './app-rules.js?v=20260622-legacy-schedule-isolation-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260622-whole-day-realtime-v1';
+import { currentUser } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');
