@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-detail-actions-v2';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260622-detail-actions-v2';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-separated-actions-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260622-separated-actions-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-detail-actions-v2';
+} from './app-rules.js?v=20260622-separated-actions-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -132,6 +132,8 @@ function bindEvents() {
     detailsEditButton: editSelectedEvent,
     detailsCancelButton: cancelSelectedEvent,
     detailsDeleteButton: deleteSelectedEvent,
+    detailsApproveButton: () => reviewSelectedEvent('approved'),
+    detailsRejectButton: () => reviewSelectedEvent('rejected'),
     deleteEventButton: deleteEventFromModal,
     agreementSubmitButton: finishAgreement,
     conflictContinueButton: continueAfterConflict,
@@ -349,6 +351,17 @@ function notifyAdmins(notification) {
   state.store.users
     .filter((user) => user.role === 'super_admin' && user.permissions?.enabled !== false)
     .forEach((user) => createNotification({ ...notification, user_id: user.id }));
+}
+
+function notifyScheduleCreator(schedule, title, message) {
+  if (!schedule?.created_by || schedule.created_by === currentUser(state.store).id) return;
+  createNotification({
+    user_id: schedule.created_by,
+    notification_type: 'schedule_update',
+    reference_id: schedule.id,
+    title,
+    message
+  });
 }
 
 function renderFilterOptions() {
@@ -970,6 +983,9 @@ function saveEvent(candidate) {
     return;
   }
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
+  if (existing && isSuperAdmin(state.store) && isOrganizationSchedule(existing) && existing.created_by !== currentUser(state.store).id) {
+    notifyScheduleCreator(candidate, 'Schedule Updated by Admin', `Admin updated your schedule "${candidate.title}".`);
+  }
   if (candidate.approval_status === 'pending' && (existingIndex < 0 || existing?.approval_status === 'rejected')) {
     notifyAdmins({
       notification_type: 'schedule_approval',
@@ -1047,13 +1063,7 @@ function openDetails(props) {
       Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
     });
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
-    setDetailsActionVisibility({
-      delete: canDeleteEvent(state.store, record),
-      cancel: false,
-      edit: canEditEvent(state.store, record),
-      approve: false,
-      reject: false
-    });
+    setDetailsActionVisibility(detailsActionVisibility(record));
   }
   openDialog('detailsModal');
 }
@@ -1061,6 +1071,36 @@ function openDetails(props) {
 function isBlockDetail(details) {
   const record = details?.record || {};
   return details?.type === 'block' || record.record_type === 'blocked_time' || record.block_source === 'admin';
+}
+
+function isOrganizationSchedule(record) {
+  return record?.schedule_source === 'organization'
+    || record?.created_by_role === 'organization'
+    || Boolean(record?.organization_id && record?.created_by && record?.requires_approval);
+}
+
+function isAdminCreatedSchedule(record) {
+  return record?.schedule_source === 'admin'
+    || record?.created_by_role === 'admin'
+    || record?.requires_approval === false;
+}
+
+function detailsActionVisibility(record) {
+  const visibility = { delete: false, cancel: false, edit: false, approve: false, reject: false };
+  if (isSuperAdmin(state.store)) {
+    visibility.delete = canDeleteEvent(state.store, record);
+    visibility.edit = canEditEvent(state.store, record);
+    if (isOrganizationSchedule(record) && !isAdminCreatedSchedule(record) && record.created_by !== currentUser(state.store).id) {
+      visibility.approve = canApproveEvents(state.store);
+      visibility.reject = canApproveEvents(state.store);
+    }
+    return visibility;
+  }
+  if (isManager(state.store) && record.created_by === currentUser(state.store).id) {
+    visibility.delete = canDeleteEvent(state.store, record);
+    visibility.edit = canEditEvent(state.store, record);
+  }
+  return visibility;
 }
 
 function setDetailsActionVisibility(visibility) {
@@ -1218,7 +1258,7 @@ async function deleteEvent(event) {
 function reviewSelectedEvent(status) { const event = state.selectedDetails?.record; if (event) reviewEvent(event, status); }
 function reviewEvent(event, status) {
   if (!requirePermission(canApproveEvents(state.store), 'This account cannot review event requests.')) return;
-  if (event.approval_status !== 'pending' || event.created_by === currentUser(state.store).id) {
+  if (isAdminCreatedSchedule(event) || event.created_by === currentUser(state.store).id) {
     return showToast('This schedule does not need admin approval.', 'error');
   }
   if (status === 'approved') {

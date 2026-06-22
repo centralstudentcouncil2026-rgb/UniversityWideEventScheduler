@@ -101,7 +101,7 @@
     <div class="modal-actions split-actions"><div><button type="button" class="danger-button" id="deleteEventButton">Delete Event</button><button type="button" class="secondary-button" id="cancelEventButton">Cancel Event</button></div><button class="primary-button">Save Event</button></div>
   </form></dialog>
 
-  <dialog class="modal details-modal" id="detailsModal"><article class="modal-card"><div class="modal-header"><div><h3 id="detailsTitle">Event Details</h3><p id="detailsMeta"></p></div><button class="icon-button" data-close="detailsModal">&times;</button></div><dl class="details-list" id="detailsList"></dl><div class="modal-actions"><button class="danger-button restricted-only" id="detailsDeleteButton">Remove</button><button class="secondary-button restricted-only" id="detailsCancelButton">Disable</button><button class="secondary-button super-admin-only" id="detailsRejectButton">Reject</button><button class="primary-button super-admin-only" id="detailsApproveButton">Approve</button><button class="primary-button restricted-only" id="detailsEditButton">Edit</button></div></article></dialog>
+  <dialog class="modal details-modal" id="detailsModal"><article class="modal-card"><div class="modal-header"><div><h3 id="detailsTitle">Event Details</h3><p id="detailsMeta"></p></div><button class="icon-button" data-close="detailsModal">&times;</button></div><dl class="details-list" id="detailsList"></dl><div class="modal-actions"><button class="danger-button action-hidden" id="detailsDeleteButton">Remove</button><button class="secondary-button action-hidden" id="detailsCancelButton">Disable</button><button class="secondary-button action-hidden" id="detailsRejectButton">Reject</button><button class="primary-button action-hidden" id="detailsApproveButton">Approve</button><button class="primary-button action-hidden" id="detailsEditButton">Edit</button></div></article></dialog>
 
   <dialog class="modal conflict-modal" id="conflictModal"><article class="modal-card conflict-card"><div class="modal-header"><div><h3 id="conflictTitle">Schedule Conflict</h3><p id="conflictSubtitle"></p></div><button class="icon-button" data-close="conflictModal">&times;</button></div><div class="conflict-body" id="conflictBody"></div><div class="modal-actions"><button class="secondary-button" data-close="conflictModal">Close</button><button class="primary-button" id="conflictContinueButton">Continue and Post Event</button></div></article></dialog>
 
@@ -140,6 +140,6 @@
   <script src="assets/fullcalendar-6.1.15.global.min.js?v=20260605-local-calendar-v1"></script>
   <script src="assets/fullcalendar-global-shim.js?v=20260605-local-calendar-v1"></script>
   <script src="supabaseClient.js?v=20260616-csc-sync-brand-v1"></script>
-  <script type="module" src="portal-bootstrap.js?v=20260622-detail-actions-v2"></script>
+  <script type="module" src="portal-bootstrap.js?v=20260622-separated-actions-v1"></script>
 </body>
 </html>
