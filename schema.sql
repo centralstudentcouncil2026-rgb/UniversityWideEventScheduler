@@ -598,16 +598,71 @@ create policy profiles_authenticated_select
   to authenticated
   using (true);
 
+create table if not exists public.account_requests (
+  id uuid primary key default gen_random_uuid(),
+  username text,
+  full_name text,
+  requested_role text default 'organization_manager',
+  organization_name text,
+  status text not null default 'pending',
+  aup_email text,
+  email text,
+  phone_number text,
+  contact_number text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table if exists public.account_requests add column if not exists username text;
+alter table if exists public.account_requests add column if not exists full_name text;
+alter table if exists public.account_requests add column if not exists requested_role text default 'organization_manager';
+alter table if exists public.account_requests add column if not exists organization_name text;
+alter table if exists public.account_requests add column if not exists status text not null default 'pending';
 alter table if exists public.account_requests add column if not exists aup_email text;
+alter table if exists public.account_requests add column if not exists email text;
 alter table if exists public.account_requests add column if not exists phone_number text;
 alter table if exists public.account_requests add column if not exists contact_number text;
-do $$
-begin
-  if to_regclass('public.account_requests') is not null then
-    create index if not exists account_requests_aup_email_idx on public.account_requests(aup_email);
-    create index if not exists account_requests_phone_number_idx on public.account_requests(phone_number);
-  end if;
-end $$;
+alter table if exists public.account_requests add column if not exists created_at timestamptz not null default now();
+alter table if exists public.account_requests add column if not exists updated_at timestamptz not null default now();
+
+create index if not exists account_requests_status_idx on public.account_requests(status);
+create index if not exists account_requests_aup_email_idx on public.account_requests(aup_email);
+create index if not exists account_requests_phone_number_idx on public.account_requests(phone_number);
+
+alter table public.account_requests enable row level security;
+
+drop policy if exists account_requests_insert_public on public.account_requests;
+drop policy if exists account_requests_select_admin on public.account_requests;
+drop policy if exists account_requests_update_admin on public.account_requests;
+drop policy if exists account_requests_delete_admin on public.account_requests;
+
+create policy account_requests_insert_public
+  on public.account_requests
+  for insert
+  to anon, authenticated
+  with check (true);
+
+create policy account_requests_select_admin
+  on public.account_requests
+  for select
+  to authenticated
+  using (true);
+
+create policy account_requests_update_admin
+  on public.account_requests
+  for update
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy account_requests_delete_admin
+  on public.account_requests
+  for delete
+  to authenticated
+  using (true);
+
+grant select, insert, update on public.account_requests to anon, authenticated;
+grant delete on public.account_requests to authenticated;
 
 create table if not exists public.activity_statuses (
   account_id uuid primary key references auth.users(id) on update cascade on delete cascade,

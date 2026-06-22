@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260622-public-center-blocks-v1';
-import { currentUser } from './app-rules.js?v=20260622-public-center-blocks-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260622-account-approval-v1';
+import { currentUser } from './app-rules.js?v=20260622-account-approval-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');

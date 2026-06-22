@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-public-center-blocks-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-public-center-blocks-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-account-approval-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-account-approval-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -126,12 +126,39 @@ export async function loadAuthenticatedStore() {
 
 async function mergeAuthenticatedProfiles(store) {
   try {
-    const profiles = await request('/rest/v1/profiles?select=*&order=created_at.asc', {}, true);
-    if (!Array.isArray(profiles) || !profiles.length) return;
+    const [profiles, accountRequests] = await Promise.all([
+      request('/rest/v1/profiles?select=*&order=created_at.asc', {}, true).catch((error) => {
+        console.warn('CONNECT profile account merge unavailable:', error);
+        return [];
+      }),
+      request('/rest/v1/account_requests?select=*&order=created_at.asc', {}, true).catch((error) => {
+        console.warn('CONNECT account request merge unavailable:', error);
+        return [];
+      })
+    ]);
     profiles.forEach((profile) => mergeProfileUser(store, profile));
+    accountRequests.forEach((accountRequest) => mergeAccountRequest(store, accountRequest));
   } catch (error) {
-    console.warn('CONNECT profile account merge unavailable:', error);
+    console.warn('CONNECT account data merge unavailable:', error);
   }
+}
+
+function mergeAccountRequest(store, accountRequest) {
+  if (!accountRequest?.id) return;
+  if (!Array.isArray(store.accountRequests)) store.accountRequests = [];
+  const existing = store.accountRequests.find((item) => (item.id || item.request_id) === accountRequest.id);
+  const next = {
+    ...existing,
+    ...accountRequest,
+    id: accountRequest.id,
+    request_id: accountRequest.id,
+    organizationName: accountRequest.organization_name || existing?.organizationName || '',
+    aup_email: accountRequest.aup_email || accountRequest.email || existing?.aup_email || '',
+    phone_number: accountRequest.phone_number || accountRequest.contact_number || existing?.phone_number || '',
+    contact_number: accountRequest.contact_number || accountRequest.phone_number || existing?.contact_number || ''
+  };
+  if (existing) Object.assign(existing, next);
+  else store.accountRequests.push(next);
 }
 
 function mergeProfileUser(store, profile) {
@@ -385,6 +412,14 @@ export async function requestAccount({ username, password, fullName, organizatio
 
 export async function decideAccountRequest(id, decision) {
   return rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
+}
+
+export async function updateAccountRequestStatus(id, decision) {
+  return request(`/rest/v1/account_requests?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status: decision, updated_at: new Date().toISOString() })
+  }, true);
 }
 
 const DELETE_COLLECTION_ALIASES = {

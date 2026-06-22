@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-public-center-blocks-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260622-public-center-blocks-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-account-approval-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-account-approval-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-public-center-blocks-v1';
+} from './app-rules.js?v=20260622-account-approval-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -2003,7 +2003,15 @@ async function decidePendingAccountRequest(id, decision) {
   if (!canManageAccounts(state.store)) return;
   const request = state.store.accountRequests.find((item) => (item.id || item.request_id) === id);
   try {
-    await decideAccountRequest(id, decision);
+    try {
+      await decideAccountRequest(id, decision);
+    } catch (error) {
+      await updateAccountRequestStatus(id, decision);
+    }
+    if (request) {
+      request.status = decision;
+      request.updated_at = new Date().toISOString();
+    }
     await reloadStore();
     if (decision === 'approved' && request) await applyApprovedAccountRequestDetails(request);
     renderUsers();
