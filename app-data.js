@@ -20,7 +20,7 @@ export const SCHEDULE_CATEGORIES = [
   ['meeting', 'Meeting', '#7C3AED'],
   ['others', 'Others', '#64748B']
 ];
-export const ACCOUNT_TYPES = ['CSC', 'OIC'];
+export const ACCOUNT_TYPES = ['CSC', 'OIC', 'org'];
 export const ACTIVITY_STATUS_OPTIONS = [
   'Available in Office',
   'Not Available',
@@ -150,7 +150,8 @@ function firstNonBlank(...values) {
 }
 
 function defaultAccountType(preset) {
-  return preset === 'head_events' || preset === 'organization' ? 'OIC' : 'CSC';
+  if (preset === 'organization') return 'org';
+  return preset === 'head_events' ? 'OIC' : 'CSC';
 }
 
 function presetForRole(role) {

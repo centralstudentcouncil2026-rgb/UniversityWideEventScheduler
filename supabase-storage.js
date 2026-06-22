@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-account-approval-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-account-approval-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-org-account-type-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-org-account-type-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -164,6 +164,7 @@ function mergeAccountRequest(store, accountRequest) {
 function mergeProfileUser(store, profile) {
   if (!profile?.id) return;
   if (!Array.isArray(store.users)) store.users = [];
+  const isOrganizationAccount = profile.role === 'organization_manager' || profile.account_preset === 'organization';
   const existing = store.users.find((user) =>
     user.id === profile.id
     || String(user.email || '').toLowerCase() === String(profile.email || '').toLowerCase()
@@ -175,8 +176,10 @@ function mergeProfileUser(store, profile) {
     full_name: profile.full_name || existing?.full_name || profile.username || profile.email || 'Account',
     role: profile.role || existing?.role || 'organization_manager',
     account_preset: profile.account_preset || existing?.account_preset || (profile.role === 'super_admin' ? 'manager' : 'organization'),
-    account_type: profile.account_type || existing?.account_type || (profile.role === 'super_admin' ? 'CSC' : 'OIC'),
+    account_type: profile.account_type || existing?.account_type || (isOrganizationAccount ? 'org' : 'CSC'),
     organization_id: profile.organization_id || existing?.organization_id || '',
+    organization_name: profile.organization_name || existing?.organization_name || existing?.organizationName || '',
+    organizationName: profile.organization_name || existing?.organizationName || existing?.organization_name || '',
     email: profile.email || existing?.email || '',
     aup_email: profile.email || existing?.aup_email || '',
     contact_number: profile.contact_number || profile.phone_number || existing?.contact_number || '',
@@ -438,8 +441,9 @@ async function upsertProfileFromAccountRequest(accountRequest, decision) {
     role: 'organization_manager',
     permissions: { enabled },
     account_preset: 'organization',
-    account_type: 'OIC',
+    account_type: 'org',
     organization_id: accountRequest.organization_id || organizationKey(accountRequest.organization_name),
+    organization_name: accountRequest.organization_name || '',
     email,
     contact_number: phone,
     phone_number: phone,

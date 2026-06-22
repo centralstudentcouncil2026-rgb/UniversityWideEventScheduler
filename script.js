@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-account-approval-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-account-approval-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-org-account-type-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260622-org-account-type-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-account-approval-v1';
+} from './app-rules.js?v=20260622-org-account-type-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -1898,12 +1898,14 @@ function accountRequestHtml(request) {
 }
 
 function userHtml(user) {
-  const organization = state.store.organizations.find((org) => org.id === user.organization_id);
+  const organization = findOrganization({ id: user.organization_id, name: userOrganizationName(user) });
+  const organizationName = organization?.organization_name || userOrganizationName(user) || 'No organization';
   const status = accountStatus(user);
   const rows = {
     Name: user.full_name || '',
     Role: roleLabel(user.account_preset || user.role),
-    Organization: organization ? organization.organization_name : 'No organization',
+    'Account Type': user.account_type || '',
+    Organization: organizationName,
     Email: accountEmail(user),
     'Contact Number': accountPhone(user),
     'Account Status': status,
@@ -2025,7 +2027,8 @@ async function applyApprovedAccountRequestDetails(request) {
   const requestUsername = cleanSingleLine(request.username || '').toLowerCase();
   const requestEmail = cleanSingleLine(accountRequestEmail(request)).toLowerCase();
   const requestPhone = String(accountRequestPhone(request)).replace(/\D/g, '');
-  if (!requestEmail && !requestPhone) return;
+  const requestOrganizationName = cleanSingleLine(request.organization_name || request.organizationName || '');
+  if (!requestEmail && !requestPhone && !requestOrganizationName) return;
   const user = state.store.users.find((item) =>
     String(item.username || '').toLowerCase() === requestUsername
     || String(accountEmail(item)).toLowerCase() === requestEmail
@@ -2040,9 +2043,28 @@ async function applyApprovedAccountRequestDetails(request) {
     user.contact_number = requestPhone;
     user.phone_number = requestPhone;
   }
+  if (requestOrganizationName) {
+    let organization = findOrganization({ id: user.organization_id, name: requestOrganizationName });
+    if (!organization) {
+      organization = {
+        id: request.organization_id || `org-${createId()}`,
+        organization_name: requestOrganizationName,
+        organization_type: 'Student Organization',
+        created_at: request.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      state.store.organizations.push(organization);
+    }
+    user.organization_id = organization.id;
+    user.organization_name = organization.organization_name;
+    user.organizationName = organization.organization_name;
+  }
+  user.account_preset = 'organization';
+  user.role = 'organization_manager';
+  user.account_type = 'org';
   user.updated_at = new Date().toISOString();
-  log('account_request_details_saved', `Saved contact details for "${user.full_name || user.username}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number });
-  await persist('Account contact details saved.');
+  log('account_request_details_saved', `Saved organization account details for "${user.full_name || user.username}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number, organization_name: user.organization_name });
+  await persist('Account organization details saved.');
 }
 
 function applyAccountSuspension(user, suspended) {
@@ -2081,7 +2103,7 @@ function applyAccountPreset(user, presetName) {
   const preset = ACCOUNT_PRESETS[presetName] || ACCOUNT_PRESETS.organization;
   user.account_preset = ACCOUNT_PRESETS[presetName] ? presetName : 'organization';
   user.role = preset.role;
-  user.account_type = user.account_preset === 'head_events' || user.account_preset === 'organization' ? 'OIC' : 'CSC';
+  user.account_type = user.account_preset === 'organization' ? 'org' : user.account_preset === 'head_events' ? 'OIC' : 'CSC';
   user.permissions = { ...preset.permissions };
 }
 

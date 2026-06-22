@@ -560,31 +560,32 @@ create index if not exists blocked_times_requires_approval_idx on public.blocked
 alter table if exists public.profiles add column if not exists account_type text;
 alter table if exists public.profiles add column if not exists contact_number text;
 alter table if exists public.profiles add column if not exists email text;
+alter table if exists public.profiles add column if not exists organization_name text;
 alter table if exists public.profiles add column if not exists suspension_status boolean not null default false;
 alter table if exists public.profiles add column if not exists suspension_date timestamptz;
 alter table if exists public.profiles add column if not exists deletion_logs jsonb not null default '[]'::jsonb;
 alter table if exists public.profiles add column if not exists modification_logs jsonb not null default '[]'::jsonb;
 do $$
 begin
-  if to_regclass('public.profiles') is not null
-     and not exists (
-       select 1
-       from pg_constraint
-       where conname = 'profiles_account_type_allowed'
-         and conrelid = 'public.profiles'::regclass
-     ) then
+  if to_regclass('public.profiles') is not null then
+    alter table public.profiles drop constraint if exists profiles_account_type_allowed;
     alter table public.profiles
-      add constraint profiles_account_type_allowed check (account_type in ('CSC', 'OIC'));
+      add constraint profiles_account_type_allowed check (account_type in ('CSC', 'OIC', 'org'));
   end if;
 end $$;
 
 update public.profiles
 set account_type = case
   when account_type is not null then account_type
-  when role = 'organization_manager' then 'OIC'
+  when role = 'organization_manager' then 'org'
   else 'CSC'
 end
 where account_type is null;
+
+update public.profiles
+set account_type = 'org'
+where role = 'organization_manager'
+   or account_preset = 'organization';
 
 create index if not exists profiles_suspension_status_idx on public.profiles(suspension_status);
 create index if not exists profiles_suspension_date_idx on public.profiles(suspension_date);
@@ -735,6 +736,7 @@ begin
     account_preset,
     account_type,
     organization_id,
+    organization_name,
     email,
     contact_number,
     phone_number,
@@ -748,8 +750,9 @@ begin
     'organization_manager',
     jsonb_build_object('enabled', profile_enabled),
     'organization',
-    'OIC',
+    'org',
     org_id,
+    coalesce(nullif(new.organization_name, ''), 'Organization'),
     coalesce(new.aup_email, new.email),
     coalesce(new.phone_number, new.contact_number),
     coalesce(new.phone_number, new.contact_number),
@@ -762,8 +765,9 @@ begin
       role = 'organization_manager',
       permissions = coalesce(public.profiles.permissions, '{}'::jsonb) || jsonb_build_object('enabled', profile_enabled),
       account_preset = 'organization',
-      account_type = 'OIC',
+      account_type = 'org',
       organization_id = excluded.organization_id,
+      organization_name = excluded.organization_name,
       email = excluded.email,
       contact_number = excluded.contact_number,
       phone_number = excluded.phone_number,
@@ -782,6 +786,16 @@ create trigger account_requests_sync_profile
 update public.account_requests
 set updated_at = now()
 where true;
+
+update public.profiles profile
+set organization_name = request.organization_name,
+    organization_id = coalesce(profile.organization_id, public.account_request_org_id(request.organization_name)),
+    account_type = 'org',
+    updated_at = now()
+from public.account_requests request
+where request.user_id = profile.id
+  and nullif(request.organization_name, '') is not null
+  and (profile.role = 'organization_manager' or profile.account_preset = 'organization');
 
 create table if not exists public.activity_statuses (
   account_id uuid primary key references auth.users(id) on update cascade on delete cascade,
