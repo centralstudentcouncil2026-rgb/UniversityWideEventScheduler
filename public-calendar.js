@@ -1,6 +1,6 @@
-import { emptyPublicStore } from './app-data.js?v=20260622-accounts-tabs-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260622-accounts-tabs-v1';
-import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260622-accounts-tabs-v1';
+import { emptyPublicStore } from './app-data.js?v=20260622-public-center-blocks-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260622-public-center-blocks-v1';
+import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260622-public-center-blocks-v1';
 
 const $ = (id) => document.getElementById(id);
 const PUBLIC_SLOW_LOAD_MS = 6500;
@@ -78,7 +78,7 @@ function startPublicStoreSync() {
 }
 
 function publicStoreHasContent(store) {
-  return Boolean(store?.events?.length || store?.announcements?.length || store?.activityStatuses?.length);
+  return Boolean(store?.events?.length || store?.blockedTimes?.length || store?.announcements?.length || store?.activityStatuses?.length);
 }
 
 function publicConnectedViewType(info) {
@@ -89,7 +89,7 @@ function publicConnectedViewType(info) {
 
 function publicStoreSignature(store) {
   const events = Array.isArray(store?.events) ? store.events : [];
-  return events
+  const schedulesSignature = events
     .filter((event) => event.approval_status === 'approved' && isPublicEvent(event))
     .map((event) => [
       event.id,
@@ -103,6 +103,17 @@ function publicStoreSignature(store) {
     ].join('|'))
     .sort()
     .join('||');
+  const blocksSignature = publicBlockRecords(store)
+    .map((block) => [
+      block.id,
+      block.title,
+      block.start_time,
+      block.end_time,
+      block.reason
+    ].join('|'))
+    .sort()
+    .join('||');
+  return `${schedulesSignature}::blocks::${blocksSignature}`;
 }
 
 function setPublicLoading(isLoading, label = 'Loading calendar...') {
@@ -388,7 +399,7 @@ function renderAnnouncements() {
 }
 
 function publicBlockedCalendarItems(viewType = state.calendar?.view.type) {
-  return (state.store.blockedTimes || [])
+  return publicBlockRecords(state.store)
     .filter((block) => block.start_time && block.end_time)
     .map((block) => {
       const isMultiDay = dateOnly(block.start_time) !== dateOnly(block.end_time);
@@ -459,11 +470,32 @@ function publicDayItems(date) {
         .map((occurrence) => ({ type: 'event', event, occurrence }));
       return results.concat(matchingOccurrences);
     }, []);
-  const blocks = (state.store.blockedTimes || [])
+  const blocks = publicBlockRecords(state.store)
     .filter((block) => blockOverlapsDate(block, date))
     .map((block) => ({ type: 'block', block, occurrence: { start_time: block.start_time, end_time: block.end_time } }));
   return events.concat(blocks)
     .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
+}
+
+function publicBlockRecords(store = state.store) {
+  const blocks = Array.isArray(store?.blockedTimes) ? store.blockedTimes : [];
+  const eventBlocks = (Array.isArray(store?.events) ? store.events : [])
+    .filter((event) => event.record_type === 'blocked_time' || event.block_source === 'admin')
+    .map((event) => ({
+      id: event.id,
+      title: event.title || 'Blocked university period',
+      block_type: event.block_type || 'single_day',
+      start_time: event.start_time,
+      end_time: event.end_time,
+      reason: event.reason || event.public_description || '',
+      record_type: 'blocked_time',
+      block_source: 'admin'
+    }));
+  const byId = new Map();
+  [...blocks, ...eventBlocks].forEach((block) => {
+    if (block?.id) byId.set(block.id, block);
+  });
+  return [...byId.values()];
 }
 
 function publicDayEventHtml(item) {

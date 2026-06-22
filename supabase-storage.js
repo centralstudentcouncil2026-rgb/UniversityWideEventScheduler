@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-accounts-tabs-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-accounts-tabs-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-public-center-blocks-v1';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-public-center-blocks-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';

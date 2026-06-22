@@ -399,6 +399,113 @@ create policy blocked_times_public_select
   to anon, authenticated
   using (true);
 
+do $$
+declare
+  state_column name;
+begin
+  if to_regclass('public.scheduler_state') is null
+     or to_regclass('public.blocked_times') is null then
+    return;
+  end if;
+
+  select column_name into state_column
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'scheduler_state'
+    and data_type = 'jsonb'
+    and column_name in ('state', 'store', 'data')
+  order by case column_name when 'state' then 1 when 'store' then 2 else 3 end
+  limit 1;
+
+  if state_column is null then
+    return;
+  end if;
+
+  execute format(
+    $sql$
+      with json_blocks as (
+        select block_item
+        from public.scheduler_state scheduler_state
+        cross join lateral jsonb_array_elements(coalesce(scheduler_state.%1$I->'blockedTimes', '[]'::jsonb)) as block_item
+      ),
+      normalized_blocks as (
+        select
+          case
+            when block_item->>'id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+              then (block_item->>'id')::uuid
+            else (
+              substr(md5(coalesce(block_item->>'id', block_item->>'title', '') || coalesce(block_item->>'start_time', '')), 1, 8) || '-' ||
+              substr(md5(coalesce(block_item->>'id', block_item->>'title', '') || coalesce(block_item->>'start_time', '')), 9, 4) || '-4' ||
+              substr(md5(coalesce(block_item->>'id', block_item->>'title', '') || coalesce(block_item->>'start_time', '')), 14, 3) || '-8' ||
+              substr(md5(coalesce(block_item->>'id', block_item->>'title', '') || coalesce(block_item->>'start_time', '')), 18, 3) || '-' ||
+              substr(md5(coalesce(block_item->>'id', block_item->>'title', '') || coalesce(block_item->>'start_time', '')), 21, 12)
+            )::uuid
+          end as id,
+          coalesce(nullif(block_item->>'title', ''), 'Blocked university period') as title,
+          case when block_item->>'block_type' in ('single_day', 'multi_day') then block_item->>'block_type' else 'single_day' end as block_type,
+          (block_item->>'start_time')::timestamptz as start_time,
+          (block_item->>'end_time')::timestamptz as end_time,
+          nullif(block_item->>'reason', '') as reason,
+          case
+            when block_item->>'created_by' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+              then (block_item->>'created_by')::uuid
+            else null
+          end as created_by,
+          coalesce(nullif(block_item->>'created_at', '')::timestamptz, now()) as created_at,
+          coalesce(nullif(block_item->>'updated_at', '')::timestamptz, now()) as updated_at
+        from json_blocks
+        where block_item ? 'start_time'
+          and block_item ? 'end_time'
+          and block_item->>'start_time' <> ''
+          and block_item->>'end_time' <> ''
+      )
+      insert into public.blocked_times (
+        id,
+        title,
+        block_type,
+        start_time,
+        end_time,
+        reason,
+        record_type,
+        block_source,
+        created_by_role,
+        requires_approval,
+        created_by,
+        created_at,
+        updated_at
+      )
+      select
+        id,
+        title,
+        block_type,
+        start_time,
+        end_time,
+        reason,
+        'blocked_time',
+        'admin',
+        'admin',
+        false,
+        created_by,
+        created_at,
+        updated_at
+      from normalized_blocks
+      where end_time > start_time
+      on conflict (id) do update
+      set title = excluded.title,
+          block_type = excluded.block_type,
+          start_time = excluded.start_time,
+          end_time = excluded.end_time,
+          reason = excluded.reason,
+          record_type = 'blocked_time',
+          block_source = 'admin',
+          created_by_role = 'admin',
+          requires_approval = false,
+          updated_at = excluded.updated_at
+    $sql$,
+    state_column
+  );
+end $$;
+
 -- Migration/update helpers for an existing blocked_times table.
 alter table if exists public.blocked_times add column if not exists block_type text;
 alter table if exists public.blocked_times add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;

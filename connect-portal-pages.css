@@ -480,19 +480,26 @@
   background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.32);
   border-radius: 18px;
+  box-sizing: border-box;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
-  display: none;
-  left: var(--dialog-left, 50%);
-  max-height: min(460px, calc(100vh - 32px));
-  overflow: hidden;
+  display: block;
+  left: 50%;
+  max-height: min(78dvh, 680px);
+  opacity: 0;
+  overflow: auto;
   position: fixed;
-  top: var(--dialog-top, 96px);
-  width: min(360px, calc(100vw - 32px));
-  z-index: 30;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+  visibility: hidden;
+  width: min(460px, calc(100vw - 28px));
+  z-index: 80;
 }
 
 .public-day-dialog.open {
-  display: block;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  visibility: visible;
 }
 
 .public-day-header {
@@ -931,14 +938,17 @@
   }
 
   .public-day-dialog {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    bottom: 0;
+    border-radius: 12px;
+    bottom: auto;
     left: 50%;
-    max-height: min(70vh, 520px);
-    top: auto;
-    transform: translateX(-50%);
-    width: min(460px, 100vw);
+    max-height: calc(100dvh - 24px);
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: calc(100vw - 20px);
+  }
+
+  .public-day-dialog.open {
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
