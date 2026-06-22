@@ -140,7 +140,7 @@ async function syncOrganizationsTable(store) {
 
 async function syncSchedulesTable(store) {
   const schedules = (store.events || [])
-    .filter((event) => event.id && event.record_type === 'schedule')
+    .filter((event) => uuidOrNull(event.id) && event.record_type === 'schedule')
     .map((event) => ({
       id: event.id,
       organization_id: event.organization_id || null,
@@ -184,7 +184,7 @@ async function syncSchedulesTable(store) {
     }, true);
   }
 
-  for (const event of (store.events || []).filter((item) => item.id && item.record_type === 'schedule')) {
+  for (const event of (store.events || []).filter((item) => uuidOrNull(item.id) && item.record_type === 'schedule')) {
     const occurrences = Array.isArray(event.occurrences) ? event.occurrences : [];
     await request(`/rest/v1/schedule_occurrences?schedule_id=eq.${encodeURIComponent(event.id)}`, { method: 'DELETE' }, true);
     if (!occurrences.length) continue;
@@ -192,7 +192,7 @@ async function syncSchedulesTable(store) {
       method: 'POST',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify(occurrences.map((occurrence) => ({
-        id: occurrence.id || undefined,
+        id: uuidOrNull(occurrence.id) || undefined,
         schedule_id: event.id,
         date: occurrence.date || String(occurrence.start_time || '').slice(0, 10),
         start_time: occurrence.start_time,
@@ -204,7 +204,7 @@ async function syncSchedulesTable(store) {
 
 async function syncBlockedTimesTable(store) {
   const blocks = (store.blockedTimes || [])
-    .filter((block) => block.id && block.record_type === 'blocked_time')
+    .filter((block) => uuidOrNull(block.id) && block.record_type === 'blocked_time')
     .map((block) => ({
       id: block.id,
       title: block.title,

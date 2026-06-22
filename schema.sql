@@ -109,6 +109,64 @@ begin
   );
 end $$;
 
+-- Cleanup for calendar schedules that still appear in scheduler_state but were
+-- never saved into public.schedules. Upload this block when the calendar shows
+-- old schedules that are missing from the schedules table.
+do $$
+declare
+  state_column name;
+begin
+  if to_regclass('public.scheduler_state') is null
+     or to_regclass('public.schedules') is null then
+    return;
+  end if;
+
+  select column_name into state_column
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'scheduler_state'
+    and data_type = 'jsonb'
+    and column_name in ('state', 'store', 'data')
+  order by case column_name when 'state' then 1 when 'store' then 2 else 3 end
+  limit 1;
+
+  if state_column is null then
+    return;
+  end if;
+
+  execute format(
+    $sql$
+      with cleaned_state as (
+        select
+          scheduler_state.ctid as row_id,
+          jsonb_set(
+            scheduler_state.%1$I,
+            '{events}',
+            coalesce((
+              select jsonb_agg(event_item)
+              from jsonb_array_elements(coalesce(scheduler_state.%1$I->'events', '[]'::jsonb)) as event_item
+              where coalesce(event_item->>'record_type', 'schedule') <> 'schedule'
+                 or exists (
+                   select 1
+                   from public.schedules saved_schedule
+                   where (event_item->>'id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+                     and saved_schedule.id = (event_item->>'id')::uuid
+                 )
+            ), '[]'::jsonb),
+            true
+          ) as next_state
+        from public.scheduler_state scheduler_state
+      )
+      update public.scheduler_state scheduler_state
+      set %1$I = cleaned_state.next_state
+      from cleaned_state
+      where scheduler_state.ctid = cleaned_state.row_id
+        and scheduler_state.%1$I is distinct from cleaned_state.next_state
+    $sql$,
+    state_column
+  );
+end $$;
+
 -- Admin dashboard schedule module migration reference
 -- Apply in Supabase when moving from the compact JSON store to relational
 -- schedule tables, or use the constraints below inside save_scheduler_store()
