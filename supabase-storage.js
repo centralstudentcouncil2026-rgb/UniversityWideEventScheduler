@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-public-blocks-v1';
-import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-public-blocks-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-public-blocks-v2';
+import { ensureAllowedAdminStore } from './app-rules.js?v=20260622-public-blocks-v2';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY = 'core_supabase_auth_session';
@@ -80,9 +80,38 @@ export async function loadStore() {
 export async function loadPublicStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store'));
+    await mergePublicBlockedTimes(store);
     return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
   } catch (error) {
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
+  }
+}
+
+async function mergePublicBlockedTimes(store) {
+  try {
+    const rows = await request('/rest/v1/blocked_times?select=*&order=start_time.asc');
+    if (!Array.isArray(rows) || !rows.length) return;
+    const existingIds = new Set((store.blockedTimes || []).map((block) => block.id));
+    const directBlocks = rows
+      .filter((row) => row.id && !existingIds.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        title: row.title || 'Blocked university period',
+        block_type: row.block_type || 'single_day',
+        start_time: row.start_time,
+        end_time: row.end_time,
+        reason: row.reason || '',
+        record_type: 'blocked_time',
+        block_source: 'admin',
+        created_by_role: 'admin',
+        requires_approval: false,
+        created_by: row.created_by || '',
+        created_at: row.created_at || row.start_time,
+        updated_at: row.updated_at || row.created_at || row.start_time
+      }));
+    store.blockedTimes = [...(store.blockedTimes || []), ...directBlocks];
+  } catch (error) {
+    console.warn('CONNECT public blocked-time fallback unavailable:', error);
   }
 }
 

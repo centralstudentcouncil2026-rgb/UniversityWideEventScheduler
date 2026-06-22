@@ -391,6 +391,14 @@ create index if not exists blocked_times_created_by_idx on public.blocked_times(
 grant select, insert, update, delete on public.blocked_times to authenticated;
 grant select on public.blocked_times to anon;
 
+alter table if exists public.blocked_times enable row level security;
+drop policy if exists blocked_times_public_select on public.blocked_times;
+create policy blocked_times_public_select
+  on public.blocked_times
+  for select
+  to anon, authenticated
+  using (true);
+
 -- Migration/update helpers for an existing blocked_times table.
 alter table if exists public.blocked_times add column if not exists block_type text;
 alter table if exists public.blocked_times add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;
