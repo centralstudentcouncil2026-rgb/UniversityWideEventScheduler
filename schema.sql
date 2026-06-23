@@ -1276,3 +1276,84 @@ create trigger schedules_enforce_organization_owner
   before insert or update on public.schedules
   for each row
   execute function public.enforce_organization_schedule_owner();
+
+-- Incremental relational-sync repair for existing Supabase projects.
+-- The browser writes these fields when schedules and organization records sync.
+alter table if exists public.schedules add column if not exists schedule_schema_version integer not null default 2;
+alter table if exists public.schedules add column if not exists record_type text not null default 'schedule';
+alter table if exists public.schedules add column if not exists schedule_source text not null default 'organization';
+alter table if exists public.schedules add column if not exists created_by_role text not null default 'organization';
+alter table if exists public.schedules add column if not exists requires_approval boolean not null default true;
+alter table if exists public.schedules add column if not exists created_by uuid references auth.users(id) on update cascade on delete set null;
+alter table if exists public.schedules add column if not exists approval_status text not null default 'pending';
+alter table if exists public.schedules add column if not exists admin_recommendation text;
+alter table if exists public.schedules add column if not exists approval_date timestamptz;
+alter table if exists public.schedules add column if not exists notification_status text;
+alter table if exists public.schedules add column if not exists revision_of uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists original_schedule_id uuid references public.schedules(id) on update cascade on delete cascade;
+alter table if exists public.schedules add column if not exists revision_status text;
+alter table if exists public.schedules add column if not exists revision_created_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_submitted_at timestamptz;
+alter table if exists public.schedules add column if not exists revision_history jsonb not null default '[]'::jsonb;
+
+alter table if exists public.schedule_organizations enable row level security;
+drop policy if exists schedule_organizations_public_select on public.schedule_organizations;
+drop policy if exists schedule_organizations_authenticated_insert on public.schedule_organizations;
+drop policy if exists schedule_organizations_authenticated_update on public.schedule_organizations;
+
+create policy schedule_organizations_public_select
+  on public.schedule_organizations
+  for select
+  to anon, authenticated
+  using (true);
+
+create policy schedule_organizations_authenticated_insert
+  on public.schedule_organizations
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or profile.organization_id = schedule_organizations.id
+          or lower(coalesce(profile.organization_name, '')) = lower(coalesce(schedule_organizations.organization_name, ''))
+        )
+    )
+  );
+
+create policy schedule_organizations_authenticated_update
+  on public.schedule_organizations
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or profile.organization_id = schedule_organizations.id
+          or lower(coalesce(profile.organization_name, '')) = lower(coalesce(schedule_organizations.organization_name, ''))
+        )
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or profile.organization_id = schedule_organizations.id
+          or lower(coalesce(profile.organization_name, '')) = lower(coalesce(schedule_organizations.organization_name, ''))
+        )
+    )
+  );
+
+notify pgrst, 'reload schema';
