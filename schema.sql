@@ -1557,4 +1557,21 @@ create policy schedule_occurrences_authenticated_delete
 
 notify pgrst, 'reload schema';
 
+-- Seed the only categories allowed by the schedule foreign key.
+insert into public.schedule_categories (id, name, color, active, updated_at)
+values
+  ('worship', 'Worship', '#2563EB', true, now()),
+  ('gathering', 'Gathering', '#16A34A', true, now()),
+  ('outreach', 'Outreach', '#DC2626', true, now()),
+  ('socialization', 'Socialization', '#D97706', true, now()),
+  ('meeting', 'Meeting', '#7C3AED', true, now()),
+  ('others', 'Others', '#64748B', true, now())
+on conflict (id) do update
+set name = excluded.name,
+    color = excluded.color,
+    active = true,
+    updated_at = now();
+
+notify pgrst, 'reload schema';
+
 notify pgrst, 'reload schema';
