@@ -1356,4 +1356,187 @@ create policy schedule_organizations_authenticated_update
     )
   );
 
+-- Allow approved organization accounts to write only their own schedules.
+-- Admin accounts retain full schedule access for review and approval.
+alter table if exists public.schedules enable row level security;
+alter table if exists public.schedule_occurrences enable row level security;
+
+drop policy if exists schedules_authenticated_select on public.schedules;
+drop policy if exists schedules_authenticated_insert on public.schedules;
+drop policy if exists schedules_authenticated_update on public.schedules;
+drop policy if exists schedules_authenticated_delete on public.schedules;
+
+create policy schedules_authenticated_select
+  on public.schedules
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedules.created_by = auth.uid()
+            and schedules.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+create policy schedules_authenticated_insert
+  on public.schedules
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedules.created_by = auth.uid()
+            and schedules.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+create policy schedules_authenticated_update
+  on public.schedules
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedules.created_by = auth.uid()
+            and schedules.organization_id = profile.organization_id
+          )
+        )
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedules.created_by = auth.uid()
+            and schedules.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+create policy schedules_authenticated_delete
+  on public.schedules
+  for delete
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.profiles profile
+      where profile.id = auth.uid()
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedules.created_by = auth.uid()
+            and schedules.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+drop policy if exists schedule_occurrences_authenticated_select on public.schedule_occurrences;
+drop policy if exists schedule_occurrences_authenticated_insert on public.schedule_occurrences;
+drop policy if exists schedule_occurrences_authenticated_update on public.schedule_occurrences;
+drop policy if exists schedule_occurrences_authenticated_delete on public.schedule_occurrences;
+
+create policy schedule_occurrences_authenticated_select
+  on public.schedule_occurrences
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.schedules schedule
+      join public.profiles profile on profile.id = auth.uid()
+      where schedule.id = schedule_occurrences.schedule_id
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedule.created_by = auth.uid()
+            and schedule.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+create policy schedule_occurrences_authenticated_insert
+  on public.schedule_occurrences
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.schedules schedule
+      join public.profiles profile on profile.id = auth.uid()
+      where schedule.id = schedule_occurrences.schedule_id
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedule.created_by = auth.uid()
+            and schedule.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+create policy schedule_occurrences_authenticated_delete
+  on public.schedule_occurrences
+  for delete
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.schedules schedule
+      join public.profiles profile on profile.id = auth.uid()
+      where schedule.id = schedule_occurrences.schedule_id
+        and coalesce((profile.permissions ->> 'enabled')::boolean, false)
+        and (
+          profile.role = 'super_admin'
+          or (
+            profile.role = 'organization_manager'
+            and schedule.created_by = auth.uid()
+            and schedule.organization_id = profile.organization_id
+          )
+        )
+    )
+  );
+
+notify pgrst, 'reload schema';
+
 notify pgrst, 'reload schema';
