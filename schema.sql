@@ -1296,6 +1296,24 @@ alter table if exists public.schedules add column if not exists revision_created
 alter table if exists public.schedules add column if not exists revision_submitted_at timestamptz;
 alter table if exists public.schedules add column if not exists revision_history jsonb not null default '[]'::jsonb;
 
+create table if not exists public.schedule_occurrences (
+  id uuid primary key default gen_random_uuid(),
+  schedule_id uuid not null references public.schedules(id) on update cascade on delete cascade,
+  date date not null,
+  start_time timestamptz not null,
+  end_time timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint schedule_occurrences_valid_time_range check (end_time > start_time)
+);
+
+create index if not exists schedule_occurrences_schedule_id_idx
+  on public.schedule_occurrences(schedule_id);
+
+create index if not exists schedule_occurrences_date_idx
+  on public.schedule_occurrences(date);
+
+grant select, insert, update, delete on public.schedule_occurrences to authenticated;
+
 alter table if exists public.schedule_organizations enable row level security;
 drop policy if exists schedule_organizations_public_select on public.schedule_organizations;
 drop policy if exists schedule_organizations_authenticated_insert on public.schedule_organizations;
