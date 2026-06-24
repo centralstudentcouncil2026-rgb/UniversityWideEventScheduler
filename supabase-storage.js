@@ -180,7 +180,11 @@ async function loadRelationalStore(authenticated = false) {
   const store = normalizeStore({
     version: 4,
     currentUserId: authenticatedUserId() || 'public',
-    users: (profiles || []).map((profile) => ({ ...profile, username: profile.email, permissions: profile.permissions || { enabled: profile.is_enabled } })),
+    users: (profiles || []).map((profile) => ({
+      ...profile,
+      username: profile.email,
+      permissions: { ...(profile.permissions || {}), enabled: Boolean(profile.is_enabled) }
+    })),
     organizations: organizations || [], categories: categories || [], announcements: announcements || [],
     blockedTimes: (blocks || []).map((block) => ({ ...block, record_type: 'blocked_time', block_source: 'admin', created_by_role: 'admin', requires_approval: false })),
     events: (schedules || []).map((schedule) => ({ ...schedule, record_type: 'schedule', organization_name: organizationNames.get(schedule.organization_id) || '', occurrences: occurrencesBySchedule.get(schedule.id) || [] }))
