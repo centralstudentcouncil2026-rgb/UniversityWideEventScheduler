@@ -1,5 +1,5 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260624-organizations-table-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-unified-calendar-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260624-unified-calendar-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -901,7 +901,7 @@ function organizationIdentifier(name) {
 function accountRequestOrganizationName(user) {
   const email = normalizedName(accountEmail(user));
   const username = normalizedName(user.username);
-  const request = (state.store.accountRequests || []).find((item) =>
+  const request = (state.store.pendingAccounts || []).find((item) =>
     (username && normalizedName(item.username) === username)
     || (email && normalizedName(accountRequestEmail(item)) === email)
     || (user.id && item.user_id === user.id)
@@ -2037,7 +2037,7 @@ function renderUsers() {
 }
 
 function pendingAccountRequests() {
-  return (state.store.accountRequests || []).filter((request) => !['approved', 'rejected'].includes(String(request.status || '').toLowerCase()));
+  return (state.store.pendingAccounts || []).filter((request) => !['approved', 'rejected'].includes(String(request.status || '').toLowerCase()));
 }
 
 function accountRequestHtml(request) {
@@ -2158,7 +2158,7 @@ async function submitAccountEditForm(event) {
 
 async function decidePendingAccountRequest(id, decision) {
   if (!canManageAccounts(state.store)) return;
-  const request = state.store.accountRequests.find((item) => (item.id || item.request_id) === id);
+  const request = state.store.pendingAccounts.find((item) => (item.id || item.request_id) === id);
   try {
     await decideAccountRequest(id, decision);
     if (request) {
@@ -2166,62 +2166,17 @@ async function decidePendingAccountRequest(id, decision) {
       request.updated_at = new Date().toISOString();
     }
     await reloadStore();
-    if (decision === 'approved' && request) await applyApprovedAccountRequestDetails(request);
     renderUsers();
     showToast(decision === 'approved' ? 'Organization account approved.' : 'Organization account rejected.', 'success');
   } catch (error) {
-    const backendUnavailable = error?.status === 404 || /approve_organization_account|function.*does not exist/i.test(String(error?.message || ''));
+    const backendUnavailable = error?.status === 404 || /approve_organization_profile|function.*does not exist/i.test(String(error?.message || ''));
     showToast(
       backendUnavailable
-        ? 'The account approval database update is not installed. Run supabase-admin-account-approval-fix.sql in Supabase, then try again.'
+        ? 'The unified account approval database update is not installed. Run supabase-unified-calendar.sql in Supabase, then try again.'
         : (error.message || 'Account request decision failed.'),
       'error'
     );
   }
-}
-
-async function applyApprovedAccountRequestDetails(request) {
-  const requestUsername = cleanSingleLine(request.username || '').toLowerCase();
-  const requestEmail = cleanSingleLine(accountRequestEmail(request)).toLowerCase();
-  const requestPhone = String(accountRequestPhone(request)).replace(/\D/g, '');
-  const requestOrganizationName = cleanSingleLine(request.organization_name || request.organizationName || '');
-  if (!requestEmail && !requestPhone && !requestOrganizationName) return;
-  const user = state.store.users.find((item) =>
-    String(item.username || '').toLowerCase() === requestUsername
-    || String(accountEmail(item)).toLowerCase() === requestEmail
-    || (request.organization_name && item.organization_id && state.store.organizations.find((org) => org.id === item.organization_id && normalizedName(org.organization_name) === normalizedName(request.organization_name)))
-  );
-  if (!user) return;
-  if (requestEmail) {
-    user.email = requestEmail;
-    user.aup_email = requestEmail;
-  }
-  if (requestPhone) {
-    user.contact_number = requestPhone;
-    user.phone_number = requestPhone;
-  }
-  if (requestOrganizationName) {
-    let organization = findOrganization({ id: user.organization_id, name: requestOrganizationName });
-    if (!organization) {
-      organization = {
-        id: request.organization_id || organizationIdentifier(requestOrganizationName),
-        organization_name: requestOrganizationName,
-        organization_type: 'Student Organization',
-        created_at: request.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      state.store.organizations.push(organization);
-    }
-    user.organization_id = organization.id;
-    user.organization_name = organization.organization_name;
-    user.organizationName = organization.organization_name;
-  }
-  user.account_preset = 'organization';
-  user.role = 'organization_manager';
-  user.account_type = 'org';
-  user.updated_at = new Date().toISOString();
-  log('account_request_details_saved', `Saved organization account details for "${user.full_name || user.username}".`, { user_id: user.id, email: user.email, contact_number: user.contact_number, organization_name: user.organization_name });
-  await persist('Account organization details saved.');
 }
 
 function applyAccountSuspension(user, suspended) {

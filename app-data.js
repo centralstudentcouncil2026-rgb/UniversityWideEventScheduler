@@ -9,7 +9,7 @@ const EMPTY_COLLECTIONS = [
   'concerns',
   'notifications',
   'activityLogs',
-  'accountRequests'
+  'pendingAccounts'
 ];
 const INTERNAL_PRIVACY_MARKER = '[[privacy:internal]]';
 export const SCHEDULE_CATEGORIES = [
@@ -159,16 +159,19 @@ function presetForRole(role) {
 }
 
 function normalizeCategories(categories = []) {
-  return SCHEDULE_CATEGORIES.map(([id, name, color]) => {
+  const defaults = SCHEDULE_CATEGORIES.map(([id, name, color]) => {
     const existing = categories.find((item) => item.id === id || String(item.name || '').toLowerCase() === name.toLowerCase());
     return {
       ...existing,
       id,
       name,
       color: existing?.color || color,
-      active: true
+      active: existing?.active !== false
     };
   });
+  const defaultNames = new Set(defaults.map((item) => String(item.name).toLowerCase()));
+  const additional = categories.filter((item) => item?.id && item?.name && !defaultNames.has(String(item.name).toLowerCase()));
+  return [...defaults, ...additional];
 }
 
 export function storeForPersistence(store) {
