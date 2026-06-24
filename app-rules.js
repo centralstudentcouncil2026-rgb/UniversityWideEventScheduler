@@ -3,7 +3,7 @@ export const APPROVAL_STATUSES=['pending','approved','rejected'];
 export const EVENT_STATUSES=['planned','finalized','postponed','cancelled','disabled','completed'];
 export const ADMIN_ACCESS_EMAILS=['cscadmin1@aup.edu.ph','cscadmin2@aup.edu.ph','cscadmin3@aup.edu.ph','cscadmin4@aup.edu.ph'];
 const ADMIN_ACCESS_EMAIL_SET=new Set(ADMIN_ACCESS_EMAILS);
-const ADMIN_PERMISSIONS={enabled:true,manageAccounts:true,approveEvents:true,editAllEvents:true,deleteAllEvents:true,manageBlockedTimes:true,manageAnnouncements:true,updatePresidentStatus:true,updateOfficeStatus:true,manageCategories:true};
+const ADMIN_PERMISSIONS={enabled:true,manageAccounts:true,approveEvents:true,editAllEvents:true,deleteAllEvents:true,manageBlockedTimes:true,manageAnnouncements:true,updatePresidentStatus:true,updateOfficeStatus:true,manageCategories:false};
 export function currentUser(store){if(store.currentUserId==='public')return PUBLIC_USER;return store.users.find((user)=>user.id===store.currentUserId)||PUBLIC_USER}
 export function isPublic(store){return currentUser(store).role==='public_viewer'}
 export function isManager(store){return currentUser(store).role==='organization_manager'}
@@ -19,7 +19,7 @@ export const canManageAccounts=(store)=>superAdminPermission(store,'manageAccoun
 export const canApproveEvents=(store)=>superAdminPermission(store,'approveEvents');
 export const canManageBlockedTimes=(store)=>superAdminPermission(store,'manageBlockedTimes');
 export const canManageAnnouncements=(store)=>superAdminPermission(store,'manageAnnouncements');
-export const canManageCategories=(store)=>superAdminPermission(store,'manageCategories');
+export const canManageCategories=()=>false;
 export const canUpdatePresidentStatus=(store)=>superAdminPermission(store,'updatePresidentStatus');
 export const canUpdateOfficeStatus=(store)=>superAdminPermission(store,'updateOfficeStatus');
 export function canCreateEvents(store){return userPermission(currentUser(store),'enabled')&&(isManager(store)||isSuperAdmin(store))}
