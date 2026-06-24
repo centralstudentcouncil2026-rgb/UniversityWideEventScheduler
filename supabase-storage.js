@@ -69,7 +69,7 @@ async function rpc(name, body = {}, authenticated = false) {
 
 export async function loadStore() {
   try {
-    const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
+    const store = await loadRelationalStore(Boolean(session()?.access_token));
     if (session()?.access_token) {
       await mergeAuthenticatedProfiles(store);
       await mergeBlockedTimes(store, true);
@@ -78,7 +78,6 @@ export async function loadStore() {
     rememberEventIds(store);
     return { store, notice: 'Connected to the authenticated Supabase backend.', noticeType: 'success' };
   } catch (error) {
-    clearSession();
     lastEventIds = new Set();
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
   }
@@ -86,8 +85,7 @@ export async function loadStore() {
 
 export async function loadPublicStore() {
   try {
-    const store = normalizeStore(await rpc('get_scheduler_store'));
-    await mergePublicSchedules(store);
+    const store = await loadRelationalStore();
     await mergeBlockedTimes(store);
     return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
   } catch (error) {
@@ -155,11 +153,38 @@ async function mergeBlockedTimes(store, authenticated = false) {
 
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
-  const store = normalizeStore(await rpc('get_scheduler_store', {}, true));
+  const store = await loadRelationalStore(true);
   await mergeAuthenticatedProfiles(store);
   await mergeBlockedTimes(store, true);
   enforceAuthenticatedIdentity(store);
   rememberEventIds(store);
+  return store;
+}
+
+async function loadRelationalStore(authenticated = false) {
+  const [profiles, organizations, categories, schedules, occurrences, blocks, announcements] = await Promise.all([
+    authenticated ? request('/rest/v1/profiles?select=*', {}, true) : Promise.resolve([]),
+    request('/rest/v1/organizations?select=*'),
+    request('/rest/v1/schedule_categories?select=*'),
+    request('/rest/v1/schedules?select=*', {}, authenticated),
+    request('/rest/v1/schedule_occurrences?select=*', {}, authenticated),
+    request('/rest/v1/blocked_times?select=*', {}, authenticated),
+    request('/rest/v1/announcements?select=*', {}, authenticated)
+  ]);
+  const occurrencesBySchedule = new Map();
+  (occurrences || []).forEach((item) => {
+    const values = occurrencesBySchedule.get(item.schedule_id) || [];
+    values.push(item); occurrencesBySchedule.set(item.schedule_id, values);
+  });
+  const organizationNames = new Map((organizations || []).map((item) => [item.id, item.organization_name]));
+  const store = normalizeStore({
+    version: 4,
+    currentUserId: authenticatedUserId() || 'public',
+    users: (profiles || []).map((profile) => ({ ...profile, username: profile.email, permissions: profile.permissions || { enabled: profile.is_enabled } })),
+    organizations: organizations || [], categories: categories || [], announcements: announcements || [],
+    blockedTimes: (blocks || []).map((block) => ({ ...block, record_type: 'blocked_time', block_source: 'admin', created_by_role: 'admin', requires_approval: false })),
+    events: (schedules || []).map((schedule) => ({ ...schedule, record_type: 'schedule', organization_name: organizationNames.get(schedule.organization_id) || '', occurrences: occurrencesBySchedule.get(schedule.id) || [] }))
+  });
   return store;
 }
 
@@ -301,7 +326,7 @@ export async function saveStore(store, { skipRecordSync = false } = {}) {
       .join(' ');
     throw new Error(`Database record sync failed. ${details}`);
   }
-  await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
+  storeForPersistence(store);
   const deleteFailures = await cleanupRemovedEvents(store);
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
