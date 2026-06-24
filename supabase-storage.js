@@ -579,27 +579,21 @@ async function refreshSession() {
 }
 
 export async function requestAccount({ username, password, fullName, organizationName, email = '', phoneNumber = '' }) {
-  const payload = {
-    p_username: username,
-    p_password: password,
-    p_full_name: fullName,
-    p_requested_role: 'organization_manager',
-    p_organization_name: organizationName
-  };
-  try {
-    return await rpc('create_scheduler_account', {
-      ...payload,
-      p_aup_email: email,
-      p_email: email,
-      p_phone_number: phoneNumber,
-      p_contact_number: phoneNumber
-    });
-  } catch (error) {
-    if (/parameter|function|schema cache|PGRST202|PGRST203/i.test(error.message || '')) {
-      throw new Error('Organization sign-up needs the latest Supabase SQL update before AUP email and phone can be saved.');
-    }
-    throw error;
-  }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const signup = await request('/auth/v1/signup', {
+    method: 'POST',
+    body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username } })
+  });
+  const userId = signup?.user?.id;
+  if (!userId) throw new Error('Supabase could not create the organization account.');
+  await request('/rest/v1/profiles', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ id: userId, full_name: fullName, email: normalizedEmail, role: 'organization_manager', account_type: 'org', contact_number: phoneNumber, is_enabled: false })
+  });
+  return request('/rest/v1/account_requests', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: userId, full_name: fullName, aup_email: normalizedEmail, contact_number: phoneNumber, organization_name: organizationName, status: 'pending' })
+  });
 }
 
 export async function decideAccountRequest(id, decision) {
