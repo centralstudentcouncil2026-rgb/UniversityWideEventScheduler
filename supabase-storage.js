@@ -330,10 +330,44 @@ async function syncRecordTables(store) {
 }
 
 async function syncOrganizationsTable(store) {
-  const user = currentUser(store);
+  const organizationIds = new Map();
+  const existingRows = await request('/rest/v1/organizations?select=id,organization_name', {}, true);
+  const existingOrganizations = Array.isArray(existingRows) ? existingRows : [];
+
+  const existingById = new Map(
+    existingOrganizations
+      .filter((organization) => organization.id)
+      .map((organization) => [String(organization.id), organization.id])
+  );
+
+  const existingByName = new Map(
+    existingOrganizations
+      .filter((organization) => organization.organization_name)
+      .map((organization) => [
+        String(organization.organization_name).trim().toLowerCase(),
+        organization.id
+      ])
+  );
+
+  for (const organization of store.organizations || []) {
+    const sourceId = String(organization.id || '').trim();
+    const organizationName = String(organization.organization_name || organization.name || '').trim();
+    const resolvedId =
+      existingById.get(sourceId)
+      || existingByName.get(organizationName.toLowerCase())
+      || uuidOrNull(sourceId);
+
+    if (!resolvedId) continue;
+    if (sourceId) organizationIds.set(`id:${sourceId}`, resolvedId);
+    if (organizationName) organizationIds.set(`name:${organizationName.toLowerCase()}`, resolvedId);
+  }
+
+  // Organization accounts should not write to the shared organizations table.
+  // The organization row is created by approve_organization_profile() during admin approval.
+  if (!isSuperAdmin(store)) return organizationIds;
+
   const candidates = (store.organizations || [])
     .filter((org) => org.id && (org.organization_name || org.name))
-    .filter((org) => isSuperAdmin(store) || org.id === user.organization_id)
     .map((org) => ({
       source_id: org.id,
       id: uuidOrNull(org.id),
@@ -341,9 +375,7 @@ async function syncOrganizationsTable(store) {
       organization_type: org.organization_type || org.type || 'Organization',
       updated_at: org.updated_at || new Date().toISOString()
     }));
-  const existingRows = await request('/rest/v1/organizations?select=id,organization_name', {}, true);
-  const existingByName = new Map((Array.isArray(existingRows) ? existingRows : []).map((organization) => [String(organization.organization_name || '').trim().toLowerCase(), organization.id]));
-  const organizationIds = new Map();
+
   const payload = candidates.map((organization) => ({
     ...(existingByName.get(organization.organization_name.toLowerCase()) || organization.id
       ? { id: existingByName.get(organization.organization_name.toLowerCase()) || organization.id }
@@ -352,32 +384,41 @@ async function syncOrganizationsTable(store) {
     organization_type: organization.organization_type,
     updated_at: organization.updated_at
   }));
+
   const byName = new Map();
   payload.forEach((organization) => {
     const key = organization.organization_name.toLowerCase();
     const existing = byName.get(key);
-    if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) byName.set(key, organization);
+    if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) {
+      byName.set(key, organization);
+    }
   });
-  const byId = new Map();
-  [...byName.values()].forEach((organization) => {
-    const key = organization.id || organization.organization_name;
-    const existing = byId.get(key);
-    if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) byId.set(key, organization);
-  });
-  const organizations = [...byId.values()];
+
+  const organizations = [...byName.values()];
   if (!organizations.length) return organizationIds;
+
   const saved = await request('/rest/v1/organizations?on_conflict=organization_name', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify(organizations)
   }, true);
-  const savedByName = new Map((Array.isArray(saved) ? saved : []).map((organization) => [organization.organization_name.toLowerCase(), organization.id]));
+
+  const savedByName = new Map(
+    (Array.isArray(saved) ? saved : [])
+      .map((organization) => [organization.organization_name.toLowerCase(), organization.id])
+  );
+
   candidates.forEach((organization) => {
-    const resolvedId = savedByName.get(organization.organization_name.toLowerCase()) || existingByName.get(organization.organization_name.toLowerCase()) || organization.id;
+    const resolvedId =
+      savedByName.get(organization.organization_name.toLowerCase())
+      || existingByName.get(organization.organization_name.toLowerCase())
+      || organization.id;
+
     if (!resolvedId) return;
     organizationIds.set(`id:${organization.source_id}`, resolvedId);
     organizationIds.set(`name:${organization.organization_name.toLowerCase()}`, resolvedId);
   });
+
   return organizationIds;
 }
 
