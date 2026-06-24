@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-relational-load-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260624-admin-approval-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -2160,11 +2160,7 @@ async function decidePendingAccountRequest(id, decision) {
   if (!canManageAccounts(state.store)) return;
   const request = state.store.accountRequests.find((item) => (item.id || item.request_id) === id);
   try {
-    try {
-      await decideAccountRequest(id, decision);
-    } catch (error) {
-      await updateAccountRequestStatus(id, decision, request);
-    }
+    await decideAccountRequest(id, decision);
     if (request) {
       request.status = decision;
       request.updated_at = new Date().toISOString();
@@ -2174,7 +2170,13 @@ async function decidePendingAccountRequest(id, decision) {
     renderUsers();
     showToast(decision === 'approved' ? 'Organization account approved.' : 'Organization account rejected.', 'success');
   } catch (error) {
-    showToast(error.message || 'Account request decision failed.', 'error');
+    const backendUnavailable = error?.status === 404 || /approve_organization_account|function.*does not exist/i.test(String(error?.message || ''));
+    showToast(
+      backendUnavailable
+        ? 'The account approval database update is not installed. Run supabase-admin-account-approval-fix.sql in Supabase, then try again.'
+        : (error.message || 'Account request decision failed.'),
+      'error'
+    );
   }
 }
 
