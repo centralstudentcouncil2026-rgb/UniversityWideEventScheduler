@@ -609,7 +609,7 @@ export async function requestAccount({ username, password, fullName, organizatio
   const signupHeaders = signup?.access_token ? { Authorization: `Bearer ${signup.access_token}` } : {};
   await request('/rest/v1/profiles', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal', ...signupHeaders },
-    body: JSON.stringify({ id: userId, full_name: fullName, email: normalizedEmail, role: 'organization_manager', account_type: 'org', contact_number: phoneNumber, approval_status: 'pending', is_enabled: false })
+    body: JSON.stringify({ id: userId, username, full_name: fullName, email: normalizedEmail, role: 'organization_manager', account_type: 'org', organization_name: organizationName, contact_number: phoneNumber, approval_status: 'pending', is_enabled: false })
   });
   await request('/rest/v1/account_requests', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal', ...signupHeaders },
