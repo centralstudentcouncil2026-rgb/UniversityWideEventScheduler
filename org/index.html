@@ -46,8 +46,8 @@
 
       <div class="auth-tab-panel" id="signupPanel" role="tabpanel" data-auth-panel="signup" hidden>
         <form class="auth-form signup-form" id="organizationSignupForm">
-          <label>Organization Code
-            <input id="signupAupEmail" type="text" required autocomplete="username" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}" placeholder="organization-code">
+          <label>Organization Login Email
+            <input id="signupAupEmail" type="email" required autocomplete="username" maxlength="160" placeholder="organization@aup.edu.ph">
           </label>
           <label>Phone Number
             <input id="signupPhone" required inputmode="numeric" minlength="11" maxlength="11" pattern="[0-9]{11}">
@@ -73,6 +73,6 @@
   </main>
 
   <script src="../supabaseClient.js?v=20260624-new-supabase-project-v1"></script>
-  <script type="module" src="../login.js?v=20260624-organization-code-v1"></script>
+  <script type="module" src="../login.js?v=20260624-organization-email-id-v1"></script>
 </body>
 </html>
