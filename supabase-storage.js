@@ -260,21 +260,29 @@ function enforceAuthenticatedIdentity(store) {
 }
 
 export async function saveStore(store) {
-  await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
   const tableFailures = await syncRecordTables(store);
-  const deleteFailures = await cleanupRemovedEvents(store);
   if (tableFailures.length) {
     console.warn('CONNECT relational table sync reported errors after store save:', tableFailures);
     const details = tableFailures
-      .map((failure) => `${failure.table}: ${failure.error?.message || 'Unknown error'}`)
+      .map((failure) => `${failure.table}: ${recordSyncFailureMessage(failure.error)}`)
       .join(' ');
     throw new Error(`Database record sync failed. ${details}`);
   }
+  await rpc('save_scheduler_store', { p_store: storeForPersistence(store) }, true);
+  const deleteFailures = await cleanupRemovedEvents(store);
   if (deleteFailures.length) {
     console.warn('CONNECT delete cleanup RPC reported errors after store save:', deleteFailures);
   }
   broadcastStoreSync();
   return { deleteFailures, tableFailures };
+}
+
+function recordSyncFailureMessage(error) {
+  const message = String(error?.message || 'Unknown error');
+  if (/schedules_category_id_fkey|foreign key.*category_id|category_id.*foreign key/i.test(message)) {
+    return 'Schedule categories are not aligned with the app. Run supabase-category-fix.sql in Supabase, refresh the portal, then save again.';
+  }
+  return message;
 }
 
 function broadcastStoreSync() {
