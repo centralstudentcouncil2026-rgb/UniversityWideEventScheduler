@@ -1,6 +1,5 @@
 -- CSC S.Y.N.C. RELATIONAL RESET
--- DESTRUCTIVE: deletes every public table and every Supabase Auth account.
--- Do not run until the portal storage adapter has been migrated off scheduler_state.
+-- Use only on the new Supabase project. It never writes to auth.users.
 
 begin;
 
@@ -8,9 +7,6 @@ drop schema if exists public cascade;
 create schema public;
 grant usage on schema public to anon, authenticated, service_role;
 grant all on schema public to postgres, service_role;
-
--- Removes every existing login. Recreate the four CSC admins after this reset.
-delete from auth.users;
 
 create extension if not exists pgcrypto with schema extensions;
 
@@ -31,6 +27,7 @@ create table public.profiles (
   organization_id uuid references public.organizations(id) on delete set null,
   contact_number text check (contact_number is null or contact_number ~ '^[0-9]{11}$'),
   is_enabled boolean not null default false,
+  permissions jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -118,5 +115,7 @@ create index schedules_org_idx on public.schedules (organization_id, created_by)
 create index occurrences_schedule_idx on public.schedule_occurrences (schedule_id, date);
 create index blocks_time_idx on public.blocked_times (start_time, end_time);
 create index notifications_user_idx on public.notifications (user_id, is_read, created_at desc);
+
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 
 commit;
