@@ -1,5 +1,8 @@
 -- Relational organization signup and Admin approval workflow.
 
+alter table public.profiles add column if not exists approval_status text not null default 'approved'
+  check (approval_status in ('pending','approved','rejected'));
+
 create or replace function public.create_organization_signup_records()
 returns trigger language plpgsql security definer set search_path = public, auth as $$
 declare
@@ -10,8 +13,8 @@ begin
   if organization_name is null or contact_number !~ '^[0-9]{11}$' or new.email !~* '^[^@]+@aup\\.edu\\.ph$' then
     raise exception 'Organization signup requires AUP email, organization name, and 11-digit contact number.';
   end if;
-  insert into public.profiles (id, full_name, email, role, account_type, contact_number, is_enabled)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, 'organization_manager', 'org', contact_number, false)
+  insert into public.profiles (id, full_name, email, role, account_type, contact_number, approval_status, is_enabled)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, 'organization_manager', 'org', contact_number, 'pending', false)
   on conflict (id) do nothing;
   insert into public.account_requests (user_id, full_name, aup_email, contact_number, organization_name, status)
   values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, contact_number, organization_name, 'pending')
@@ -35,9 +38,9 @@ begin
     insert into public.organizations (organization_name) values (request_row.organization_name)
     on conflict (organization_name) do update set updated_at = now()
     returning id into organization_uuid;
-    update public.profiles set organization_id = organization_uuid, is_enabled = true, updated_at = now() where id = request_row.user_id;
+    update public.profiles set organization_id = organization_uuid, approval_status = 'approved', is_enabled = true, updated_at = now() where id = request_row.user_id;
   else
-    update public.profiles set is_enabled = false, updated_at = now() where id = request_row.user_id;
+    update public.profiles set approval_status = 'rejected', is_enabled = false, updated_at = now() where id = request_row.user_id;
   end if;
   update public.account_requests set status = p_decision, reviewed_by = auth.uid(), reviewed_at = now(), updated_at = now() where id = p_request_id;
 end $$;

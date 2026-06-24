@@ -26,6 +26,7 @@ create table public.profiles (
   account_type text not null check (account_type in ('CSC','OIC','org')),
   organization_id uuid references public.organizations(id) on delete set null,
   contact_number text check (contact_number is null or contact_number ~ '^[0-9]{11}$'),
+  approval_status text not null default 'approved' check (approval_status in ('pending','approved','rejected')),
   is_enabled boolean not null default false,
   permissions jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
