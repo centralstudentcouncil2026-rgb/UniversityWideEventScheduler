@@ -584,10 +584,18 @@ async function refreshSession() {
 
 export async function requestAccount({ username, password, fullName, organizationName, email = '', phoneNumber = '' }) {
   const normalizedEmail = String(email).trim().toLowerCase();
-  const signup = await request('/auth/v1/signup', {
-    method: 'POST',
-    body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, contact_number: phoneNumber, account_type: 'org' } })
-  });
+  let signup;
+  try {
+    signup = await request('/auth/v1/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, contact_number: phoneNumber, account_type: 'org' } })
+    });
+  } catch (error) {
+    if (/already registered|user already exists/i.test(String(error.message || ''))) {
+      throw new Error('This AUP email is already registered. Wait for approval, or ask an admin to review the existing request.');
+    }
+    throw error;
+  }
   const userId = signup?.user?.id;
   if (!userId) throw new Error('Supabase could not create the organization account.');
   await request('/rest/v1/profiles', {

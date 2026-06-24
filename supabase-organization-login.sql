@@ -3,26 +3,8 @@
 alter table public.profiles add column if not exists approval_status text not null default 'approved'
   check (approval_status in ('pending','approved','rejected'));
 
-create or replace function public.create_organization_signup_records()
-returns trigger language plpgsql security definer set search_path = public, auth as $$
-declare
-  organization_name text := nullif(new.raw_user_meta_data->>'organization_name', '');
-  contact_number text := nullif(new.raw_user_meta_data->>'contact_number', '');
-begin
-  if new.raw_user_meta_data->>'account_type' <> 'org' then return new; end if;
-  if organization_name is null or contact_number !~ '^[0-9]{11}$' or new.email !~* '^[^@]+@aup\\.edu\\.ph$' then return new; end if;
-  insert into public.profiles (id, full_name, email, role, account_type, contact_number, approval_status, is_enabled)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, 'organization_manager', 'org', contact_number, 'pending', false)
-  on conflict (id) do nothing;
-  insert into public.account_requests (user_id, full_name, aup_email, contact_number, organization_name, status)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, contact_number, organization_name, 'pending')
-  on conflict (user_id) do nothing;
-  return new;
-end $$;
-
 drop trigger if exists organization_signup_records on auth.users;
-create trigger organization_signup_records after insert on auth.users
-for each row execute function public.create_organization_signup_records();
+drop function if exists public.create_organization_signup_records();
 
 create or replace function public.approve_organization_account(p_request_id uuid, p_decision text)
 returns void language plpgsql security definer set search_path = public, auth as $$
