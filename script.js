@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-occurrence-id-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-schedule-delete-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -1386,9 +1386,21 @@ async function deleteEvent(event) {
 
   const deletedEvent = state.store.events[index];
   const logLength = state.store.activityLogs.length;
+  const notificationsBefore = [...(state.store.notifications || [])];
 
   try {
     state.store.events.splice(index, 1);
+    state.store.notifications = (state.store.notifications || []).filter((item) => item.reference_id !== deletedEvent.id);
+    if (isManager(state.store) && deletedEvent.created_by === currentUser(state.store).id) {
+      notifyAdmins({
+        notification_type: 'schedule_removed',
+        reference_id: deletedEvent.id,
+        title: 'Schedule Removed by Organization',
+        message: `${deletedEvent.organization_name || 'An organization'} removed "${deletedEvent.title}".`
+      });
+    } else if (isSuperAdmin(state.store) && isOrganizationSchedule(deletedEvent)) {
+      notifyScheduleCreator(deletedEvent, 'Schedule Removed by Admin', `Admin removed your schedule "${deletedEvent.title}".`);
+    }
     log(
       'event_deleted',
       `${currentUser(state.store).full_name} deleted "${deletedEvent.title}".`,
@@ -1410,6 +1422,7 @@ async function deleteEvent(event) {
     showToast('Event deleted.', 'success');
   } catch (error) {
     state.store.events.splice(index, 0, deletedEvent);
+    state.store.notifications = notificationsBefore;
     state.store.activityLogs.length = logLength;
     await reloadStore();
     showToast(`Could not delete event: ${error.message}`, 'error');

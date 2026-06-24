@@ -1,5 +1,5 @@
 import { emptyPublicStore } from './app-data.js?v=20260623-public-popup-close-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260624-occurrence-id-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260624-schedule-delete-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260623-public-popup-close-v1';
 
 const $ = (id) => document.getElementById(id);

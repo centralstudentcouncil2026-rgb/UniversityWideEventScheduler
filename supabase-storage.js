@@ -599,6 +599,10 @@ const DELETE_COLLECTION_ALIASES = {
 };
 
 export async function deleteRecord(collection, id) {
+  if (collection === 'events') {
+    await deleteScheduleRows(id);
+    return;
+  }
   const candidateCollections = DELETE_COLLECTION_ALIASES[collection] || [collection];
   const errors = [];
 
@@ -611,6 +615,14 @@ export async function deleteRecord(collection, id) {
   }
 
   throw new Error(`Supabase rejected delete for ${collection} ${id}: ${errors.join('; ')}`);
+}
+
+async function deleteScheduleRows(id) {
+  const scheduleId = uuidOrNull(id);
+  if (!scheduleId) return;
+  const encodedId = encodeURIComponent(scheduleId);
+  await request(`/rest/v1/schedule_occurrences?schedule_id=eq.${encodedId}`, { method: 'DELETE' }, true);
+  await request(`/rest/v1/schedules?id=eq.${encodedId}`, { method: 'DELETE' }, true);
 }
 
 export function clearSession() {
