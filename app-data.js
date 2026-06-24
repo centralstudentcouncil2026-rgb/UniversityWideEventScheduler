@@ -68,7 +68,7 @@ export function normalizeStore(store = {}) {
   });
   normalized.users = normalized.users.map(normalizeUser);
   normalized.categories = normalizeCategories(normalized.categories);
-  normalized.events = normalized.events.map(normalizeEvent);
+  normalized.events = dedupeEvents(normalized.events.map(normalizeEvent));
   normalized.blockedTimes = normalized.blockedTimes.map(normalizeBlockedTime);
   normalized.activityStatuses = normalized.activityStatuses.map(normalizeActivityStatus).filter(Boolean);
   normalized.announcements = normalized.announcements.map(normalizeAnnouncement);
@@ -251,9 +251,16 @@ function eventOccurrencesForValidation(event) {
 }
 
 function normalizeEvent(event) {
-  const occurrences = Array.isArray(event.occurrences) && event.occurrences.length
+  const occurrenceRows = Array.isArray(event.occurrences) && event.occurrences.length
     ? event.occurrences.map((item) => occurrenceFromRange(item.start_time, item.end_time, item.id))
     : [occurrenceFromRange(event.start_time, event.end_time)];
+  const occurrenceKeys = new Set();
+  const occurrences = occurrenceRows.filter((item) => {
+    const key = `${item.date}|${item.start_time}|${item.end_time}`;
+    if (occurrenceKeys.has(key)) return false;
+    occurrenceKeys.add(key);
+    return true;
+  });
   occurrences.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   const firstOccurrence = occurrences[0] || {};
   const lastOccurrence = occurrences[occurrences.length - 1] || {};
@@ -283,6 +290,18 @@ function normalizeEvent(event) {
     revision_submitted_at: event.revision_submitted_at || '',
     revision_history: Array.isArray(event.revision_history) ? event.revision_history : []
   };
+}
+
+function dedupeEvents(events) {
+  const byId = new Map();
+  events.forEach((event) => {
+    if (!event?.id) return;
+    const existing = byId.get(event.id);
+    if (!existing || new Date(event.updated_at || event.created_at || 0) >= new Date(existing.updated_at || existing.created_at || 0)) {
+      byId.set(event.id, event);
+    }
+  });
+  return [...byId.values()];
 }
 
 function isCurrentScheduleRecord(event = {}) {

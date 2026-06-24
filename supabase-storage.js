@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260624-approval-audit-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260624-calendar-dedupe-v1';
 import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;

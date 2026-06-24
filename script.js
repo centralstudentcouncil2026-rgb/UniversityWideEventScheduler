@@ -1,4 +1,4 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-approval-audit-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
 import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-occurrence-id-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
@@ -446,6 +446,8 @@ function refreshCalendar() {
 function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.calendar?.view.type) {
   const user = currentUser(state.store);
   const visibleEvents = state.store.events.filter((event) => {
+    // Revision requests stay in Schedule Status/Event Requests until approved.
+    if (event.revision_of) return false;
     if (isPublic(state.store)) return event.approval_status === 'approved' && isPublicEvent(event);
     if (isSuperAdmin(state.store)) return true;
     if (event.approval_status !== 'approved') return event.created_by === user.id;
@@ -1110,7 +1112,11 @@ async function saveEvent(candidate) {
     return;
   }
   const previousValues = existing ? scheduleAuditSnapshot(existing) : null;
-  if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
+  if (existingIndex >= 0) {
+    state.store.events = [...state.store.events.filter((event) => event.id !== candidate.id), candidate];
+  } else {
+    state.store.events.push(candidate);
+  }
   if (existing && isSuperAdmin(state.store) && isOrganizationSchedule(existing) && existing.created_by !== currentUser(state.store).id) {
     const nextValues = scheduleAuditSnapshot(candidate);
     const changedFields = Object.keys(nextValues)
