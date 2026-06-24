@@ -7,7 +7,7 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260624-persist-first-v1');
+  await import('./script.js?v=20260624-approval-review-v1');
   await import('./portal-wiring.js?v=20260622-whole-day-realtime-v1');
 } else {
   window.location.replace('index.html');

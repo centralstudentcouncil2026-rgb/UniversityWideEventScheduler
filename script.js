@@ -1180,6 +1180,9 @@ function openDetails(props) {
       'Rejection Reason': record.rejection_reason,
       Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
     });
+    if (!isSuperAdmin(state.store) && isManager(state.store) && record.organization_id === currentUser(state.store).organization_id && record.admin_recommendation) {
+      data['Admin Recommendation'] = record.admin_recommendation;
+    }
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
     setDetailsActionVisibility(detailsActionVisibility(record));
   }
@@ -1208,7 +1211,7 @@ function detailsActionVisibility(record) {
   if (isSuperAdmin(state.store)) {
     visibility.delete = canDeleteEvent(state.store, record);
     visibility.edit = canEditEvent(state.store, record);
-    if (isOrganizationSchedule(record) && !isAdminCreatedSchedule(record) && record.created_by !== currentUser(state.store).id) {
+    if (record.approval_status === 'pending' && isOrganizationSchedule(record) && !isAdminCreatedSchedule(record) && record.created_by !== currentUser(state.store).id) {
       visibility.approve = canApproveEvents(state.store);
       visibility.reject = canApproveEvents(state.store);
     }
@@ -1379,6 +1382,7 @@ function reviewEvent(event, status) {
   if (isAdminCreatedSchedule(event) || event.created_by === currentUser(state.store).id) {
     return showToast('This schedule does not need admin approval.', 'error');
   }
+  if (event.approval_status !== 'pending') return showToast('This schedule request has already been reviewed.', 'error');
   if (status === 'approved') {
     const block = findEventBlock(event);
     if (block) return showConflict('Approval Blocked', 'This request overlaps an admin-blocked period.', [block], false);
@@ -1400,7 +1404,7 @@ function openEventReviewModal(event, status) {
   openDialog('eventReviewModal');
 }
 
-function submitEventReviewForm(event) {
+async function submitEventReviewForm(event) {
   event.preventDefault();
   const record = state.store.events.find((item) => item.id === $('eventReviewId').value);
   const status = $('eventReviewStatus').value;
@@ -1434,9 +1438,13 @@ function submitEventReviewForm(event) {
     });
   }
   log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${record.title}" as ${status}.`, record);
+  const saved = await persist(`Event request ${status}.`);
+  if (!saved) {
+    await reloadStore().catch(() => {});
+    return;
+  }
   closeDialog('eventReviewModal');
   closeDialog('detailsModal');
-  persist(`Event request ${status}.`);
   renderEventRequests();
 }
 
