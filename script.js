@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-schedule-delete-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-block-workflow-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -429,7 +429,7 @@ function initializeCalendar() {
     },
     eventClick: (info) => handleCalendarEventClick(info),
     eventDidMount: mountCalendarEvent,
-    eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? canManageBlockedTimes(state.store) : canEditEvent(state.store, event.extendedProps.record)),
+    eventAllow: (_dropInfo, event) => state.calendar.view.type !== 'multiMonthYear' && (event.extendedProps.type === 'block' ? canManageBlockRecord(event.extendedProps.record) : canEditEvent(state.store, event.extendedProps.record)),
     eventDrop: persistMovedCalendarItem, eventResize: persistMovedCalendarItem
   });
   state.calendar.render();
@@ -471,7 +471,7 @@ function calendarEvents(monthView = isConnectedCalendarView(), viewType = state.
     allDay: wholeDay,
     backgroundColor: '#071C3D',
     borderColor: '#F4B400',
-    editable: state.calendar?.view.type !== 'multiMonthYear' && canManageBlockedTimes(state.store),
+    editable: state.calendar?.view.type !== 'multiMonthYear' && canManageBlockRecord(block),
     classNames: ['event-blocked', 'event-super-admin-block'],
     extendedProps: { type: 'block', record: block }
     };
@@ -1173,10 +1173,7 @@ function openDetails(props) {
   if (isBlockDetail(props)) {
     $('detailsTitle').textContent = record.title || 'Blocked university period'; $('detailsMeta').textContent = 'Blocked university period';
     $('detailsList').innerHTML = rows({ Date: formatDateTime(record.start_time), End: formatTime(record.end_time), Reason: record.reason || 'No reason provided.' });
-    const canManageBlock = canManageBlockedTimes(state.store) && (
-      state.store.blockedTimes.some((block) => block.id === record.id)
-      || state.store.events.some((event) => event.id === record.id)
-    );
+    const canManageBlock = canManageBlockRecord(record) && state.store.blockedTimes.some((block) => block.id === record.id);
     setDetailsActionVisibility({ delete: canManageBlock, cancel: false, edit: canManageBlock, approve: false, reject: false });
   } else {
     const category = categoryById(state.store, record.category_id); const privateView = canViewPrivateEvent(state.store, record);
@@ -1232,6 +1229,15 @@ function openDetails(props) {
 function isBlockDetail(details) {
   const record = details?.record || {};
   return details?.type === 'block' || record.record_type === 'blocked_time' || record.block_source === 'admin';
+}
+
+function canManageBlockRecord(block) {
+  return Boolean(
+    block
+    && canManageBlockedTimes(state.store)
+    && block.created_by
+    && block.created_by === currentUser(state.store).id
+  );
 }
 
 function isOrganizationSchedule(record) {
@@ -1877,10 +1883,11 @@ function syncSingleDayBlockEndDate() {
   if ($('blockType')?.value !== 'multi_day') $('blockEndDate').value = $('blockStartDate').value;
 }
 
-function addBlockedTime(event) {
+async function addBlockedTime(event) {
   event.preventDefault();
   if (!canManageBlockedTimes(state.store)) return;
   const existing = state.store.blockedTimes.find((item) => item.id === $('blockId')?.value);
+  if (existing && !canManageBlockRecord(existing)) return showToast('Only the creator can edit this blocked period.', 'error');
   const title = cleanSingleLine($('blockTitle').value);
   const reason = cleanMultiline($('blockReason').value);
   const blockType = $('blockType').value;
@@ -1899,10 +1906,19 @@ function addBlockedTime(event) {
   const end = blockType === 'whole_day' ? localIso(nextDateInput(startDate), '00:00') : localIso(endDate, $('blockEnd').value);
   if (!start || !end || new Date(start) >= new Date(end)) return showToast('Blocked-time end must be later than start.', 'error');
   const item = { ...(existing || {}), id: existing?.id || createId(), record_type: 'blocked_time', block_source: 'admin', created_by_role: 'admin', requires_approval: false, title, block_type: blockType, start_time: start, end_time: end, reason, created_by: existing?.created_by || currentUser(state.store).id, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() };
+  const previous = existing ? { ...existing } : null;
   if (existing) Object.assign(existing, item);
   else state.store.blockedTimes.push(item);
   log(existing ? 'blocked_time_updated' : 'blocked_time_created', `${existing ? 'Updated' : 'Added'} blocked period "${item.title}".`, item);
-  resetBlockedTimeForm(); persist(existing ? 'Blocked period updated.' : 'Blocked period added.'); renderBlockedTimes();
+  const saved = await persist(existing ? 'Blocked period updated.' : 'Blocked period added.');
+  if (!saved) {
+    if (existing) Object.assign(existing, previous);
+    else state.store.blockedTimes = state.store.blockedTimes.filter((block) => block.id !== item.id);
+    await reloadStore().catch(() => {});
+    return;
+  }
+  resetBlockedTimeForm();
+  renderBlockedTimes();
 }
 function renderBlockedTimes() {
   $('blockedTimesList').innerHTML = state.store.blockedTimes.map(blockedTimeHtml).join('') || empty('No blocked periods');
@@ -1910,7 +1926,7 @@ function renderBlockedTimes() {
 
 function blockedTimeHtml(item) {
   const blockType = item.block_type === 'whole_day' ? 'Whole Day' : item.block_type === 'multi_day' ? 'Multiple Day' : 'Single Day';
-  const actions = canManageBlockedTimes(state.store)
+  const actions = canManageBlockRecord(item)
     ? `${actionButton('block-edit', item.id, 'Edit', 'secondary-button')}${actionButton('block-delete', item.id, 'Remove', 'danger-button')}`
     : '';
   return `<div class="activity-item"><strong>${escapeHtml(item.title)} <span class="status-pill ${classToken(item.block_type || 'single_day')}">${escapeHtml(blockType)}</span></strong><p>${escapeHtml(formatDateTime(item.start_time))} to ${escapeHtml(formatDateTime(item.end_time))}</p><p>${escapeHtml(item.reason || 'No reason provided.')}</p>${actions}</div>`;
@@ -1919,6 +1935,7 @@ function blockedTimeHtml(item) {
 function editBlockedTime(id) {
   const item = state.store.blockedTimes.find((block) => block.id === id);
   if (!item) return showToast('Blocked period was not found.', 'error');
+  if (!canManageBlockRecord(item)) return showToast('Only the creator can edit this blocked period.', 'error');
   $('blockId').value = item.id;
   $('blockTitle').value = item.title || '';
   $('blockType').value = item.block_type || 'single_day';
@@ -1942,18 +1959,15 @@ function resetBlockedTimeForm() {
 }
 
 async function removeBlockedTime(id) {
-  if (!requirePermission(canManageBlockedTimes(state.store), 'This account cannot manage blocked times.')) return;
   const item = state.store.blockedTimes.find((block) => block.id === id);
   if (!item) return;
+  if (!requirePermission(canManageBlockRecord(item), 'Only the creator can remove this blocked period.')) return;
   state.store.blockedTimes = state.store.blockedTimes.filter((block) => block.id !== id);
   log('blocked_time_removed', 'Blocked period removed.', item);
   try {
-    await persist('Blocked period removed.');
-    try {
-      await deleteRecord('blockedTimes', id);
-    } catch (error) {
-      console.warn('CONNECT blocked-period table cleanup failed after store removal:', error);
-    }
+    await deleteRecord('blockedTimes', id);
+    const saved = await persist('Blocked period removed.');
+    if (!saved) throw new Error('Could not save the blocked-period removal.');
     resetBlockedTimeForm();
     renderBlockedTimes();
     refreshCalendar();

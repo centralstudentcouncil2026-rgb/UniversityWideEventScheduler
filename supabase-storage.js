@@ -72,6 +72,7 @@ export async function loadStore() {
     const store = normalizeStore(await rpc('get_scheduler_store', {}, Boolean(session()?.access_token)));
     if (session()?.access_token) {
       await mergeAuthenticatedProfiles(store);
+      await mergeBlockedTimes(store, true);
       enforceAuthenticatedIdentity(store);
     }
     rememberEventIds(store);
@@ -87,7 +88,7 @@ export async function loadPublicStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store'));
     await mergePublicSchedules(store);
-    store.blockedTimes = [];
+    await mergeBlockedTimes(store);
     return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
   } catch (error) {
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
@@ -131,10 +132,32 @@ async function mergePublicSchedules(store) {
   }
 }
 
+async function mergeBlockedTimes(store, authenticated = false) {
+  try {
+    const rows = await request('/rest/v1/blocked_times?select=*&order=start_time.asc', {}, authenticated);
+    if (!Array.isArray(rows)) return;
+    const byId = new Map((store.blockedTimes || []).map((block) => [block.id, block]));
+    rows.filter((row) => row.id).forEach((row) => {
+      byId.set(row.id, {
+        ...(byId.get(row.id) || {}),
+        ...row,
+        record_type: 'blocked_time',
+        block_source: 'admin',
+        created_by_role: 'admin',
+        requires_approval: false
+      });
+    });
+    store.blockedTimes = [...byId.values()];
+  } catch (error) {
+    console.warn('CONNECT blocked-time sync unavailable:', error);
+  }
+}
+
 export async function loadAuthenticatedStore() {
   if (!session()?.access_token) throw new Error('Your session expired. Please log in again.');
   const store = normalizeStore(await rpc('get_scheduler_store', {}, true));
   await mergeAuthenticatedProfiles(store);
+  await mergeBlockedTimes(store, true);
   enforceAuthenticatedIdentity(store);
   rememberEventIds(store);
   return store;
@@ -611,6 +634,11 @@ const DELETE_COLLECTION_ALIASES = {
 export async function deleteRecord(collection, id) {
   if (collection === 'events') {
     await deleteScheduleRows(id);
+    return;
+  }
+  if (collection === 'blockedTimes') {
+    const blockId = uuidOrNull(id);
+    if (blockId) await request(`/rest/v1/blocked_times?id=eq.${encodeURIComponent(blockId)}`, { method: 'DELETE' }, true);
     return;
   }
   const candidateCollections = DELETE_COLLECTION_ALIASES[collection] || [collection];
