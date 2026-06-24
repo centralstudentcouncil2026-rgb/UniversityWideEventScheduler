@@ -14,15 +14,30 @@ declare
 begin
   if coalesce(admin_password, '') = '' then raise exception 'Set app.admin_seed_password first.'; end if;
   foreach admin_email in array array['cscadmin1@aup.edu.ph','cscadmin2@aup.edu.ph','cscadmin3@aup.edu.ph','cscadmin4@aup.edu.ph'] loop
-    admin_id := gen_random_uuid();
-    insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-    values (admin_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', admin_email,
-      crypt(admin_password, gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now());
-    insert into auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at)
-    values (admin_id, admin_id, admin_email, jsonb_build_object('sub', admin_id::text, 'email', admin_email), 'email', now(), now());
+    select id into admin_id from auth.users where lower(email) = admin_email limit 1;
+    if admin_id is null then
+      admin_id := gen_random_uuid();
+      insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+      values (admin_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', admin_email,
+        crypt(admin_password, gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now());
+    else
+      update auth.users
+      set encrypted_password = crypt(admin_password, gen_salt('bf')),
+          email_confirmed_at = coalesce(email_confirmed_at, now()),
+          updated_at = now()
+      where id = admin_id;
+    end if;
+    if not exists (select 1 from auth.identities where user_id = admin_id and provider = 'email') then
+      insert into auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at)
+      values (admin_id, admin_id, admin_email, jsonb_build_object('sub', admin_id::text, 'email', admin_email), 'email', now(), now());
+    end if;
     insert into public.profiles (id, full_name, email, role, account_type, is_enabled, permissions)
     values (admin_id, initcap(split_part(admin_email, '@', 1)), admin_email, 'super_admin', 'CSC', true,
-      '{"enabled":true,"manageAccounts":true,"approveEvents":true,"editAllEvents":true,"deleteAllEvents":true,"manageBlockedTimes":true,"manageAnnouncements":true,"updatePresidentStatus":true,"updateOfficeStatus":true,"manageCategories":true}'::jsonb);
+      '{"enabled":true,"manageAccounts":true,"approveEvents":true,"editAllEvents":true,"deleteAllEvents":true,"manageBlockedTimes":true,"manageAnnouncements":true,"updatePresidentStatus":true,"updateOfficeStatus":true,"manageCategories":true}'::jsonb)
+    on conflict (id) do update set
+      full_name = excluded.full_name, email = excluded.email, role = excluded.role,
+      account_type = excluded.account_type, is_enabled = true, permissions = excluded.permissions,
+      updated_at = now();
   end loop;
 end $$;
 
