@@ -1,4 +1,4 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260624-organization-signup-v5';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260624-organization-code-v1';
 import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-detail-actions-v1';
 
 const loginType = document.body.dataset.loginType;
@@ -69,12 +69,6 @@ function isAupEmail(value) {
   return EMAIL_PATTERN.test(value) && value.endsWith('@aup.edu.ph');
 }
 
-function usernameFromAupEmail(email) {
-  const localPart = String(email || '').split('@')[0] || '';
-  const username = localPart.toLowerCase().replace(/[^a-z0-9_.-]+/g, '.').replace(/^[.-]+|[.-]+$/g, '').slice(0, 32);
-  return username.length >= 3 ? username : `${username}org`.slice(0, 32);
-}
-
 if (form) form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const username = cleanUsername(document.getElementById('loginUsername').value);
@@ -114,15 +108,16 @@ if (signupForm) signupForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const fullName = String(document.getElementById('signupUsername').value || '').trim().replace(/\s+/g, ' ');
   const password = document.getElementById('signupPassword').value;
-  const aupEmail = cleanUsername(document.getElementById('signupAupEmail').value);
-  const username = usernameFromAupEmail(aupEmail);
+  const organizationCode = cleanUsername(document.getElementById('signupAupEmail').value);
+  const aupEmail = `${organizationCode}@aup.edu.ph`;
+  const username = organizationCode;
   const phoneNumber = String(document.getElementById('signupPhone').value || '').replace(/\D/g, '');
   const organizationName = String(document.getElementById('signupOrganization').value || '').trim().replace(/\s+/g, ' ');
   const button = signupForm.querySelector('button[type="submit"]');
 
   if (!fullName) return setSignupMessage('Name is required.');
-  if (!isAupEmail(aupEmail)) return setSignupMessage('Use a valid AUP email address.');
-  if (!USERNAME_PATTERN.test(username)) return setSignupMessage('Use an AUP email with a valid name before @aup.edu.ph.');
+  if (!USERNAME_PATTERN.test(organizationCode)) return setSignupMessage('Organization code must use 3 to 32 letters, numbers, dots, hyphens, or underscores.');
+  if (!isAupEmail(aupEmail)) return setSignupMessage('Organization code could not create a valid AUP identifier.');
   if (!/^\d{11}$/.test(phoneNumber)) return setSignupMessage('Phone number must contain exactly 11 digits.');
   if (!organizationName) return setSignupMessage('Organization name is required.');
   if (password.length < 10 || password.length > 128) return setSignupMessage('Password must be 10 to 128 characters.');
@@ -130,7 +125,7 @@ if (signupForm) signupForm.addEventListener('submit', async (event) => {
   button.disabled = true;
   setSignupMessage('Submitting account request...', 'success');
   try {
-    await requestAccount({ username, password, fullName, organizationName, email: aupEmail, phoneNumber });
+    await requestAccount({ username, password, fullName, organizationName, email: aupEmail, phoneNumber, organizationCode });
     signupForm.reset();
     setSignupMessage('Account request submitted. Wait for admin approval before logging in.', 'success');
   } catch (error) {

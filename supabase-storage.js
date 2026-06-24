@@ -582,15 +582,17 @@ async function refreshSession() {
   return payload;
 }
 
-export async function requestAccount({ username, password, fullName, organizationName, email = '', phoneNumber = '' }) {
+export async function requestAccount({ username, password, fullName, organizationName, email = '', phoneNumber = '', organizationCode = '' }) {
   const normalizedEmail = String(email).trim().toLowerCase();
   let signup;
   try {
     signup = await request('/auth/v1/signup', {
       method: 'POST',
-      body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, contact_number: phoneNumber, account_type: 'org' } })
+      body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, organization_code: organizationCode || username, contact_number: phoneNumber, account_type: 'organization', email_category: 'aup' } })
     });
   } catch (error) {
+    console.error('Organization signup error:', { message: error?.message, status: error?.status, code: error?.code });
+    if (typeof alert === 'function') alert(error?.message || 'Organization signup failed.');
     if (/already registered|user already exists/i.test(String(error.message || ''))) {
       throw new Error('This AUP email is already registered. Wait for approval, or ask an admin to review the existing request.');
     }
