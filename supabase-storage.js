@@ -434,13 +434,18 @@ async function syncSchedulesTable(store, organizationIds = new Map()) {
       created_at: event.created_at,
       updated_at: event.updated_at
     }));
-  if (schedules.length) {
+  const upsertSchedules = async (items) => {
+    if (!items.length) return;
     await request('/rest/v1/schedules?on_conflict=id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(schedules)
+      body: JSON.stringify(items)
     }, true);
-  }
+  };
+  // A revision references its original schedule, so save originals before
+  // revision rows instead of relying on database row ordering in one batch.
+  await upsertSchedules(schedules.filter((schedule) => !schedule.revision_of));
+  await upsertSchedules(schedules.filter((schedule) => schedule.revision_of));
 
   for (const event of ownedSchedules) {
     const occurrences = Array.isArray(event.occurrences) ? event.occurrences : [];
