@@ -376,17 +376,8 @@ async function syncOrganizationsTable(store) {
       updated_at: org.updated_at || new Date().toISOString()
     }));
 
-  const payload = candidates.map((organization) => ({
-    ...(existingByName.get(organization.organization_name.toLowerCase()) || organization.id
-      ? { id: existingByName.get(organization.organization_name.toLowerCase()) || organization.id }
-      : {}),
-    organization_name: organization.organization_name,
-    organization_type: organization.organization_type,
-    updated_at: organization.updated_at
-  }));
-
   const byName = new Map();
-  payload.forEach((organization) => {
+  candidates.forEach((organization) => {
     const key = organization.organization_name.toLowerCase();
     const existing = byName.get(key);
     if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) {
@@ -394,30 +385,27 @@ async function syncOrganizationsTable(store) {
     }
   });
 
-  const organizations = [...byName.values()];
-  if (!organizations.length) return organizationIds;
+  for (const organization of byName.values()) {
+    const resolvedExistingId = existingByName.get(organization.organization_name.toLowerCase()) || organization.id;
+    const payload = {
+      ...(resolvedExistingId ? { id: resolvedExistingId } : {}),
+      organization_name: organization.organization_name,
+      organization_type: organization.organization_type,
+      updated_at: organization.updated_at
+    };
 
-  const saved = await request('/rest/v1/organizations?on_conflict=organization_name', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify(organizations)
-  }, true);
+    const saved = await request('/rest/v1/organizations?on_conflict=organization_name', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(payload)
+    }, true);
 
-  const savedByName = new Map(
-    (Array.isArray(saved) ? saved : [])
-      .map((organization) => [organization.organization_name.toLowerCase(), organization.id])
-  );
-
-  candidates.forEach((organization) => {
-    const resolvedId =
-      savedByName.get(organization.organization_name.toLowerCase())
-      || existingByName.get(organization.organization_name.toLowerCase())
-      || organization.id;
-
-    if (!resolvedId) return;
+    const savedRow = Array.isArray(saved) ? saved[0] : saved;
+    const resolvedId = savedRow?.id || resolvedExistingId;
+    if (!resolvedId) continue;
     organizationIds.set(`id:${organization.source_id}`, resolvedId);
     organizationIds.set(`name:${organization.organization_name.toLowerCase()}`, resolvedId);
-  });
+  }
 
   return organizationIds;
 }
@@ -492,12 +480,18 @@ async function syncCalendarItemsTable(store, organizationIds = new Map()) {
     created_at: category.created_at || new Date().toISOString(),
     updated_at: category.updated_at || new Date().toISOString()
   })) : [];
-  const items = [...categories, ...schedules, ...(isSuperAdmin(store) ? blocks : [])];
-  if (!items.length) return;
+
+  await upsertCalendarItemRows(categories);
+  await upsertCalendarItemRows(schedules);
+  if (isSuperAdmin(store)) await upsertCalendarItemRows(blocks);
+}
+
+async function upsertCalendarItemRows(rows) {
+  if (!rows.length) return;
   await request('/rest/v1/calendar_items?on_conflict=id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(items)
+    body: JSON.stringify(rows)
   }, true);
 }
 
