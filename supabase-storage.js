@@ -299,8 +299,13 @@ function broadcastStoreSync() {
 async function syncRecordTables(store) {
   if (!session()?.access_token) return [];
   const failures = [];
-  await syncOrganizationsTable(store).catch((error) => failures.push({ table: 'schedule_organizations', error }));
-  await syncSchedulesTable(store).catch((error) => failures.push({ table: 'schedules', error }));
+  let organizationIds = new Map();
+  try {
+    organizationIds = await syncOrganizationsTable(store);
+  } catch (error) {
+    failures.push({ table: 'schedule_organizations', error });
+  }
+  await syncSchedulesTable(store, organizationIds).catch((error) => failures.push({ table: 'schedules', error }));
   if (isSuperAdmin(store)) {
     await syncBlockedTimesTable(store).catch((error) => failures.push({ table: 'blocked_times', error }));
   }
@@ -318,6 +323,16 @@ async function syncOrganizationsTable(store) {
       organization_type: org.organization_type || org.type || 'Organization',
       updated_at: org.updated_at || new Date().toISOString()
     }));
+  const existingRows = await request('/rest/v1/schedule_organizations?select=id,organization_name', {}, true);
+  const existingByName = new Map((Array.isArray(existingRows) ? existingRows : []).map((organization) => [String(organization.organization_name || '').trim().toLowerCase(), organization.id]));
+  const organizationIds = new Map();
+  candidates.forEach((organization) => {
+    const existingId = existingByName.get(organization.organization_name.toLowerCase());
+    const resolvedId = existingId || organization.id;
+    organizationIds.set(`id:${organization.id}`, resolvedId);
+    organizationIds.set(`name:${organization.organization_name.toLowerCase()}`, resolvedId);
+    organization.id = resolvedId;
+  });
   const byName = new Map();
   candidates.forEach((organization) => {
     const key = organization.organization_name.toLowerCase();
@@ -330,15 +345,16 @@ async function syncOrganizationsTable(store) {
     if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) byId.set(organization.id, organization);
   });
   const organizations = [...byId.values()];
-  if (!organizations.length) return;
+  if (!organizations.length) return organizationIds;
   await request('/rest/v1/schedule_organizations?on_conflict=organization_name', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(organizations)
   }, true);
+  return organizationIds;
 }
 
-async function syncSchedulesTable(store) {
+async function syncSchedulesTable(store, organizationIds = new Map()) {
   const user = currentUser(store);
   const ownedSchedules = (store.events || [])
     .filter((event) => uuidOrNull(event.id) && event.record_type === 'schedule')
@@ -347,7 +363,10 @@ async function syncSchedulesTable(store) {
   const schedules = ownedSchedules
     .map((event) => ({
       id: event.id,
-      organization_id: event.organization_id || null,
+      organization_id: organizationIds.get(`id:${event.organization_id}`)
+        || organizationIds.get(`name:${String(event.organization_name || '').trim().toLowerCase()}`)
+        || event.organization_id
+        || null,
       category_id: event.category_id,
       title: event.title,
       venue: event.venue,
