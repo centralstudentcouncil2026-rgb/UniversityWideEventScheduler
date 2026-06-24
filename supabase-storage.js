@@ -86,10 +86,35 @@ export async function loadStore() {
 export async function loadPublicStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store'));
+    await mergePublicSchedules(store);
     await mergePublicBlockedTimes(store);
     return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
   } catch (error) {
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
+  }
+}
+
+async function mergePublicSchedules(store) {
+  try {
+    const rows = await request('/rest/v1/schedules?select=id,organization_id,category_id,title,venue,schedule_type,start_time,end_time,expected_attendees,privacy_level,contact_person,contact_info,public_description,purpose,approval_status,admin_recommendation,approval_date,event_status,record_type,schedule_source,created_by_role,requires_approval,created_by,created_at,updated_at,revision_of,original_schedule_id,revision_status,revision_history&approval_status=eq.approved&privacy_level=eq.basic&revision_of=is.null');
+    if (!Array.isArray(rows)) return;
+    const storedById = new Map((store.events || []).map((event) => [event.id, event]));
+    store.events = rows
+      .filter((row) => row.id && row.record_type === 'schedule' && !['cancelled', 'disabled', 'draft'].includes(row.event_status || 'planned'))
+      .map((row) => {
+        const existing = storedById.get(row.id) || {};
+        return {
+          ...existing,
+          ...row,
+          organization_name: existing.organization_name || '',
+          occurrences: Array.isArray(existing.occurrences) && existing.occurrences.length
+            ? existing.occurrences
+            : [{ id: `${row.id}-public`, date: String(row.start_time || '').slice(0, 10), start_time: row.start_time, end_time: row.end_time }]
+        };
+      });
+  } catch (error) {
+    store.events = [];
+    console.warn('CONNECT public relational schedule sync unavailable:', error);
   }
 }
 
