@@ -1,4 +1,4 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260624-organization-email-id-v1';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260624-organization-email-id-v2';
 import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-detail-actions-v1';
 
 const loginType = document.body.dataset.loginType;

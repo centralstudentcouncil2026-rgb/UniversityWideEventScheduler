@@ -59,7 +59,13 @@ async function request(endpoint, options = {}, authenticated = false) {
       clearSession();
     }
   }
-  if (!response.ok) throw new Error(payload?.message || payload?.error_description || payload?.error || `Supabase request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(payload?.message || payload?.error_description || payload?.error || `Supabase request failed (${response.status})`);
+    error.status = response.status;
+    error.code = payload?.code || payload?.error_code || '';
+    error.details = payload;
+    throw error;
+  }
   return payload;
 }
 
