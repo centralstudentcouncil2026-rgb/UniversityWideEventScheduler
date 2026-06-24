@@ -37,7 +37,7 @@ create table public.account_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid unique references auth.users(id) on delete cascade,
   full_name text not null,
-  aup_email text not null unique check (aup_email ~* '^[^@]+@aup\\.edu\\.ph$'),
+  aup_email text not null unique check (aup_email ~* '^[^@[:space:]]+@aup[.]edu[.]ph$'),
   contact_number text not null check (contact_number ~ '^[0-9]{11}$'),
   organization_name text not null,
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
