@@ -60,9 +60,9 @@ async function request(endpoint, options = {}, authenticated = false) {
     }
   }
   if (!response.ok) {
-    const error = new Error(payload?.message || payload?.error_description || payload?.error || `Supabase request failed (${response.status})`);
+    const error = new Error(payload?.message || payload?.error_description || payload?.error || payload?.msg || `Supabase request failed (${response.status})`);
     error.status = response.status;
-    error.code = payload?.code || payload?.error_code || '';
+    error.code = payload?.error_code || payload?.code || '';
     error.details = payload;
     throw error;
   }
@@ -597,11 +597,13 @@ export async function requestAccount({ username, password, fullName, organizatio
       body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, organization_code: organizationCode || username, contact_number: phoneNumber, account_type: 'organization', email_category: 'aup' } })
     });
   } catch (error) {
-    console.error('Organization signup error:', { message: error?.message, status: error?.status, code: error?.code });
-    if (typeof alert === 'function') alert(error?.message || 'Organization signup failed.');
-    if (/already registered|user already exists/i.test(String(error.message || ''))) {
-      throw new Error('This AUP email is already registered. Wait for approval, or ask an admin to review the existing request.');
-    }
+    const isDuplicateAccount = /user_already_exists|already registered|user already exists/i.test(`${error?.code || ''} ${error?.message || ''}`);
+    const message = isDuplicateAccount
+      ? 'This AUP email is already registered. Wait for admin approval, or ask an admin to review the existing request.'
+      : (error?.message || 'Organization signup failed.');
+    console.error('Organization signup error:', { message, status: error?.status, code: error?.code, details: error?.details });
+    if (typeof alert === 'function') alert(message);
+    if (isDuplicateAccount) throw new Error(message);
     throw error;
   }
   const userId = signup?.user?.id;
