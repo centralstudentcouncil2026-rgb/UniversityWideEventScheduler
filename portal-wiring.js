@@ -1,4 +1,4 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260624-block-workflow-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260624-delete-isolated-v1';
 import { currentUser } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 document.addEventListener('click', (event) => {

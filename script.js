@@ -1,5 +1,5 @@
 import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-calendar-dedupe-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-block-workflow-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-delete-isolated-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
@@ -1419,7 +1419,7 @@ async function deleteEvent(event) {
     refreshCalendar();
 
     await deleteRecord('events', deletedEvent.id);
-    const result = await saveStore(state.store);
+    const result = await saveStore(state.store, { skipRecordSync: true });
     if (result?.deleteFailures?.length) {
       console.warn('CONNECT event delete cleanup warning:', result.deleteFailures);
     }

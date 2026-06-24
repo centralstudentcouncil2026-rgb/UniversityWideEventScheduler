@@ -292,8 +292,8 @@ function enforceAuthenticatedIdentity(store) {
   return store;
 }
 
-export async function saveStore(store) {
-  const tableFailures = await syncRecordTables(store);
+export async function saveStore(store, { skipRecordSync = false } = {}) {
+  const tableFailures = skipRecordSync ? [] : await syncRecordTables(store);
   if (tableFailures.length) {
     console.warn('CONNECT relational table sync reported errors after store save:', tableFailures);
     const details = tableFailures
