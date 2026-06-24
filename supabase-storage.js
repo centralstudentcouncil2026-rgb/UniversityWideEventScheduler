@@ -309,15 +309,27 @@ async function syncRecordTables(store) {
 
 async function syncOrganizationsTable(store) {
   const user = currentUser(store);
-  const organizations = (store.organizations || [])
+  const candidates = (store.organizations || [])
     .filter((org) => org.id && (org.organization_name || org.name))
     .filter((org) => isSuperAdmin(store) || org.id === user.organization_id)
     .map((org) => ({
       id: org.id,
-      organization_name: org.organization_name || org.name,
+      organization_name: String(org.organization_name || org.name).trim(),
       organization_type: org.organization_type || org.type || 'Organization',
       updated_at: org.updated_at || new Date().toISOString()
     }));
+  const byName = new Map();
+  candidates.forEach((organization) => {
+    const key = organization.organization_name.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) byName.set(key, organization);
+  });
+  const byId = new Map();
+  [...byName.values()].forEach((organization) => {
+    const existing = byId.get(organization.id);
+    if (!existing || new Date(organization.updated_at) >= new Date(existing.updated_at)) byId.set(organization.id, organization);
+  });
+  const organizations = [...byId.values()];
   if (!organizations.length) return;
   await request('/rest/v1/schedule_organizations?on_conflict=organization_name', {
     method: 'POST',
