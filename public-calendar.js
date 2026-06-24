@@ -1,5 +1,5 @@
 import { emptyPublicStore } from './app-data.js?v=20260623-public-popup-close-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260624-public-db-schedules-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260624-public-approved-schedules-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260623-public-popup-close-v1';
 
 const $ = (id) => document.getElementById(id);
@@ -82,7 +82,7 @@ function startPublicStoreSync() {
 }
 
 function publicStoreHasContent(store) {
-  return Boolean(store?.events?.length || store?.blockedTimes?.length || store?.announcements?.length || store?.activityStatuses?.length);
+  return Boolean(store?.events?.length || store?.announcements?.length || store?.activityStatuses?.length);
 }
 
 function publicConnectedViewType(info) {
@@ -107,17 +107,7 @@ function publicStoreSignature(store) {
     ].join('|'))
     .sort()
     .join('||');
-  const blocksSignature = publicBlockRecords(store)
-    .map((block) => [
-      block.id,
-      block.title,
-      block.start_time,
-      block.end_time,
-      block.reason
-    ].join('|'))
-    .sort()
-    .join('||');
-  return `${schedulesSignature}::blocks::${blocksSignature}`;
+  return schedulesSignature;
 }
 
 function setPublicLoading(isLoading, label = 'Loading calendar...') {
@@ -272,7 +262,7 @@ function publicEvents(viewType = state.calendar?.view.type) {
     .filter(matchesSelectedOrganization)
   const dateCounts = publicDateEventCounts(approvedEvents);
   const scheduleItems = approvedEvents.reduce((items, event) => items.concat(publicCalendarItems(event, dateCounts, viewType)), []);
-  return scheduleItems.concat(publicBlockedCalendarItems(viewType));
+  return scheduleItems;
 }
 
 function matchesSelectedOrganization(event) {
@@ -402,27 +392,6 @@ function renderAnnouncements() {
   $('announcementPreview').innerHTML = announcements.map(announcementHtml).join('') || announcementHtml(DEFAULT_ANNOUNCEMENT);
 }
 
-function publicBlockedCalendarItems(viewType = state.calendar?.view.type) {
-  return publicBlockRecords(state.store)
-    .filter((block) => block.start_time && block.end_time)
-    .map((block) => {
-      const wholeDay = block.block_type === 'whole_day';
-      const isMultiDay = !wholeDay && dateOnly(block.start_time) !== dateOnly(block.end_time);
-      return {
-        id: `${block.id}::public-block`,
-        title: block.title || 'Blocked university period',
-        start: wholeDay || isMultiDay ? dateOnly(block.start_time) : block.start_time,
-        end: wholeDay ? dateOnly(block.end_time) : isMultiDay ? nextDate(dateOnly(block.end_time)) : block.end_time,
-        allDay: wholeDay || isMultiDay,
-        display: 'block',
-        backgroundColor: '#071C3D',
-        borderColor: '#F4B400',
-        classNames: ['event-blocked', 'public-blocked-event', viewType === 'multiMonthYear' ? 'event-year-span' : null].filter(Boolean),
-        extendedProps: { type: 'block', block, panelDate: dateOnly(block.start_time), accentColor: '#F4B400' }
-      };
-    });
-}
-
 function isDefaultAnnouncement(item) {
   const title = String(item?.title || '').trim().toLowerCase();
   const content = String(item?.content || '').trim().toLowerCase();
@@ -475,36 +444,11 @@ function publicDayItems(date) {
         .map((occurrence) => ({ type: 'event', event, occurrence }));
       return results.concat(matchingOccurrences);
     }, []);
-  const blocks = publicBlockRecords(state.store)
-    .filter((block) => blockOverlapsDate(block, date))
-    .map((block) => ({ type: 'block', block, occurrence: { start_time: block.start_time, end_time: block.end_time } }));
-  return events.concat(blocks)
+  return events
     .sort((a, b) => new Date(a.occurrence.start_time) - new Date(b.occurrence.start_time));
 }
 
-function publicBlockRecords(store = state.store) {
-  const blocks = Array.isArray(store?.blockedTimes) ? store.blockedTimes : [];
-  const eventBlocks = (Array.isArray(store?.events) ? store.events : [])
-    .filter((event) => event.record_type === 'blocked_time' || event.block_source === 'admin')
-    .map((event) => ({
-      id: event.id,
-      title: event.title || 'Blocked university period',
-      block_type: event.block_type || 'single_day',
-      start_time: event.start_time,
-      end_time: event.end_time,
-      reason: event.reason || event.public_description || '',
-      record_type: 'blocked_time',
-      block_source: 'admin'
-    }));
-  const byId = new Map();
-  [...blocks, ...eventBlocks].forEach((block) => {
-    if (block?.id) byId.set(block.id, block);
-  });
-  return [...byId.values()];
-}
-
 function publicDayEventHtml(item) {
-  if (item.type === 'block') return publicBlockedDayHtml(item.block);
   const { event, occurrence } = item;
   const details = {
     Organization: event.organization_name,
@@ -520,21 +464,6 @@ function publicDayEventHtml(item) {
   return `<article class="public-day-event" style="border-left-color:${escapeHtml(eventPrimaryColor(event))};--event-accent-color:${escapeHtml(eventAccentColor(event))}"><strong>${escapeHtml(event.title)}</strong><dl class="public-event-details">${detailRows(details)}</dl></article>`;
 }
 
-function publicBlockedDayHtml(block) {
-  const details = {
-    Type: 'Blocked university period',
-    Schedule: `${formatPublicDateTime(block.start_time)} to ${formatTime(block.end_time)}`,
-    Reason: block.reason || 'No reason provided.'
-  };
-  return `<article class="public-day-event public-blocked-card"><strong>${escapeHtml(block.title || 'Blocked university period')}</strong><dl class="public-event-details">${detailRows(details)}</dl></article>`;
-}
-
-function blockOverlapsDate(block, date) {
-  const start = new Date(`${date}T00:00:00`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return new Date(block.start_time) < end && new Date(block.end_time) > start;
-}
 
 function publicCategoryName(event) {
   const category = state.store.categories.find((item) => item.id === event.category_id || item.name === event.event_type);
@@ -611,10 +540,6 @@ function nextDate(dateString) {
   const date = new Date(`${dateString}T12:00:00`);
   date.setDate(date.getDate() + 1);
   return date.toISOString().slice(0, 10);
-}
-
-function dateOnly(value) {
-  return String(value || '').slice(0, 10);
 }
 
 function hashText(value) {

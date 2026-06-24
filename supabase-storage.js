@@ -87,7 +87,7 @@ export async function loadPublicStore() {
   try {
     const store = normalizeStore(await rpc('get_scheduler_store'));
     await mergePublicSchedules(store);
-    await mergePublicBlockedTimes(store);
+    store.blockedTimes = [];
     return { store, notice: 'Connected to the public Supabase calendar.', noticeType: 'success' };
   } catch (error) {
     return { store: emptyPublicStore(), notice: `Supabase is unavailable. ${error.message}`, noticeType: 'error' };
@@ -96,53 +96,38 @@ export async function loadPublicStore() {
 
 async function mergePublicSchedules(store) {
   try {
-    const rows = await request('/rest/v1/schedules?select=id,organization_id,category_id,title,venue,schedule_type,start_time,end_time,expected_attendees,privacy_level,contact_person,contact_info,public_description,purpose,approval_status,admin_recommendation,approval_date,event_status,record_type,schedule_source,created_by_role,requires_approval,created_by,created_at,updated_at,revision_of,original_schedule_id,revision_status,revision_history&approval_status=eq.approved&privacy_level=eq.basic&revision_of=is.null');
+    const [rows, organizations, occurrences] = await Promise.all([
+      request('/rest/v1/schedules?select=id,organization_id,category_id,title,venue,schedule_type,start_time,end_time,expected_attendees,privacy_level,contact_person,contact_info,public_description,purpose,approval_status,admin_recommendation,approval_date,event_status,created_at,updated_at,revision_of&approval_status=eq.approved&privacy_level=eq.basic&revision_of=is.null'),
+      request('/rest/v1/schedule_organizations?select=id,organization_name,organization_type'),
+      request('/rest/v1/schedule_occurrences?select=id,schedule_id,date,start_time,end_time&order=start_time.asc')
+    ]);
     if (!Array.isArray(rows)) return;
+    const organizationsById = new Map((Array.isArray(organizations) ? organizations : []).map((organization) => [organization.id, organization]));
+    const occurrencesBySchedule = new Map();
+    (Array.isArray(occurrences) ? occurrences : []).forEach((occurrence) => {
+      const scheduleOccurrences = occurrencesBySchedule.get(occurrence.schedule_id) || [];
+      scheduleOccurrences.push(occurrence);
+      occurrencesBySchedule.set(occurrence.schedule_id, scheduleOccurrences);
+    });
     const storedById = new Map((store.events || []).map((event) => [event.id, event]));
     store.events = rows
-      .filter((row) => row.id && row.record_type === 'schedule' && !['cancelled', 'disabled', 'draft'].includes(row.event_status || 'planned'))
+      .filter((row) => row.id && !['cancelled', 'disabled', 'draft'].includes(row.event_status || 'planned'))
       .map((row) => {
         const existing = storedById.get(row.id) || {};
+        const organization = organizationsById.get(row.organization_id);
         return {
           ...existing,
           ...row,
-          organization_name: existing.organization_name || '',
-          occurrences: Array.isArray(existing.occurrences) && existing.occurrences.length
-            ? existing.occurrences
+          record_type: 'schedule',
+          organization_name: organization?.organization_name || existing.organization_name || '',
+          occurrences: occurrencesBySchedule.get(row.id)?.length
+            ? occurrencesBySchedule.get(row.id)
             : [{ id: `${row.id}-public`, date: String(row.start_time || '').slice(0, 10), start_time: row.start_time, end_time: row.end_time }]
         };
       });
   } catch (error) {
     store.events = [];
     console.warn('CONNECT public relational schedule sync unavailable:', error);
-  }
-}
-
-async function mergePublicBlockedTimes(store) {
-  try {
-    const rows = await request('/rest/v1/blocked_times?select=*&order=start_time.asc');
-    if (!Array.isArray(rows) || !rows.length) return;
-    const existingIds = new Set((store.blockedTimes || []).map((block) => block.id));
-    const directBlocks = rows
-      .filter((row) => row.id && !existingIds.has(row.id))
-      .map((row) => ({
-        id: row.id,
-        title: row.title || 'Blocked university period',
-        block_type: row.block_type || 'single_day',
-        start_time: row.start_time,
-        end_time: row.end_time,
-        reason: row.reason || '',
-        record_type: 'blocked_time',
-        block_source: 'admin',
-        created_by_role: 'admin',
-        requires_approval: false,
-        created_by: row.created_by || '',
-        created_at: row.created_at || row.start_time,
-        updated_at: row.updated_at || row.created_at || row.start_time
-      }));
-    store.blockedTimes = [...(store.blockedTimes || []), ...directBlocks];
-  } catch (error) {
-    console.warn('CONNECT public blocked-time fallback unavailable:', error);
   }
 }
 
