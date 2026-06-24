@@ -417,7 +417,6 @@ async function syncSchedulesTable(store, organizationIds = new Map()) {
       method: 'POST',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify(occurrences.map((occurrence) => ({
-        id: uuidOrNull(occurrence.id) || undefined,
         schedule_id: event.id,
         date: occurrence.date || String(occurrence.start_time || '').slice(0, 10),
         start_time: occurrence.start_time,
