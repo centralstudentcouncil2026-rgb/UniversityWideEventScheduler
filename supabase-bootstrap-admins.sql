@@ -24,13 +24,17 @@ begin
       update auth.users
       set encrypted_password = crypt(admin_password, gen_salt('bf')),
           email_confirmed_at = coalesce(email_confirmed_at, now()),
+          raw_app_meta_data = '{"provider":"email","providers":["email"]}'::jsonb,
+          confirmation_token = '',
+          recovery_token = '',
           updated_at = now()
       where id = admin_id;
     end if;
-    if not exists (select 1 from auth.identities where user_id = admin_id and provider = 'email') then
-      insert into auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at)
-      values (admin_id, admin_id, admin_email, jsonb_build_object('sub', admin_id::text, 'email', admin_email), 'email', now(), now());
-    end if;
+    delete from auth.identities where user_id = admin_id and provider = 'email';
+    insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+    values (admin_id, admin_id, admin_email,
+      jsonb_build_object('sub', admin_id::text, 'email', admin_email, 'email_verified', true, 'phone_verified', false),
+      'email', now(), now(), now());
     insert into public.profiles (id, full_name, email, role, account_type, is_enabled, permissions)
     values (admin_id, initcap(split_part(admin_email, '@', 1)), admin_email, 'super_admin', 'CSC', true,
       '{"enabled":true,"manageAccounts":true,"approveEvents":true,"editAllEvents":true,"deleteAllEvents":true,"manageBlockedTimes":true,"manageAnnouncements":true,"updatePresidentStatus":true,"updateOfficeStatus":true,"manageCategories":true}'::jsonb)
