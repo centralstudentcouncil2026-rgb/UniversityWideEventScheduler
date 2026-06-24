@@ -3,6 +3,19 @@
 alter table public.profiles add column if not exists approval_status text not null default 'approved'
   check (approval_status in ('pending','approved','rejected'));
 
+alter table public.profiles enable row level security;
+alter table public.account_requests enable row level security;
+
+drop policy if exists organization_signup_profile_insert on public.profiles;
+create policy organization_signup_profile_insert on public.profiles
+  for insert to authenticated
+  with check (id = auth.uid() and role = 'organization_manager' and account_type = 'org' and approval_status = 'pending' and is_enabled = false);
+
+drop policy if exists organization_signup_request_insert on public.account_requests;
+create policy organization_signup_request_insert on public.account_requests
+  for insert to authenticated
+  with check (user_id = auth.uid() and status = 'pending');
+
 drop trigger if exists organization_signup_records on auth.users;
 drop function if exists public.create_organization_signup_records();
 

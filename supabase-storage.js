@@ -606,12 +606,13 @@ export async function requestAccount({ username, password, fullName, organizatio
   }
   const userId = signup?.user?.id;
   if (!userId) throw new Error('Supabase could not create the organization account.');
+  const signupHeaders = signup?.access_token ? { Authorization: `Bearer ${signup.access_token}` } : {};
   await request('/rest/v1/profiles', {
-    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal', ...signupHeaders },
     body: JSON.stringify({ id: userId, full_name: fullName, email: normalizedEmail, role: 'organization_manager', account_type: 'org', contact_number: phoneNumber, approval_status: 'pending', is_enabled: false })
   });
   await request('/rest/v1/account_requests', {
-    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal', ...signupHeaders },
     body: JSON.stringify({ user_id: userId, full_name: fullName, aup_email: normalizedEmail, contact_number: phoneNumber, organization_name: organizationName, status: 'pending' })
   });
   return signup;
