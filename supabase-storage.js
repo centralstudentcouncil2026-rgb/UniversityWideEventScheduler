@@ -103,7 +103,7 @@ async function mergePublicSchedules(store) {
   try {
     const [rows, organizations, occurrences] = await Promise.all([
       request('/rest/v1/schedules?select=id,organization_id,category_id,title,venue,schedule_type,start_time,end_time,expected_attendees,privacy_level,contact_person,contact_info,public_description,purpose,approval_status,admin_recommendation,approval_date,event_status,created_at,updated_at,revision_of&approval_status=eq.approved&privacy_level=eq.basic&revision_of=is.null'),
-      request('/rest/v1/schedule_organizations?select=id,organization_name,organization_type'),
+      request('/rest/v1/organizations?select=id,organization_name,organization_type'),
       request('/rest/v1/schedule_occurrences?select=id,schedule_id,date,start_time,end_time&order=start_time.asc')
     ]);
     if (!Array.isArray(rows)) return;
@@ -371,7 +371,7 @@ async function syncRecordTables(store) {
   try {
     organizationIds = await syncOrganizationsTable(store);
   } catch (error) {
-    failures.push({ table: 'schedule_organizations', error });
+    failures.push({ table: 'organizations', error });
   }
   await syncSchedulesTable(store, organizationIds).catch((error) => failures.push({ table: 'schedules', error }));
   if (isSuperAdmin(store)) {
@@ -391,7 +391,7 @@ async function syncOrganizationsTable(store) {
       organization_type: org.organization_type || org.type || 'Organization',
       updated_at: org.updated_at || new Date().toISOString()
     }));
-  const existingRows = await request('/rest/v1/schedule_organizations?select=id,organization_name', {}, true);
+  const existingRows = await request('/rest/v1/organizations?select=id,organization_name', {}, true);
   const existingByName = new Map((Array.isArray(existingRows) ? existingRows : []).map((organization) => [String(organization.organization_name || '').trim().toLowerCase(), organization.id]));
   const organizationIds = new Map();
   candidates.forEach((organization) => {
@@ -414,7 +414,7 @@ async function syncOrganizationsTable(store) {
   });
   const organizations = [...byId.values()];
   if (!organizations.length) return organizationIds;
-  await request('/rest/v1/schedule_organizations?on_conflict=organization_name', {
+  await request('/rest/v1/organizations?on_conflict=organization_name', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(organizations)

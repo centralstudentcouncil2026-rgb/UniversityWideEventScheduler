@@ -2,7 +2,7 @@
 -- Run once in Supabase SQL Editor. Public View receives only approved,
 -- public schedules and their occurrences. Blocked calendar periods stay private.
 
-grant select on public.schedules, public.schedule_organizations, public.schedule_occurrences to anon;
+grant select on public.schedules, public.organizations, public.schedule_occurrences to anon;
 
 alter table public.schedules enable row level security;
 alter table public.schedule_occurrences enable row level security;
