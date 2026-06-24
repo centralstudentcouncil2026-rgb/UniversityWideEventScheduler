@@ -10,9 +10,7 @@ declare
   contact_number text := nullif(new.raw_user_meta_data->>'contact_number', '');
 begin
   if new.raw_user_meta_data->>'account_type' <> 'org' then return new; end if;
-  if organization_name is null or contact_number !~ '^[0-9]{11}$' or new.email !~* '^[^@]+@aup\\.edu\\.ph$' then
-    raise exception 'Organization signup requires AUP email, organization name, and 11-digit contact number.';
-  end if;
+  if organization_name is null or contact_number !~ '^[0-9]{11}$' or new.email !~* '^[^@]+@aup\\.edu\\.ph$' then return new; end if;
   insert into public.profiles (id, full_name, email, role, account_type, contact_number, approval_status, is_enabled)
   values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email), new.email, 'organization_manager', 'org', contact_number, 'pending', false)
   on conflict (id) do nothing;
