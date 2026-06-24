@@ -17,16 +17,17 @@ begin
     select id into admin_id from auth.users where lower(email) = admin_email limit 1;
     if admin_id is null then
       admin_id := gen_random_uuid();
-      insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+    insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
       values (admin_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', admin_email,
-        crypt(admin_password, gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now());
+        extensions.crypt(admin_password, extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('full_name', initcap(split_part(admin_email, '@', 1))), now(), now(), '', '', '', '');
     else
       update auth.users
-      set encrypted_password = crypt(admin_password, gen_salt('bf')),
+      set encrypted_password = extensions.crypt(admin_password, extensions.gen_salt('bf')),
           email_confirmed_at = coalesce(email_confirmed_at, now()),
           raw_app_meta_data = '{"provider":"email","providers":["email"]}'::jsonb,
           confirmation_token = '',
           recovery_token = '',
+          raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('full_name', initcap(split_part(admin_email, '@', 1))),
           updated_at = now()
       where id = admin_id;
     end if;
