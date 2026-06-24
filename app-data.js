@@ -273,6 +273,8 @@ function normalizeEvent(event) {
     end_time: lastOccurrence.end_time || event.end_time,
     admin_recommendation: event.admin_recommendation || '',
     approval_date: event.approval_date || '',
+    approved_by: event.approved_by || '',
+    reviewed_by: event.reviewed_by || '',
     notification_status: event.notification_status || '',
     revision_of: event.revision_of || '',
     original_schedule_id: event.original_schedule_id || event.revision_of || '',

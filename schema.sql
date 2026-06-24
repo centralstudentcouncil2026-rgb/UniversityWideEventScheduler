@@ -1557,6 +1557,16 @@ create policy schedule_occurrences_authenticated_delete
 
 notify pgrst, 'reload schema';
 
+-- Approval accountability fields for organization schedules and revisions.
+alter table if exists public.schedules
+  add column if not exists approved_by uuid references auth.users(id) on update cascade on delete set null;
+alter table if exists public.schedules
+  add column if not exists reviewed_by uuid references auth.users(id) on update cascade on delete set null;
+create index if not exists schedules_approved_by_idx on public.schedules(approved_by);
+create index if not exists schedules_reviewed_by_idx on public.schedules(reviewed_by);
+
+notify pgrst, 'reload schema';
+
 -- Normalize legacy category IDs so the application IDs always satisfy the
 -- schedules.category_id foreign key.
 do $$

@@ -1,4 +1,4 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260622-whole-day-realtime-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260624-approval-audit-v1';
 import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-whole-day-realtime-v1';
 
 const { url, publishableKey } = window.SUPABASE_CONFIG;
@@ -352,6 +352,8 @@ async function syncSchedulesTable(store) {
       approval_status: event.approval_status || 'pending',
       admin_recommendation: event.admin_recommendation || null,
       approval_date: event.approval_date || null,
+      approved_by: uuidOrNull(event.approved_by),
+      reviewed_by: uuidOrNull(event.reviewed_by),
       notification_status: event.notification_status || null,
       revision_of: event.revision_of || null,
       original_schedule_id: event.original_schedule_id || null,

@@ -1,4 +1,4 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260622-whole-day-realtime-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-approval-audit-v1';
 import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore, updateAccountRequestStatus } from './supabase-storage.js?v=20260624-persist-first-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
@@ -278,9 +278,24 @@ async function persist(message = '') {
   }
 }
 
-function log(action, description, payload = null) {
+function log(action, description, payload = null, previousValues = null) {
   const user = currentUser(state.store);
-  state.store.activityLogs.push({ id: createId(), action, description, payload, performed_by: user.full_name, performed_by_role: user.role, created_at: new Date().toISOString() });
+  state.store.activityLogs.push({
+    id: createId(), action, description, payload,
+    previous_values: previousValues, new_values: payload,
+    performed_by: user.full_name, performed_by_role: user.role,
+    performed_by_id: user.id, organization_id: user.organization_id || '',
+    created_at: new Date().toISOString()
+  });
+}
+
+function scheduleAuditSnapshot(event = {}) {
+  return {
+    title: event.title || '', category_id: event.category_id || '', venue: event.venue || '',
+    start_time: event.start_time || '', end_time: event.end_time || '', privacy_level: event.privacy_level || '',
+    approval_status: event.approval_status || '', admin_recommendation: event.admin_recommendation || '',
+    revision_of: event.revision_of || ''
+  };
 }
 
 function populateStaticOptions() {
@@ -822,7 +837,7 @@ function readEventForm() {
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
     contact_person: cleanSingleLine($('eventContactPerson').value), contact_info: cleanSingleLine($('eventContactInfo').value), private_notes: existing?.private_notes || '',
     admin_notes: existing?.admin_notes || '', rejection_reason: resubmitsRejectedSchedule(existing) ? '' : existing?.rejection_reason || '', admin_recommendation: resubmitsRejectedSchedule(existing) ? '' : existing?.admin_recommendation || '',
-    approval_date: resubmitsRejectedSchedule(existing) ? '' : existing?.approval_date || '', notification_status: existing?.notification_status || '',
+    approval_date: resubmitsRejectedSchedule(existing) ? '' : existing?.approval_date || '', approved_by: existing?.approved_by || '', reviewed_by: existing?.reviewed_by || '', notification_status: existing?.notification_status || '',
     revision_of: existing?.revision_of || '', original_schedule_id: existing?.original_schedule_id || '', revision_status: existing?.revision_status || '',
     revision_created_at: existing?.revision_created_at || '', revision_submitted_at: existing?.revision_submitted_at || '', revision_history: existing?.revision_history || [],
     event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: approvalStatusForSave(existing), created_by: existing?.created_by || currentUser(state.store).id,
@@ -1094,9 +1109,14 @@ async function saveEvent(candidate) {
     }
     return;
   }
+  const previousValues = existing ? scheduleAuditSnapshot(existing) : null;
   if (existingIndex >= 0) state.store.events[existingIndex] = candidate; else state.store.events.push(candidate);
   if (existing && isSuperAdmin(state.store) && isOrganizationSchedule(existing) && existing.created_by !== currentUser(state.store).id) {
-    notifyScheduleCreator(candidate, 'Schedule Updated by Admin', `Admin updated your schedule "${candidate.title}".`);
+    const nextValues = scheduleAuditSnapshot(candidate);
+    const changedFields = Object.keys(nextValues)
+      .filter((key) => previousValues[key] !== nextValues[key] && !['approval_status', 'admin_recommendation', 'revision_of'].includes(key))
+      .map((key) => key.replace(/_/g, ' '));
+    notifyScheduleCreator(candidate, 'Schedule Updated by Admin', `Admin updated your schedule "${candidate.title}".${changedFields.length ? ` Changed: ${changedFields.join(', ')}.` : ''}`);
   }
   if (candidate.approval_status === 'pending' && (existingIndex < 0 || existing?.approval_status === 'rejected')) {
     notifyAdmins({
@@ -1106,7 +1126,7 @@ async function saveEvent(candidate) {
       message: `${candidate.organization_name || 'An organization'} submitted "${candidate.title}" for approval.`
     });
   }
-  log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, candidate);
+  log(existingIndex >= 0 ? 'event_updated' : 'event_posted', `${currentUser(state.store).full_name} saved "${candidate.title}".`, scheduleAuditSnapshot(candidate), previousValues);
   state.pendingCalendarDate = candidate.occurrences[0]?.date || dateInput(candidate.start_time);
   const saved = await persist(isManager(state.store) && candidate.approval_status === 'pending' ? 'Schedule submitted for admin approval.' : 'Schedule saved.');
   if (saved) {
@@ -1176,12 +1196,26 @@ function openDetails(props) {
       Status: cap(record.event_status),
       'Admin Recommendation': record.admin_recommendation,
       'Approval Date': record.approval_date ? formatDateTime(record.approval_date) : '',
+      'Reviewed By': record.reviewed_by || '',
       'Admin Notes': record.admin_notes,
       'Rejection Reason': record.rejection_reason,
       Conflicts: record.conflict_event_ids?.length ? record.conflict_event_ids.length : ''
     });
     if (!isSuperAdmin(state.store) && isManager(state.store) && record.organization_id === currentUser(state.store).organization_id && record.admin_recommendation) {
       data['Admin Recommendation'] = record.admin_recommendation;
+    }
+    if (record.revision_of && isSuperAdmin(state.store)) {
+      const original = state.store.events.find((item) => item.id === record.revision_of);
+      if (original) Object.assign(data, {
+        'Original Schedule': `${formatDateTime(original.start_time)} to ${formatTime(original.end_time)}`,
+        'Original Venue': original.venue,
+        'Original Description': original.public_description
+      });
+    }
+    if (Array.isArray(record.revision_history) && record.revision_history.length && (isSuperAdmin(state.store) || record.organization_id === currentUser(state.store).organization_id)) {
+      data['Revision History'] = record.revision_history
+        .map((item) => `${cap(item.status || 'pending')} - ${formatDateTime(item.approved_at || item.submitted_at)}`)
+        .join('\n');
     }
     $('detailsTitle').textContent = record.title; $('detailsMeta').textContent = `${category.name} - ${record.venue}`; $('detailsList').innerHTML = rows(data);
     setDetailsActionVisibility(detailsActionVisibility(record));
@@ -1414,10 +1448,13 @@ async function submitEventReviewForm(event) {
   const textError = textLimitError(recommendation, TEXT_LIMITS.adminNotes, 'Admin recommendation');
   if (textError) return showToast(textError, 'error');
   const now = new Date().toISOString();
+  const previousValues = scheduleAuditSnapshot(record);
   Object.assign(record, {
     approval_status: status,
     admin_recommendation: recommendation,
     approval_date: now,
+    approved_by: status === 'approved' ? currentUser(state.store).id : '',
+    reviewed_by: currentUser(state.store).id,
     notification_status: 'unread',
     revision_status: record.revision_of ? status : record.revision_status,
     updated_at: now
@@ -1437,7 +1474,7 @@ async function submitEventReviewForm(event) {
         : `Your schedule "${record.title}" was rejected. Please delete the proposed event.${recommendation ? ` Recommendation: ${recommendation}` : ''}`
     });
   }
-  log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${record.title}" as ${status}.`, record);
+  log(`event_request_${status}`, `${currentUser(state.store).full_name} marked "${record.title}" as ${status}.`, scheduleAuditSnapshot(record), previousValues);
   const saved = await persist(`Event request ${status}.`);
   if (!saved) {
     await reloadStore().catch(() => {});
@@ -1655,7 +1692,8 @@ function renderNotifications() {
 }
 
 function notificationHtml(item) {
-  return `<div class="activity-item ${item.is_read ? '' : 'unread-notification'}"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.is_read ? 'read' : 'pending'}">${escapeHtml(item.is_read ? 'Read' : 'Unread')}</span></strong><p>${escapeHtml(item.message)}</p><p>${escapeHtml(formatDateTime(item.created_at))}</p>${item.is_read ? '' : actionButton('notification-read', item.notification_id, 'Mark as Read', 'secondary-button')}</div>`;
+  const scheduleNotification = /^schedule_(approval|revision|update)$/.test(item.notification_type || '');
+  return `<div class="activity-item ${item.is_read ? '' : 'unread-notification'}"><strong>${escapeHtml(item.title)} <span class="status-pill ${item.is_read ? 'read' : 'pending'}">${escapeHtml(item.is_read ? 'Read' : 'Unread')}</span></strong><p>${escapeHtml(item.message)}</p><p>${escapeHtml(formatDateTime(item.created_at))}</p><div class="inline-actions">${scheduleNotification ? actionButton('notification-open', item.notification_id, 'View Schedule', 'secondary-button') : ''}${item.is_read ? '' : actionButton('notification-read', item.notification_id, 'Mark as Read', 'secondary-button')}</div></div>`;
 }
 
 function markNotificationRead(id) {
@@ -2198,7 +2236,16 @@ function openActivityLog() {
 }
 
 function activityLogHtml(item) {
-  return `<div class="activity-item"><strong>${escapeHtml(cap(String(item.action || '').split('_').join(' ')))}</strong><p>${escapeHtml(formatDateTime(item.created_at))}</p><p>${escapeHtml(item.description)}</p><p>${escapeHtml(item.performed_by)} - ${escapeHtml(roleLabel(item.performed_by_role))}</p></div>`;
+  const changes = auditChangeSummary(item.previous_values, item.new_values);
+  return `<div class="activity-item"><strong>${escapeHtml(cap(String(item.action || '').split('_').join(' ')))}</strong><p>${escapeHtml(formatDateTime(item.created_at))}</p><p>${escapeHtml(item.description)}</p><p>${escapeHtml(item.performed_by)} - ${escapeHtml(roleLabel(item.performed_by_role))}</p>${changes ? `<p>Changed: ${escapeHtml(changes)}</p>` : ''}</div>`;
+}
+
+function auditChangeSummary(previousValues, nextValues) {
+  if (!previousValues || !nextValues || typeof previousValues !== 'object' || typeof nextValues !== 'object') return '';
+  return Object.keys(nextValues)
+    .filter((key) => previousValues[key] !== nextValues[key])
+    .map((key) => key.replace(/_/g, ' '))
+    .join(', ');
 }
 
 function handleListAction(event) {
@@ -2228,6 +2275,7 @@ const LIST_ACTION_PERMISSIONS = {
   'account-request-approve': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can approve accounts.' },
   'account-request-reject': { allowed: () => canManageAccounts(state.store), message: 'Only the Manager can reject accounts.' },
   'notification-read': { allowed: () => !isPublic(state.store), message: 'Login to manage notifications.' },
+  'notification-open': { allowed: () => !isPublic(state.store), message: 'Login to view schedule notifications.' },
   'concern-review': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-resolve': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' },
   'concern-reject': { allowed: () => canApproveEvents(state.store), message: 'This account cannot respond to concerns.' }
@@ -2252,6 +2300,7 @@ const LIST_ACTIONS = {
   'account-request-approve': (id) => decidePendingAccountRequest(id, 'approved'),
   'account-request-reject': (id) => decidePendingAccountRequest(id, 'rejected'),
   'notification-read': markNotificationRead,
+  'notification-open': openNotificationSchedule,
   'concern-review': reviewConcern,
   'concern-resolve': (id) => updateConcernStatus(id, 'resolved', 'concern_resolved', 'Concern resolved.'),
   'concern-reject': (id) => updateConcernStatus(id, 'rejected', 'concern_rejected', 'Concern rejected.')
@@ -2260,6 +2309,17 @@ const LIST_ACTIONS = {
 function viewEventRequest(id) {
   const item = state.store.events.find((event) => event.id === id);
   if (item) openDetails({ type: 'event', record: item });
+}
+
+function openNotificationSchedule(id) {
+  const notification = (state.store.notifications || []).find((item) => item.notification_id === id);
+  if (!notification || notification.user_id !== currentUser(state.store).id) return;
+  const schedule = state.store.events.find((item) => item.id === notification.reference_id);
+  if (!schedule) return showToast('This schedule is no longer available.', 'error');
+  notification.is_read = true;
+  closeDialog('notificationsModal');
+  openDetails({ type: 'event', record: schedule });
+  void persist('Notification marked as read.');
 }
 
 function reviewEventRequest(id, status) {
