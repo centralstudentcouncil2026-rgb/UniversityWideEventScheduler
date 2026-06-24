@@ -582,22 +582,15 @@ export async function requestAccount({ username, password, fullName, organizatio
   const normalizedEmail = String(email).trim().toLowerCase();
   const signup = await request('/auth/v1/signup', {
     method: 'POST',
-    body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username } })
+    body: JSON.stringify({ email: normalizedEmail, password, data: { full_name: fullName, username, organization_name: organizationName, contact_number: phoneNumber, account_type: 'org' } })
   });
   const userId = signup?.user?.id;
   if (!userId) throw new Error('Supabase could not create the organization account.');
-  await request('/rest/v1/profiles', {
-    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ id: userId, full_name: fullName, email: normalizedEmail, role: 'organization_manager', account_type: 'org', contact_number: phoneNumber, is_enabled: false })
-  });
-  return request('/rest/v1/account_requests', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ user_id: userId, full_name: fullName, aup_email: normalizedEmail, contact_number: phoneNumber, organization_name: organizationName, status: 'pending' })
-  });
+  return signup;
 }
 
 export async function decideAccountRequest(id, decision) {
-  return rpc('apply_account_request_decision', { p_request_id: id, p_decision: decision }, true);
+  return rpc('approve_organization_account', { p_request_id: id, p_decision: decision }, true);
 }
 
 export async function updateAccountRequestStatus(id, decision, accountRequest = null) {
