@@ -3,6 +3,14 @@
   window.__portalUiPolish = true;
 
   let enhanceTimer = 0;
+  const DEFAULT_ANNOUNCEMENT = {
+    title: 'CSC S.Y.N.C. is ready for scheduling',
+    content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
+  };
+  const LEGACY_DEFAULT_ANNOUNCEMENT = {
+    title: 'CONNECT is ready for scheduling',
+    content: 'Student organizations may now coordinate university-wide events through CONNECT.'
+  };
 
   function style() {
     if (document.getElementById('portal-ui-polish-style')) return;
@@ -13,6 +21,11 @@
       body.is-manager #eventRequestsButton,
       body.is-manager #usersButton{display:none!important;}
       body.is-manager #announcementsButton{display:inline-flex!important;}
+      body.is-manager #announcementsModal #announcementForm{display:none!important;}
+      #orgAnnouncementViewer{display:grid!important;gap:14px!important;max-width:960px!important;margin:0 auto!important;width:100%!important;}
+      #orgAnnouncementViewer .notice{background:#fff!important;border:1px solid #dbe4ef!important;border-radius:20px!important;padding:18px!important;box-shadow:0 14px 36px rgba(15,23,42,.08)!important;}
+      #orgAnnouncementViewer .notice strong{display:block!important;color:#071c3d!important;font-size:1.15rem!important;margin-bottom:8px!important;}
+      #orgAnnouncementViewer .notice p{color:#475569!important;line-height:1.5!important;margin:0!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;}
 
       #notificationsModal .modal-card{background:linear-gradient(180deg,#fff,#f8fafc)!important;}
       #notificationsList{display:flex!important;flex-direction:column!important;gap:14px!important;align-items:stretch!important;}
@@ -47,6 +60,23 @@
     document.head.appendChild(s);
   }
 
+  function store() { return window.CONNECT_STATE?.store; }
+  function currentUser() { return (store()?.users || []).find((user) => user.id === store()?.currentUserId) || {}; }
+  function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); }
+  function isDefaultAnnouncement(item) {
+    const title = String(item?.title || '').trim().toLowerCase();
+    const content = String(item?.content || '').trim().toLowerCase();
+    return [DEFAULT_ANNOUNCEMENT, LEGACY_DEFAULT_ANNOUNCEMENT].some((announcement) => title === announcement.title.toLowerCase() && content === announcement.content.toLowerCase());
+  }
+  function visibleAnnouncements() {
+    return [...(store()?.announcements || [])]
+      .filter((item) => item && item.visibility_status !== 'hidden' && !isDefaultAnnouncement(item))
+      .sort((a, b) => new Date(b.updated_at || b.created_at || b.posted_at || 0) - new Date(a.updated_at || a.created_at || a.posted_at || 0));
+  }
+  function announcementCard(item) {
+    return `<div class="notice"><strong>${escapeHtml(item.title || 'Announcement')}</strong><p>${escapeHtml(item.content || '')}</p></div>`;
+  }
+
   function enhanceNotifications() {
     const list = document.getElementById('notificationsList');
     if (!list) return;
@@ -69,6 +99,84 @@
     panel.classList.remove('super-admin-only');
     announcementButton.hidden = false;
     announcementButton.disabled = false;
+    renderOrgAnnouncementViewer();
+  }
+
+  function renderOrgAnnouncementViewer() {
+    if (!document.body.classList.contains('is-manager')) return;
+    const modal = document.getElementById('announcementsModal');
+    const card = modal?.querySelector('.modal-card');
+    if (!card) return;
+    const form = document.getElementById('announcementForm');
+    if (form) form.hidden = true;
+    let viewer = document.getElementById('orgAnnouncementViewer');
+    if (!viewer) {
+      viewer = document.createElement('div');
+      viewer.id = 'orgAnnouncementViewer';
+      viewer.className = 'org-announcement-viewer';
+      card.appendChild(viewer);
+    }
+    const list = visibleAnnouncements();
+    viewer.innerHTML = list.length ? list.map(announcementCard).join('') : announcementCard(DEFAULT_ANNOUNCEMENT);
+  }
+
+  function notifyConcernOwnerWithRemarks(concern, remarks) {
+    const current = currentUser();
+    if (!Array.isArray(store().notifications)) store().notifications = [];
+    (store().users || [])
+      .filter((user) => user.organization_id === concern.organization_id && user.role === 'organization_manager')
+      .forEach((user) => {
+        store().notifications.push({
+          notification_id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          user_id: user.id,
+          notification_type: 'concern_resolution_remarks',
+          reference_id: concern.id,
+          title: 'Concern Resolved with Remarks',
+          message: `${current.full_name || 'Admin'} resolved "${concern.title}". Remarks: ${remarks}`,
+          is_read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+  }
+
+  function requireResolveRemarks(event) {
+    const button = event.target.closest('[data-action="concern-resolve"]');
+    if (!button) return;
+    const concern = (store()?.concerns || []).find((item) => item.id === button.dataset.id);
+    if (!concern) return;
+    const remarks = prompt('Remarks are required before marking this concern as resolved:', concern.admin_response || '');
+    if (remarks === null) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    const cleaned = String(remarks).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (!cleaned) {
+      alert('Remarks are required before marking this concern as resolved.');
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (cleaned.length > 1000) {
+      alert('Concern remarks must be 1000 characters or fewer.');
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    concern.admin_response = cleaned;
+    notifyConcernOwnerWithRemarks(concern, cleaned);
+  }
+
+  function showMobileOrgAnnouncementPopup() {
+    if (!document.body.classList.contains('is-manager') || window.innerWidth > 768) return;
+    const key = `org_announcement_popup_${currentUser().id || 'manager'}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    setTimeout(() => {
+      if (window.innerWidth > 768 || document.querySelector('dialog[open]')) return;
+      renderOrgAnnouncementViewer();
+      document.getElementById('announcementsButton')?.click();
+    }, 650);
   }
 
   function markSaving() {
@@ -82,19 +190,21 @@
     enhanceTimer = setTimeout(() => {
       enhanceNotifications();
       showOrgAnnouncements();
+      showMobileOrgAnnouncementPopup();
     }, 80);
   }
 
   function init() {
     style();
     debounceEnhance();
+    document.addEventListener('click', requireResolveRemarks, true);
     document.addEventListener('submit', (e) => {
       if (e.target?.matches?.('form')) markSaving();
     }, true);
     document.addEventListener('click', (e) => {
-      if (e.target.closest('#agreementSubmitButton,#eventReviewSubmitButton,[data-action="notification-read"],#markNotificationsReadButton,[data-action="announcement-show"],[data-action="announcement-hide"],[data-action="announcement-edit"],[data-action="announcement-delete"]')) markSaving();
+      if (e.target.closest('#agreementSubmitButton,#eventReviewSubmitButton,[data-action="notification-read"],#markNotificationsReadButton,[data-action="announcement-show"],[data-action="announcement-hide"],[data-action="announcement-edit"],[data-action="announcement-delete"],[data-action="concern-resolve"]')) markSaving();
     }, true);
-    new MutationObserver(debounceEnhance).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+    new MutationObserver(debounceEnhance).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'open'] });
     window.addEventListener('resize', debounceEnhance, { passive: true });
   }
 
