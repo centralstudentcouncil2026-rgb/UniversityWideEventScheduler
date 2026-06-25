@@ -15,8 +15,8 @@
       body.is-manager #announcementsButton{display:inline-flex!important;}
 
       #notificationsModal .modal-card{background:linear-gradient(180deg,#fff,#f8fafc)!important;}
-      #notificationsList{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))!important;gap:14px!important;align-items:stretch!important;}
-      #notificationsList>.activity-item{display:grid!important;grid-template-rows:auto 1fr auto!important;gap:10px!important;background:#fff!important;border:1px solid #dbe4ef!important;border-radius:18px!important;padding:16px 16px 14px 18px!important;box-shadow:0 14px 36px rgba(15,23,42,.08)!important;position:relative!important;overflow:hidden!important;min-height:160px!important;}
+      #notificationsList{display:flex!important;flex-direction:column!important;gap:14px!important;align-items:stretch!important;}
+      #notificationsList>.activity-item{display:grid!important;grid-template-rows:auto auto auto!important;gap:10px!important;background:#fff!important;border:1px solid #dbe4ef!important;border-radius:18px!important;padding:16px 16px 14px 18px!important;box-shadow:0 14px 36px rgba(15,23,42,.08)!important;position:relative!important;overflow:hidden!important;min-height:0!important;width:100%!important;}
       #notificationsList>.activity-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,#2563eb,#38bdf8)!important;}
       #notificationsList>.activity-item.unread-notification::before{background:linear-gradient(180deg,#f59e0b,#f97316)!important;}
       #notificationsList>.activity-item>strong{display:flex!important;align-items:flex-start!important;justify-content:space-between!important;gap:10px!important;color:#0f172a!important;font-size:1rem!important;line-height:1.35!important;}
@@ -37,8 +37,8 @@
       .ui-light-cards-enabled .public-day-event{transition:box-shadow .18s ease, transform .18s ease, background-color .18s ease!important;}
 
       @media(max-width:720px){
-        #notificationsList{grid-template-columns:1fr!important;gap:12px!important;}
-        #notificationsList>.activity-item{min-height:auto!important;border-radius:16px!important;padding:14px!important;}
+        #notificationsList{gap:12px!important;}
+        #notificationsList>.activity-item{border-radius:16px!important;padding:14px!important;}
         #notificationsList>.activity-item>p{grid-template-columns:1fr!important;gap:4px!important;}
         #notificationsList>.activity-item>.inline-actions{justify-content:stretch!important;}
         #notificationsList>.activity-item>.inline-actions button{flex:1 1 150px!important;}
@@ -50,7 +50,8 @@
   function enhanceNotifications() {
     const list = document.getElementById('notificationsList');
     if (!list) return;
-    list.classList.add('ui-card-list', 'ui-notification-card-list');
+    list.classList.remove('ui-card-list');
+    list.classList.add('ui-notification-card-list');
     [...list.children].forEach((card) => {
       if (!card.matches('.activity-item')) return;
       card.classList.add('ui-light-card', 'ui-notification-message-card');
