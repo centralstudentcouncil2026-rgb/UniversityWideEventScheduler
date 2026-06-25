@@ -1,6 +1,9 @@
 (() => {
   const SESSION_KEY = 'core_supabase_auth_session';
-  const GUARD_FLAG = '__cscCalendarLogicGuardV3';
+  const GUARD_FLAG = '__cscCalendarLogicGuardV4';
+  const CALENDAR_TIME_ZONE = 'Asia/Manila';
+  const DATE_PARTS = new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const TIME_PARTS = new Intl.DateTimeFormat('en-GB', { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: false });
   if (window[GUARD_FLAG]) return;
   window[GUARD_FLAG] = true;
 
@@ -15,13 +18,13 @@
     return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, length);
   }
 
-  function legacyCalendarId() {
-    return `${hex(8)}-${hex(4)}-4${hex(3)}-8${hex(12)}`;
+  function calendarId() {
+    return `${hex(8)}-${hex(4)}-4${hex(3)}-${['8', '9', 'a', 'b'][Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
   }
 
   try {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      Object.defineProperty(window.crypto, 'randomUUID', { value: legacyCalendarId, configurable: true });
+      Object.defineProperty(window.crypto, 'randomUUID', { value: calendarId, configurable: true });
     }
   } catch {}
 
@@ -102,9 +105,9 @@
     const source = saved.length
       ? saved
       : [{ id: `${row.id || 'schedule'}-occurrence`, date: dateOnly(row.start_time), start_time: row.start_time, end_time: row.end_time }];
-    return source.flatMap((occurrence, index) => expandOccurrence(occurrence, row.id || 'schedule', index))
+    return source.flatMap((occurrence, index) => expandOccurrence(occurrence, row, index))
       .filter((item) => item.date && item.start_time && item.end_time)
-      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+      .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.start_time) - new Date(b.start_time));
   }
 
   function parseOccurrences(value) {
@@ -118,20 +121,28 @@
     }
   }
 
-  function expandOccurrence(occurrence = {}, eventId = 'schedule', index = 0) {
+  function expandOccurrence(occurrence = {}, row = {}, index = 0) {
     if (!occurrence.start_time || !occurrence.end_time) return [];
-    const startDate = occurrence.date || dateOnly(occurrence.start_time);
-    const endDate = dateOnly(occurrence.end_time);
+    const eventId = row.id || 'schedule';
+    const startDate = String(occurrence.date || '').slice(0, 10) || dateOnly(occurrence.start_time);
+    const detectedEndDate = dateOnly(occurrence.end_time);
+    const endDate = row.schedule_type === 'multi_day' && !occurrence.date && detectedEndDate && detectedEndDate >= startDate ? detectedEndDate : startDate;
     if (!startDate || !endDate || startDate === endDate) {
-      return [{ ...occurrence, id: occurrence.id || `${eventId}-occurrence-${index}`, date: startDate }];
+      return [{
+        ...occurrence,
+        id: occurrence.id || `${eventId}-occurrence-${index}`,
+        date: startDate,
+        start_time: `${startDate}T${clockOnly(occurrence.start_time)}:00`,
+        end_time: `${startDate}T${clockOnly(occurrence.end_time)}:00`
+      }];
     }
-    const startTime = utcClock(occurrence.start_time);
-    const endTime = utcClock(occurrence.end_time);
+    const startTime = clockOnly(occurrence.start_time);
+    const endTime = clockOnly(occurrence.end_time);
     return datesBetween(startDate, endDate).map((date, dayIndex) => ({
       id: dayIndex === 0 ? (occurrence.id || `${eventId}-occurrence-${index}`) : `${occurrence.id || eventId}-${date}`,
       date,
-      start_time: `${date}T${startTime}:00.000Z`,
-      end_time: `${date}T${endTime}:00.000Z`
+      start_time: `${date}T${startTime}:00`,
+      end_time: `${date}T${endTime}:00`
     }));
   }
 
@@ -143,15 +154,27 @@
     return rows.map((row) => Object.fromEntries(keys.map((key) => [key, row?.[key] === undefined ? null : row[key]])));
   }
 
-  function dateOnly(value) { return String(value || '').slice(0, 10); }
-  function utcClock(value) {
+  function dateOnly(value) {
+    if (!value) return '';
+    const text = String(value);
+    if (!text.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(text) && /^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '00:00' : date.toISOString().slice(11, 16);
+    if (Number.isNaN(date.getTime())) return text.slice(0, 10);
+    const parts = Object.fromEntries(DATE_PARTS.formatToParts(date).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+  function clockOnly(value) {
+    const text = String(value || '');
+    const raw = text.match(/T(\d{2}:\d{2})/) || text.match(/^(\d{2}:\d{2})/);
+    if (!text.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(text) && raw) return raw[1];
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return raw ? raw[1] : '00:00';
+    return TIME_PARTS.format(date);
   }
   function datesBetween(startDate, endDate) {
     const dates = [];
-    for (let day = new Date(`${startDate}T12:00:00Z`), end = new Date(`${endDate}T12:00:00Z`); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
-      dates.push(day.toISOString().slice(0, 10));
+    for (let day = new Date(`${startDate}T12:00:00`), end = new Date(`${endDate}T12:00:00`); day <= end; day.setDate(day.getDate() + 1)) {
+      dates.push(localDate(day));
     }
     return dates;
   }
