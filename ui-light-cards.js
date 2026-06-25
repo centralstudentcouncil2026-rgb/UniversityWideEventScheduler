@@ -12,7 +12,7 @@
     style.id = 'ui-light-cards-style';
     style.textContent = `
       :root{--ui-card-bg:#fff;--ui-card-line:#e2e8f0;--ui-card-strong:#0f172a;--ui-card-muted:#64748b;--ui-card-accent:#2563eb;--ui-card-radius:18px;}
-      body.ui-light-cards-enabled dialog.portal-tab-view .modal-card,body.ui-light-cards-enabled dialog .modal-card{background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)!important;border:1px solid rgba(226,232,240,.95)!important;box-shadow:0 22px 70px rgba(15,23,42,.12)!important;}
+      body.ui-light-cards-enabled dialog .modal-card{background:linear-gradient(180deg,#fff 0%,#f8fafc 100%)!important;border:1px solid rgba(226,232,240,.95)!important;box-shadow:0 22px 70px rgba(15,23,42,.12)!important;}
       .ui-card-list{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))!important;gap:14px!important;align-items:stretch!important;}
       #eventRequestsList.ui-card-list,#usersList.ui-card-list,#accountRequestsList.ui-card-list,#announcementsList.ui-card-list,#blockedTimesList.ui-card-list,#organizationsList.ui-card-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))!important;}
       .ui-light-card,body.ui-light-cards-enabled .activity-item,body.ui-light-cards-enabled .notification-item,body.ui-light-cards-enabled .public-day-event{position:relative!important;display:flex!important;flex-direction:column!important;gap:.55rem!important;min-width:0!important;background:var(--ui-card-bg)!important;border:1px solid var(--ui-card-line)!important;border-radius:var(--ui-card-radius)!important;padding:16px!important;box-shadow:0 14px 36px rgba(15,23,42,.08)!important;overflow:hidden!important;transition:box-shadow .18s ease,transform .18s ease,background-color .18s ease!important;}

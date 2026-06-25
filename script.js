@@ -17,6 +17,7 @@ const STORE_SYNC_INTERVAL_MS = 3000;
 const monthSpanLabels = new Set();
 const $ = (id) => document.getElementById(id);
 const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filterEventType', 'filterDate', 'filterMonth', 'filterApproval', 'filterEventStatus'];
+const ADMIN_TAB_PAGE_IDS = new Set(['announcementsModal', 'eventRequestsModal', 'usersModal']);
 const DEFAULT_ANNOUNCEMENT = {
   title: 'CSC S.Y.N.C. is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
@@ -2557,7 +2558,7 @@ function startStoreSync() {
 }
 
 async function syncStoreFromBackend() {
-  if (state.storeSyncing || document.hidden || document.querySelector('dialog[open]')) return;
+  if (state.storeSyncing || document.hidden || document.querySelector('dialog[open], .admin-tab-page.is-active')) return;
   state.storeSyncing = true;
   try {
     await reloadStore();
@@ -2568,13 +2569,60 @@ async function syncStoreFromBackend() {
   }
 }
 function openDialog(id) {
+  if (ADMIN_TAB_PAGE_IDS.has(id)) {
+    openAdminTabPage(id);
+    return;
+  }
   $(id).showModal();
   closeSidebar();
 }
 
 function closeDialog(id) {
+  if (ADMIN_TAB_PAGE_IDS.has(id)) {
+    closeAdminTabPage(id);
+    return;
+  }
   const dialog = $(id);
   if (dialog && dialog.open) dialog.close();
+}
+
+function openAdminTabPage(id) {
+  const page = $(id);
+  if (!page) return;
+  ensureAdminTabPageHeader(page);
+  document.querySelectorAll('.admin-tab-page.is-active').forEach((activePage) => {
+    if (activePage.id !== id) closeAdminTabPage(activePage.id);
+  });
+  page.hidden = false;
+  page.classList.add('is-active');
+  page.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('admin-tab-page-open');
+  closeSidebar();
+  page.scrollTop = 0;
+  window.CONNECT_STATE?.calendar?.updateSize?.();
+}
+
+function closeAdminTabPage(id) {
+  const page = $(id);
+  if (!page) return;
+  page.classList.remove('is-active');
+  page.setAttribute('aria-hidden', 'true');
+  page.hidden = true;
+  if (!document.querySelector('.admin-tab-page.is-active')) {
+    document.body.classList.remove('admin-tab-page-open');
+    window.CONNECT_STATE?.calendar?.updateSize?.();
+  }
+}
+
+function ensureAdminTabPageHeader(page) {
+  const header = page.querySelector('.modal-header');
+  if (!header || header.querySelector('.portal-tab-back')) return;
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'secondary-button portal-tab-back';
+  back.dataset.close = page.id;
+  back.textContent = '← Back to Calendar View';
+  header.prepend(back);
 }
 
 function scheduleMobileAnnouncementPopup(force = false) {

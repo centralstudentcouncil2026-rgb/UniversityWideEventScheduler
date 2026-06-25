@@ -1,5 +1,4 @@
 const PLF_SESSION_KEY = 'core_supabase_auth_session';
-const PLF_TAB_MODAL_IDS = new Set(['eventRequestsModal', 'announcementsModal', 'usersModal']);
 let plfOrgSnapshot = null;
 
 function plfHex(length) {
@@ -318,32 +317,6 @@ function plfBindOrgScheduleFallback() {
   window.setInterval(plfShowOrgButtons, 500);
 }
 
-function plfInjectTabStyles() {
-  if (document.getElementById('portal-tab-view-style')) return;
-  const style = document.createElement('style');
-  style.id = 'portal-tab-view-style';
-  style.textContent = `dialog.portal-tab-view{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;background:#f8fafc!important;overflow:auto!important;z-index:2147483600!important}dialog.portal-tab-view::backdrop{background:transparent!important;backdrop-filter:none!important}dialog.portal-tab-view .modal-card{width:min(1180px,calc(100vw - 32px))!important;max-width:none!important;min-height:calc(100vh - 32px)!important;margin:16px auto!important;border-radius:24px!important;box-shadow:none!important}dialog.portal-tab-view .modal-header{position:sticky!important;top:0!important;background:linear-gradient(135deg,#facc15 0%,#eab308 62%,#ca8a04 100%)!important;z-index:3!important;padding-top:12px!important;border-bottom:4px solid #2563eb!important;box-shadow:0 14px 30px rgba(7,28,61,.14)!important}.portal-tab-back{margin-right:12px!important;white-space:nowrap!important;background:rgba(255,255,255,.94)!important;border-color:rgba(255,255,255,.78)!important;color:#071c3d!important;box-shadow:0 10px 22px rgba(7,28,61,.12)!important}body.portal-tab-open .calendar-panel{visibility:hidden!important}`;
-  document.head.appendChild(style);
-}
-function plfMakeTabDialog(dialog) {
-  if (!dialog || !PLF_TAB_MODAL_IDS.has(dialog.id)) return;
-  dialog.classList.add('portal-tab-view');
-  const header = dialog.querySelector('.modal-header');
-  if (!header || header.querySelector('.portal-tab-back')) return;
-  const back = document.createElement('button');
-  back.type = 'button'; back.className = 'secondary-button portal-tab-back'; back.textContent = '← Back to Calendar View';
-  back.addEventListener('click', () => { dialog.close(); document.body.classList.remove('portal-tab-open'); window.CONNECT_STATE?.calendar?.updateSize?.(); });
-  header.prepend(back);
-}
-function plfWatchTabDialogs() {
-  PLF_TAB_MODAL_IDS.forEach((id) => plfMakeTabDialog(document.getElementById(id)));
-  const observer = new MutationObserver(() => {
-    let anyOpen = false;
-    PLF_TAB_MODAL_IDS.forEach((id) => { const dialog = document.getElementById(id); plfMakeTabDialog(dialog); if (dialog?.open) anyOpen = true; });
-    document.body.classList.toggle('portal-tab-open', anyOpen);
-  });
-  PLF_TAB_MODAL_IDS.forEach((id) => { const dialog = document.getElementById(id); if (dialog) observer.observe(dialog, { attributes: true, attributeFilter: ['open'] }); });
-}
-function plfInit() { plfInjectTabStyles(); plfBindApprovalPersistence(); plfBindOrgScheduleFallback(); plfWatchTabDialogs(); }
+function plfInit() { plfBindApprovalPersistence(); plfBindOrgScheduleFallback(); }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', plfInit);
 else queueMicrotask(plfInit);
