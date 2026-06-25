@@ -1,6 +1,6 @@
 (() => {
   const SESSION_KEY = 'core_supabase_auth_session';
-  const GUARD_FLAG = '__cscCalendarLogicGuardV1';
+  const GUARD_FLAG = '__cscCalendarLogicGuardV2';
   if (window[GUARD_FLAG]) return;
   window[GUARD_FLAG] = true;
 
@@ -28,7 +28,8 @@
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async function guardedFetch(input, init = {}) {
     const target = typeof input === 'string' ? input : input?.url || '';
-    const method = String(init?.method || '').toUpperCase();
+    const method = String(init?.method || 'GET').toUpperCase();
+
     if (method === 'POST' && target.includes('/rest/v1/calendar_items') && init?.body) {
       try {
         const parsed = JSON.parse(init.body);
@@ -39,8 +40,41 @@
         console.warn('Calendar payload guard skipped:', error);
       }
     }
-    return nativeFetch(input, init);
+
+    const response = await nativeFetch(input, init);
+    if (method === 'GET' && target.includes('/rest/v1/calendar_items') && response.ok) {
+      return normalizedCalendarResponse(response);
+    }
+    return response;
   };
+
+  async function normalizedCalendarResponse(response) {
+    try {
+      const cloned = response.clone();
+      const data = await cloned.json();
+      if (!Array.isArray(data)) return response;
+      const fixed = data.map(fixLoadedCalendarRow);
+      return new Response(JSON.stringify(fixed), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
+    } catch (error) {
+      console.warn('Calendar read guard skipped:', error);
+      return response;
+    }
+  }
+
+  function fixLoadedCalendarRow(row = {}) {
+    if (row.record_type !== 'schedule') return row;
+    const occurrences = normalizeOccurrences(row);
+    return {
+      ...row,
+      occurrences,
+      start_time: occurrences[0]?.start_time || row.start_time,
+      end_time: occurrences.at(-1)?.end_time || row.end_time
+    };
+  }
 
   function fixCalendarRow(row = {}) {
     if (row.record_type !== 'schedule') return row;
@@ -55,12 +89,24 @@
   }
 
   function normalizeOccurrences(row = {}) {
-    const source = Array.isArray(row.occurrences) && row.occurrences.length
-      ? row.occurrences
+    const saved = parseOccurrences(row.occurrences);
+    const source = saved.length
+      ? saved
       : [{ id: `${row.id || 'schedule'}-occurrence`, date: dateOnly(row.start_time), start_time: row.start_time, end_time: row.end_time }];
     return source.flatMap((occurrence, index) => expandOccurrence(occurrence, row.id || 'schedule', index))
       .filter((item) => item.date && item.start_time && item.end_time)
       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  }
+
+  function parseOccurrences(value) {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string' || !value.trim()) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 
   function expandOccurrence(occurrence = {}, eventId = 'schedule', index = 0) {
