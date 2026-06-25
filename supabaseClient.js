@@ -5,7 +5,7 @@ window.SUPABASE_CONFIG = Object.freeze({
 
 (() => {
   const assetBase = new URL('.', document.currentScript?.src || window.location.href);
-  const assetVersion = '20260625-admin-tabs-header-v2';
+  const assetVersion = '20260625-admin-tab-pages-v1';
   const stylesheets = [
     `csc-live-theme.css?v=${assetVersion}`,
     `connect-calendar-overrides.css?v=${assetVersion}`,

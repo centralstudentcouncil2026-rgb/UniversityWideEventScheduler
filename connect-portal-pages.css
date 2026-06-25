@@ -442,6 +442,45 @@
   border-color: #2563eb;
 }
 
+.portal-shell #announcementsModal .modal-header,
+.portal-shell #eventRequestsModal .modal-header,
+.portal-shell #usersModal .modal-header {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-bottom: 1px solid var(--aup-border);
+  border-radius: 14px 14px 0 0;
+  justify-content: space-between;
+  margin: -22px -22px 18px;
+  min-height: 58px;
+  padding: 14px 18px 12px;
+  text-align: center;
+}
+
+.portal-shell #announcementsModal .modal-header > div,
+.portal-shell #eventRequestsModal .modal-header > div,
+.portal-shell #usersModal .modal-header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-shell #announcementsModal .modal-header h3,
+.portal-shell #eventRequestsModal .modal-header h3,
+.portal-shell #usersModal .modal-header h3 {
+  color: var(--aup-navy);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.portal-shell #announcementsModal .modal-header .icon-button,
+.portal-shell #eventRequestsModal .modal-header .icon-button,
+.portal-shell #usersModal .modal-header .icon-button {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--aup-border);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
 .portal-shell .sidebar .announcement-preview {
   order: -5;
 }
@@ -1244,6 +1283,13 @@
   .public-shell .public-day-event {
     font-size: clamp(12px, 3.2vw, 14px);
   }
+
+  .portal-shell #announcementsModal .modal-header,
+  .portal-shell #eventRequestsModal .modal-header,
+  .portal-shell #usersModal .modal-header {
+    border-radius: 0;
+    margin: -18px -18px 14px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1271,5 +1317,19 @@
     margin-top: 6px;
     max-width: 100%;
     white-space: normal;
+  }
+
+  .portal-shell #announcementsModal .modal-header,
+  .portal-shell #eventRequestsModal .modal-header,
+  .portal-shell #usersModal .modal-header {
+    margin: -14px -14px 12px;
+    min-height: 54px;
+    padding: 12px 12px 10px;
+  }
+
+  .portal-shell #announcementsModal .modal-header h3,
+  .portal-shell #eventRequestsModal .modal-header h3,
+  .portal-shell #usersModal .modal-header h3 {
+    font-size: 20px;
   }
 }
