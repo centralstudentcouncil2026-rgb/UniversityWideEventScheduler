@@ -152,6 +152,20 @@
   min-height: 220px;
 }
 
+.portal-shell .org-announcement-preview {
+  display: none;
+  order: -7;
+}
+
+body.portal-shell.is-manager .org-announcement-preview {
+  display: block;
+}
+
+body.portal-shell.is-super-admin .org-announcement-preview,
+body.portal-shell.is-public .org-announcement-preview {
+  display: none;
+}
+
 .public-shell .announcement-preview #announcementPreview,
 .portal-shell .announcement-preview #announcementPreview {
   display: grid;
@@ -391,6 +405,7 @@
 
 .portal-shell .admin-tabs-panel {
   order: -7;
+  overflow: hidden;
 }
 
 .portal-shell .admin-tabs-panel > .section-label {
@@ -406,6 +421,20 @@
   min-height: 46px;
   padding: 12px 14px 10px;
   text-align: center;
+}
+
+.portal-shell .admin-tabs-panel .sidebar-tabs {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.portal-shell .admin-tabs-panel .sidebar-tab {
+  justify-content: center;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
 }
 
 .portal-shell .admin-action-panel .create-button,
@@ -1353,6 +1382,22 @@ body.admin-tab-page-open .calendar-panel {
   .portal-shell .admin-tabs-panel,
   .public-shell .sidebar-section {
     padding: clamp(10px, 3vw, 14px);
+  }
+
+  .portal-shell .admin-tabs-panel {
+    border-radius: 12px;
+    gap: 8px;
+  }
+
+  .portal-shell .admin-tabs-panel > .section-label {
+    border-radius: 9px;
+    margin: 0 0 8px;
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  .portal-shell .admin-tabs-panel .sidebar-tabs {
+    gap: 8px;
   }
 
   .portal-shell .sidebar-tab,

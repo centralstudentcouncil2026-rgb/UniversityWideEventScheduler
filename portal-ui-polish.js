@@ -3,29 +3,13 @@
   window.__portalUiPolish = true;
 
   let enhanceTimer = 0;
-  const DEFAULT_ANNOUNCEMENT = {
-    title: 'CSC S.Y.N.C. is ready for scheduling',
-    content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.'
-  };
-  const LEGACY_DEFAULT_ANNOUNCEMENT = {
-    title: 'CONNECT is ready for scheduling',
-    content: 'Student organizations may now coordinate university-wide events through CONNECT.'
-  };
-
   function style() {
     if (document.getElementById('portal-ui-polish-style')) return;
     const s = document.createElement('style');
     s.id = 'portal-ui-polish-style';
     s.textContent = `
-      body.is-manager .admin-tabs-panel{display:block!important;visibility:visible!important;opacity:1!important;}
-      body.is-manager #eventRequestsButton,
-      body.is-manager #usersButton{display:none!important;}
-      body.is-manager #announcementsButton{display:inline-flex!important;}
+      body.is-manager .admin-tabs-panel{display:none!important;}
       body.is-manager #announcementsModal #announcementForm{display:none!important;}
-      #orgAnnouncementViewer{display:grid!important;gap:14px!important;max-width:960px!important;margin:0 auto!important;width:100%!important;}
-      #orgAnnouncementViewer .notice{background:#fff!important;border:1px solid #dbe4ef!important;border-radius:20px!important;padding:18px!important;box-shadow:0 14px 36px rgba(15,23,42,.08)!important;}
-      #orgAnnouncementViewer .notice strong{display:block!important;color:#071c3d!important;font-size:1.15rem!important;margin-bottom:8px!important;}
-      #orgAnnouncementViewer .notice p{color:#475569!important;line-height:1.5!important;margin:0!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;}
 
       #notificationsModal .modal-card{background:linear-gradient(180deg,#fff,#f8fafc)!important;}
       #notificationsList{display:flex!important;flex-direction:column!important;gap:14px!important;align-items:stretch!important;}
@@ -62,20 +46,6 @@
 
   function store() { return window.CONNECT_STATE?.store; }
   function currentUser() { return (store()?.users || []).find((user) => user.id === store()?.currentUserId) || {}; }
-  function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); }
-  function isDefaultAnnouncement(item) {
-    const title = String(item?.title || '').trim().toLowerCase();
-    const content = String(item?.content || '').trim().toLowerCase();
-    return [DEFAULT_ANNOUNCEMENT, LEGACY_DEFAULT_ANNOUNCEMENT].some((announcement) => title === announcement.title.toLowerCase() && content === announcement.content.toLowerCase());
-  }
-  function visibleAnnouncements() {
-    return [...(store()?.announcements || [])]
-      .filter((item) => item && item.visibility_status !== 'hidden' && !isDefaultAnnouncement(item))
-      .sort((a, b) => new Date(b.updated_at || b.created_at || b.posted_at || 0) - new Date(a.updated_at || a.created_at || a.posted_at || 0));
-  }
-  function announcementCard(item) {
-    return `<div class="notice"><strong>${escapeHtml(item.title || 'Announcement')}</strong><p>${escapeHtml(item.content || '')}</p></div>`;
-  }
 
   function enhanceNotifications() {
     const list = document.getElementById('notificationsList');
@@ -88,36 +58,6 @@
       const actions = card.querySelector('.inline-actions');
       if (actions && !actions.children.length) actions.remove();
     });
-  }
-
-  function showOrgAnnouncements() {
-    const body = document.body;
-    const panel = document.querySelector('.admin-tabs-panel');
-    const announcementButton = document.getElementById('announcementsButton');
-    if (!body.classList.contains('is-manager') || !panel || !announcementButton) return;
-    panel.hidden = false;
-    panel.classList.remove('super-admin-only');
-    announcementButton.hidden = false;
-    announcementButton.disabled = false;
-    renderOrgAnnouncementViewer();
-  }
-
-  function renderOrgAnnouncementViewer() {
-    if (!document.body.classList.contains('is-manager')) return;
-    const modal = document.getElementById('announcementsModal');
-    const card = modal?.querySelector('.modal-card');
-    if (!card) return;
-    const form = document.getElementById('announcementForm');
-    if (form) form.hidden = true;
-    let viewer = document.getElementById('orgAnnouncementViewer');
-    if (!viewer) {
-      viewer = document.createElement('div');
-      viewer.id = 'orgAnnouncementViewer';
-      viewer.className = 'org-announcement-viewer';
-      card.appendChild(viewer);
-    }
-    const list = visibleAnnouncements();
-    viewer.innerHTML = list.length ? list.map(announcementCard).join('') : announcementCard(DEFAULT_ANNOUNCEMENT);
   }
 
   function notifyConcernOwnerWithRemarks(concern, remarks) {
@@ -174,8 +114,8 @@
     sessionStorage.setItem(key, '1');
     setTimeout(() => {
       if (window.innerWidth > 768 || document.querySelector('dialog[open]')) return;
-      renderOrgAnnouncementViewer();
-      document.getElementById('announcementsButton')?.click();
+      const preview = document.getElementById('announcementPreview');
+      if (preview) preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 650);
   }
 
@@ -189,7 +129,6 @@
     clearTimeout(enhanceTimer);
     enhanceTimer = setTimeout(() => {
       enhanceNotifications();
-      showOrgAnnouncements();
       showMobileOrgAnnouncementPopup();
     }, 80);
   }
