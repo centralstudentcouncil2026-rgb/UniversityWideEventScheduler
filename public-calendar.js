@@ -1,5 +1,5 @@
 import { emptyPublicStore } from './app-data.js?v=20260625-status-sync-v1';
-import { loadPublicStore } from './supabase-storage.js?v=20260625-status-sync-v1';
+import { loadPublicStore } from './supabase-storage.js?v=20260625-concerns-sync-v1';
 import { activeAnnouncements, eventOccurrences, isPublicEvent } from './app-rules.js?v=20260625-status-sync-v1';
 
 const $ = (id) => document.getElementById(id);

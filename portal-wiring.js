@@ -1,4 +1,4 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260625-status-sync-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260625-concerns-sync-v1';
 import { currentUser } from './app-rules.js?v=20260625-status-sync-v1';
 
 document.addEventListener('click', (event) => {
