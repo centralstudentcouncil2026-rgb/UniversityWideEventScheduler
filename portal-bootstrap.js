@@ -9,7 +9,7 @@ if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
   await import('./script.js?v=20260625-status-sync-v1');
   await import('./portal-wiring.js?v=20260625-status-sync-v1');
-  await import('./activity-status-bridge.js?v=20260625-profile-status-v1');
+  await import('./activity-status-bridge.js?v=20260625-profile-status-v2');
 } else {
   window.location.replace('index.html');
 }
