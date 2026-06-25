@@ -1,5 +1,5 @@
-import { clearSession, loadStore } from './supabase-storage.js?v=20260624-unified-calendar-v1';
-import { currentUser } from './app-rules.js?v=20260622-whole-day-realtime-v1';
+import { clearSession, loadStore } from './supabase-storage.js?v=20260625-status-sync-v1';
+import { currentUser } from './app-rules.js?v=20260625-status-sync-v1';
 
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a');
@@ -38,17 +38,19 @@ else queueMicrotask(hydratePortalExtras);
 async function hydratePortalExtras() {
   const store = window.CONNECT_BOOTSTRAP_STORE || (await loadStore()).store;
   const user = currentUser(store);
-  const office = findStatus(store, 'incampus_offcampus');
-  const president = findStatus(store, 'csc_president');
+  const office = findStatus(store, 'OIC');
+  const president = findStatus(store, 'CSC');
 
-  setText('officeStatusValue', statusLabel(office));
-  setText('presidentStatusValue', statusLabel(president));
+  setText('oicStatusValue', statusLabel(office));
+  setText('cscStatusValue', statusLabel(president));
   setText('notificationBadge', String(unreadNotificationCount(store, user)));
 }
 
 function findStatus(store, key) {
   const statuses = Array.isArray(store.activityStatuses) ? store.activityStatuses : [];
-  return statuses.find((item) => item.id === key || item.key === key);
+  return statuses
+    .filter((item) => item.account_type === key || item.id === key || item.key === key)
+    .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))[0];
 }
 
 function readableStatus(value) {
@@ -58,7 +60,7 @@ function readableStatus(value) {
 
 function statusLabel(status) {
   if (!status) return 'Status not posted';
-  return status.status_label || readableStatus(status.status) || 'Status not posted';
+  return status.activity_status || status.status_label || readableStatus(status.status) || 'Status not posted';
 }
 
 function unreadNotificationCount(store, user) {

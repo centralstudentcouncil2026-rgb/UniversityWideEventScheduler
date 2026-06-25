@@ -1,5 +1,5 @@
 try {
-  await import('./portal-guard.js?v=20260622-whole-day-realtime-v1');
+  await import('./portal-guard.js?v=20260625-status-sync-v1');
 } catch (error) {
   console.error('CONNECT portal guard failed:', error);
   window.location.replace('index.html');
@@ -7,9 +7,9 @@ try {
 
 if (window.CONNECT_AUTHENTICATED_USER) {
   await waitForFullCalendar();
-  await import('./script.js?v=20260624-unified-calendar-v1');
-  await import('./portal-wiring.js?v=20260622-whole-day-realtime-v1');
-  await import('./activity-status-bridge.js?v=20260624-activity-status-v1');
+  await import('./script.js?v=20260625-status-sync-v1');
+  await import('./portal-wiring.js?v=20260625-status-sync-v1');
+  await import('./activity-status-bridge.js?v=20260625-status-sync-v1');
 } else {
   window.location.replace('index.html');
 }

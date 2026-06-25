@@ -1,5 +1,5 @@
-import { authenticatedEmail, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260624-unified-calendar-v1';
-import { currentUser, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260622-whole-day-realtime-v1';
+import { authenticatedEmail, clearSession, loadAuthenticatedStore } from './supabase-storage.js?v=20260625-status-sync-v1';
+import { currentUser, isAllowedAdminAccount, isAllowedAdminEmail, isPublic, isSuperAdmin, userPermission } from './app-rules.js?v=20260625-status-sync-v1';
 
 const store = await loadAuthenticatedStore();
 const user = currentUser(store);

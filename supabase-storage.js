@@ -1,5 +1,5 @@
-import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260624-unified-calendar-v1';
-import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260622-whole-day-realtime-v1';
+import { emptyPublicStore, normalizeStore, storeForPersistence } from './app-data.js?v=20260625-status-sync-v1';
+import { currentUser, ensureAllowedAdminStore, isAllowedAdminEmail, isSuperAdmin } from './app-rules.js?v=20260625-status-sync-v1';
 const { url, publishableKey } = window.SUPABASE_CONFIG;
 const SESSION_KEY='core_supabase_auth_session', STORE_SYNC_SIGNAL_KEY='csc-sync-store-version', STORE_SYNC_CHANNEL='csc-sync-store';
 const CALENDAR_DEFAULTS=Object.freeze({id:null,record_type:null,organization_id:null,category_id:null,category_name:null,category_color:null,category_active:null,title:null,venue:null,schedule_type:null,start_time:null,end_time:null,occurrences:[],expected_attendees:null,privacy_level:null,contact_person:null,contact_info:null,public_description:null,purpose:null,approval_status:null,admin_recommendation:null,approval_date:null,reviewed_by:null,approved_by:null,revision_of:null,original_schedule_id:null,revision_status:null,revision_created_at:null,revision_submitted_at:null,revision_history:[],event_status:null,block_type:null,reason:null,created_by:null,created_at:null,updated_at:null});

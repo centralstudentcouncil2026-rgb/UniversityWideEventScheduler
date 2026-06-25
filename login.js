@@ -1,5 +1,5 @@
-import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260624-unified-calendar-v1';
-import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260619-detail-actions-v1';
+import { authenticate, clearSession, loadAuthenticatedStore, requestAccount } from './supabase-storage.js?v=20260625-status-sync-v1';
+import { ADMIN_ACCESS_EMAILS, currentUser, isAllowedAdminEmail, isAllowedAdminAccount, isManager, isPublic, userPermission } from './app-rules.js?v=20260625-status-sync-v1';
 
 const loginType = document.body.dataset.loginType;
 const portalHref = document.body.dataset.portalHref || 'portal.html';

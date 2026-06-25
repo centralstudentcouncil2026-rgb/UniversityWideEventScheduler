@@ -12,6 +12,23 @@ alter table public.profiles add column if not exists approval_status text not nu
 alter table public.profiles add column if not exists is_enabled boolean not null default false;
 alter table public.profiles add column if not exists permissions jsonb not null default '{}'::jsonb;
 
+create table if not exists public.activity_statuses (
+  id text primary key,
+  account_id uuid references auth.users(id) on delete set null,
+  account_type text not null check (account_type in ('CSC', 'OIC')),
+  activity_status text not null check (activity_status in (
+    'Available in Office',
+    'Not Available',
+    'On Break',
+    'In a Meeting',
+    'Out for University Activity',
+    'Available After an Hour',
+    'Online Consultation Only'
+  )),
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+
 -- Keep every existing organization request in profiles before retiring account_requests.
 insert into public.profiles (
   id, full_name, email, role, account_type, organization_name,
@@ -145,19 +162,19 @@ insert into public.calendar_items (
   approval_status, event_status, created_by, created_at, updated_at
 )
 select
-  block.id::text,
+  blocked_time.id::text,
   'blocked_time',
-  block.title,
-  block.block_type,
-  block.start_time,
-  block.end_time,
-  block.reason,
+  blocked_time.title,
+  blocked_time.block_type,
+  blocked_time.start_time,
+  blocked_time.end_time,
+  blocked_time.reason,
   'approved',
   'planned',
-  block.created_by,
-  block.created_at,
-  block.updated_at
-from public.blocked_times as block;
+  blocked_time.created_by,
+  blocked_time.created_at,
+  blocked_time.updated_at
+from public.blocked_times as blocked_time;
 
 drop table public.schedule_occurrences;
 drop table public.schedules;
@@ -251,6 +268,7 @@ $$;
 grant execute on function public.approve_organization_profile(uuid, text) to authenticated;
 
 alter table public.calendar_items enable row level security;
+alter table public.activity_statuses enable row level security;
 
 drop policy if exists calendar_items_public_read on public.calendar_items;
 create policy calendar_items_public_read on public.calendar_items
@@ -281,6 +299,37 @@ create policy calendar_items_authenticated_write on public.calendar_items
 
 grant select on public.calendar_items to anon, authenticated;
 grant insert, update, delete on public.calendar_items to authenticated;
+
+drop policy if exists activity_statuses_public_read on public.activity_statuses;
+create policy activity_statuses_public_read on public.activity_statuses
+  for select to anon
+  using (true);
+
+drop policy if exists activity_statuses_authenticated_read on public.activity_statuses;
+create policy activity_statuses_authenticated_read on public.activity_statuses
+  for select to authenticated
+  using (true);
+
+drop policy if exists activity_statuses_admin_write on public.activity_statuses;
+create policy activity_statuses_admin_write on public.activity_statuses
+  for all to authenticated
+  using (
+    public.is_enabled_admin()
+    and (
+      (account_type = 'CSC' and exists (select 1 from public.profiles where id = auth.uid() and lower(email) = 'cscadmin2@aup.edu.ph'))
+      or (account_type = 'OIC' and exists (select 1 from public.profiles where id = auth.uid() and lower(email) = 'cscadmin1@aup.edu.ph'))
+    )
+  )
+  with check (
+    public.is_enabled_admin()
+    and (
+      (account_type = 'CSC' and exists (select 1 from public.profiles where id = auth.uid() and lower(email) = 'cscadmin2@aup.edu.ph'))
+      or (account_type = 'OIC' and exists (select 1 from public.profiles where id = auth.uid() and lower(email) = 'cscadmin1@aup.edu.ph'))
+    )
+  );
+
+grant select on public.activity_statuses to anon, authenticated;
+grant insert, update, delete on public.activity_statuses to authenticated;
 notify pgrst, 'reload schema';
 
 commit;

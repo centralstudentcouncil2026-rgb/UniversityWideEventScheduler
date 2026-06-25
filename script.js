@@ -1,12 +1,12 @@
-import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260624-unified-calendar-v1';
-import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260624-unified-calendar-v1';
+import { ACCOUNT_PRESETS, ACCOUNT_TYPES, ACTIVITY_STATUS_OPTIONS, createId } from './app-data.js?v=20260625-status-sync-v1';
+import { authenticate, clearSession, decideAccountRequest, deleteRecord, loadStore, requestAccount, saveStore } from './supabase-storage.js?v=20260625-status-sync-v1';
 import {
   APPROVAL_STATUSES, EVENT_STATUSES, activeAnnouncements, canApproveEvents, canCreateEvents,
   canDeleteEvent, canEditEvent, canManageAccounts, canManageAnnouncements, canManageBlockedTimes,
   canManageCategories, canUpdateOfficeStatus, canUpdatePresidentStatus, canViewPrivateEvent,
   categoryById, currentUser, findApprovedVenueConflict, eventOccurrences, findBlockingTime,
   findVenueConflicts, isManager, isPublic, isPublicEvent, isSuperAdmin, overlaps
-} from './app-rules.js?v=20260622-whole-day-realtime-v1';
+} from './app-rules.js?v=20260625-status-sync-v1';
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_VIEWS = new Set(['timeGridWeek', 'timeGridDay', 'dayGridMonth', 'multiMonthYear', 'listWeek']);
@@ -1736,18 +1736,18 @@ function markAllNotificationsRead() {
 }
 
 function chooseActivityStatus() {
-  const user = currentUser(state.store);
-  const accountType = ACCOUNT_TYPES.includes(user.account_type) ? user.account_type : 'CSC';
-  updateAppStatus(accountType);
+  if (canUpdatePresidentStatus(state.store)) return updateAppStatus('CSC');
+  if (canUpdateOfficeStatus(state.store)) return updateAppStatus('OIC');
+  showToast('This account cannot update activity status.', 'error');
 }
 
 function updateAppStatus(accountType) {
   const allowed = accountType === 'CSC' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
-  if (!requirePermission(allowed, `This account cannot update ${accountType} status.`)) return;
+  if (!requirePermission(allowed, `This account cannot update ${activityStatusLabel(accountType)} status.`)) return;
   const existing = findStatus(accountType);
   const currentLabel = existing?.activity_status || existing?.status_label || ACTIVITY_STATUS_OPTIONS[0];
   $('activityStatusAccountType').value = accountType;
-  $('activityStatusTitle').textContent = `${accountType} Activity Status`;
+  $('activityStatusTitle').textContent = `${activityStatusLabel(accountType)} Activity Status`;
   fillSelect('activityStatusSelect', ACTIVITY_STATUS_OPTIONS.map((item) => [item, item]), currentLabel);
   openDialog('activityStatusModal');
 }
@@ -1758,7 +1758,7 @@ function submitActivityStatusForm(event) {
   const statusLabelValue = $('activityStatusSelect').value;
   if (!ACCOUNT_TYPES.includes(accountType) || !ACTIVITY_STATUS_OPTIONS.includes(statusLabelValue)) return showToast('Choose one of the listed status options.', 'error');
   const allowed = accountType === 'CSC' ? canUpdatePresidentStatus(state.store) : canUpdateOfficeStatus(state.store);
-  if (!requirePermission(allowed, `This account cannot update ${accountType} status.`)) return;
+  if (!requirePermission(allowed, `This account cannot update ${activityStatusLabel(accountType)} status.`)) return;
   const textError = textLimitError(statusLabelValue, TEXT_LIMITS.statusLabel, 'Status');
   if (textError) return showToast(textError, 'error');
   const user = currentUser(state.store);
@@ -1773,9 +1773,15 @@ function submitActivityStatusForm(event) {
     updated_by: user.full_name
   });
   if (!existing) state.store.activityStatuses.push(item);
-  log('app_status_updated', `${user.full_name} updated ${accountType} status to "${statusLabelValue}".`, item);
+  log('app_status_updated', `${user.full_name} updated ${activityStatusLabel(accountType)} status to "${statusLabelValue}".`, item);
   closeDialog('activityStatusModal');
-  persist(`${accountType} status updated.`);
+  persist(`${activityStatusLabel(accountType)} status updated.`);
+}
+
+function activityStatusLabel(accountType) {
+  if (accountType === 'CSC') return 'CSC President';
+  if (accountType === 'OIC') return 'OIC (Off Campus/In Campus Coordinator)';
+  return accountType;
 }
 
 function openConcerns() { if (!requirePermission(!isPublic(state.store), 'Login to access concerns.')) return; renderConcerns(); openDialog('concernsModal'); }

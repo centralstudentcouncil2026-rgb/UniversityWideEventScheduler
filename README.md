@@ -55,7 +55,7 @@ internal remain visible only to the posting organization and admins.
 - Manage blocked dates and times that prevent event posting.
 - Manage announcements, categories, organizations, accounts, and activity logs.
 - Use account presets and toggles to control each account's available tools.
-- Update CSC President and Incampus/Offcampus status cards when authorized.
+- Update CSC President and OIC (Off Campus/In Campus Coordinator) status cards when authorized.
 
 ### Calendar Behavior
 

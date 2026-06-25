@@ -1,7 +1,7 @@
 const STATUS_TABLE = 'activity_statuses';
 const SESSION_KEY = 'core_supabase_auth_session';
 const STATUS_RULES = {
-  'cscadmin1@aup.edu.ph': { id: 'oic', account_type: 'OIC', name: 'OIC', targets: ['oicStatusValue', 'officeStatusValue'], permission: 'updateOfficeStatus' },
+  'cscadmin1@aup.edu.ph': { id: 'oic', account_type: 'OIC', name: 'OIC (Off Campus/In Campus Coordinator)', targets: ['oicStatusValue', 'officeStatusValue'], permission: 'updateOfficeStatus' },
   'cscadmin2@aup.edu.ph': { id: 'csc', account_type: 'CSC', name: 'CSC President', targets: ['cscStatusValue', 'presidentStatusValue'], permission: 'updatePresidentStatus' }
 };
 const STATUS_TARGETS = {

@@ -1,4 +1,4 @@
--- Run after supabase-relational-reset.sql.
+-- Run after supabase-unified-calendar.sql.
 -- Recreates the four CSC Admin accounts. Replace the password once below.
 
 -- In Supabase SQL Editor, replace YOUR_ADMIN_PASSWORD below before running.
@@ -38,7 +38,18 @@ begin
       'email', now(), now(), now());
     insert into public.profiles (id, full_name, email, role, account_type, is_enabled, permissions)
     values (admin_id, initcap(split_part(admin_email, '@', 1)), admin_email, 'super_admin', 'CSC', true,
-      '{"enabled":true,"manageAccounts":true,"approveEvents":true,"editAllEvents":true,"deleteAllEvents":true,"manageBlockedTimes":true,"manageAnnouncements":true,"updatePresidentStatus":true,"updateOfficeStatus":true,"manageCategories":true}'::jsonb)
+      jsonb_build_object(
+        'enabled', true,
+        'manageAccounts', true,
+        'approveEvents', true,
+        'editAllEvents', true,
+        'deleteAllEvents', true,
+        'manageBlockedTimes', true,
+        'manageAnnouncements', true,
+        'updatePresidentStatus', admin_email = 'cscadmin2@aup.edu.ph',
+        'updateOfficeStatus', admin_email = 'cscadmin1@aup.edu.ph',
+        'manageCategories', true
+      ))
     on conflict (id) do update set
       full_name = excluded.full_name, email = excluded.email, role = excluded.role,
       account_type = excluded.account_type, is_enabled = true, permissions = excluded.permissions,

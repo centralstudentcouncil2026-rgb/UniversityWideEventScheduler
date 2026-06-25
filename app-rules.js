@@ -5,7 +5,7 @@ export const ADMIN_ACCESS_EMAILS=['cscadmin1@aup.edu.ph','cscadmin2@aup.edu.ph',
 const ADMIN_ACCESS_EMAIL_SET=new Set(ADMIN_ACCESS_EMAILS);
 const ADMIN_PERMISSIONS={enabled:true,manageAccounts:true,approveEvents:true,editAllEvents:true,deleteAllEvents:true,manageBlockedTimes:true,manageAnnouncements:true,updatePresidentStatus:false,updateOfficeStatus:false,manageCategories:false};
 const STATUS_ADMIN_PROFILES={
-  'cscadmin1@aup.edu.ph':{full_name:'OIC',account_type:'OIC',updateOfficeStatus:true,updatePresidentStatus:false},
+  'cscadmin1@aup.edu.ph':{full_name:'OIC (Off Campus/In Campus Coordinator)',account_type:'OIC',updateOfficeStatus:true,updatePresidentStatus:false},
   'cscadmin2@aup.edu.ph':{full_name:'CSC President',account_type:'CSC',updateOfficeStatus:false,updatePresidentStatus:true}
 };
 export function currentUser(store){if(store.currentUserId==='public')return PUBLIC_USER;return store.users.find((user)=>user.id===store.currentUserId)||PUBLIC_USER}
