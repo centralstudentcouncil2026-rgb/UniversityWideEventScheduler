@@ -1,6 +1,6 @@
 (() => {
   const SESSION_KEY = 'core_supabase_auth_session';
-  const GUARD_FLAG = '__cscCalendarLogicGuardV2';
+  const GUARD_FLAG = '__cscCalendarLogicGuardV3';
   if (window[GUARD_FLAG]) return;
   window[GUARD_FLAG] = true;
 
@@ -34,7 +34,7 @@
       try {
         const parsed = JSON.parse(init.body);
         const rows = Array.isArray(parsed) ? parsed : [parsed];
-        const fixedRows = alignObjectKeys(rows.map(fixCalendarRow));
+        const fixedRows = alignObjectKeys(rows.map(fixCalendarRow).filter(Boolean));
         init = { ...init, body: JSON.stringify(Array.isArray(parsed) ? fixedRows : fixedRows[0]) };
       } catch (error) {
         console.warn('Calendar payload guard skipped:', error);
@@ -53,7 +53,7 @@
       const cloned = response.clone();
       const data = await cloned.json();
       if (!Array.isArray(data)) return response;
-      const fixed = data.map(fixLoadedCalendarRow);
+      const fixed = data.map(fixLoadedCalendarRow).filter(Boolean);
       return new Response(JSON.stringify(fixed), {
         status: response.status,
         statusText: response.statusText,
@@ -65,26 +65,35 @@
     }
   }
 
+  function stripCategoryFields(row = {}) {
+    const { category_name, category_color, category_active, ...clean } = row;
+    return clean;
+  }
+
   function fixLoadedCalendarRow(row = {}) {
-    if (row.record_type !== 'schedule') return row;
-    const occurrences = normalizeOccurrences(row);
+    if (row.record_type === 'category') return null;
+    if (row.record_type !== 'schedule') return stripCategoryFields(row);
+    const clean = stripCategoryFields(row);
+    const occurrences = normalizeOccurrences(clean);
     return {
-      ...row,
+      ...clean,
       occurrences,
-      start_time: occurrences[0]?.start_time || row.start_time,
-      end_time: occurrences.at(-1)?.end_time || row.end_time
+      start_time: occurrences[0]?.start_time || clean.start_time,
+      end_time: occurrences.at(-1)?.end_time || clean.end_time
     };
   }
 
   function fixCalendarRow(row = {}) {
-    if (row.record_type !== 'schedule') return row;
-    const occurrences = normalizeOccurrences(row);
+    if (row.record_type === 'category') return null;
+    if (row.record_type !== 'schedule') return stripCategoryFields(row);
+    const clean = stripCategoryFields(row);
+    const occurrences = normalizeOccurrences(clean);
     return {
-      ...row,
-      created_by: row.created_by || sessionUserId() || null,
+      ...clean,
+      created_by: clean.created_by || sessionUserId() || null,
       occurrences,
-      start_time: occurrences[0]?.start_time || row.start_time,
-      end_time: occurrences.at(-1)?.end_time || row.end_time
+      start_time: occurrences[0]?.start_time || clean.start_time,
+      end_time: occurrences.at(-1)?.end_time || clean.end_time
     };
   }
 
