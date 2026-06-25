@@ -1,9 +1,9 @@
-const STATUS_TABLE = 'activity_statuses';
 const SESSION_KEY = 'core_supabase_auth_session';
 const STATUS_RULES = {
   'cscadmin1@aup.edu.ph': { id: 'oic', account_type: 'OIC', name: 'OIC (Off Campus/In Campus Coordinator)', targets: ['oicStatusValue', 'officeStatusValue'], permission: 'updateOfficeStatus' },
   'cscadmin2@aup.edu.ph': { id: 'csc', account_type: 'CSC', name: 'CSC President', targets: ['cscStatusValue', 'presidentStatusValue'], permission: 'updatePresidentStatus' }
 };
+const STATUS_EMAILS = Object.keys(STATUS_RULES);
 const STATUS_TARGETS = {
   oic: ['oicStatusValue', 'officeStatusValue'],
   csc: ['cscStatusValue', 'presidentStatusValue']
@@ -46,12 +46,16 @@ async function rest(endpoint, options = {}, authenticated = false) {
   return payload;
 }
 
-function readableStatus(row) {
-  return row?.activity_status || row?.status_label || 'Status not posted';
+function profileStatusId(profile = {}) {
+  return STATUS_RULES[String(profile.email || '').trim().toLowerCase()]?.id || '';
 }
 
-function renderStatusRows(rows = []) {
-  const byId = new Map(rows.map((row) => [String(row.id || '').toLowerCase(), row]));
+function readableStatus(profile) {
+  return profile?.activity_status || profile?.status_label || 'Status not posted';
+}
+
+function renderStatusRows(profiles = []) {
+  const byId = new Map(profiles.map((profile) => [profileStatusId(profile), profile]).filter(([id]) => id));
   Object.entries(STATUS_TARGETS).forEach(([id, targets]) => {
     const label = readableStatus(byId.get(id));
     targets.forEach((targetId) => {
@@ -63,10 +67,12 @@ function renderStatusRows(rows = []) {
 
 async function refreshActivityStatuses() {
   try {
-    const rows = await rest(`/rest/v1/${STATUS_TABLE}?select=*&id=in.(oic,csc)&order=updated_at.desc`, {}, false);
+    const emailList = STATUS_EMAILS.join(',');
+    const select = 'id,email,full_name,account_type,activity_status,status_label,status_updated_at,status_updated_by';
+    const rows = await rest(`/rest/v1/profiles?select=${select}&email=in.(${emailList})`, {}, false);
     renderStatusRows(Array.isArray(rows) ? rows : []);
   } catch (error) {
-    console.warn('Activity status refresh unavailable:', error.message);
+    console.warn('Profile status refresh unavailable:', error.message);
   }
 }
 
@@ -109,22 +115,19 @@ async function saveActivityStatusFromForm() {
   const typedAccount = String(accountTypeField?.value || rule.account_type).toUpperCase();
   if (typedAccount !== rule.account_type) return;
   const now = new Date().toISOString();
-  const row = {
-    id: rule.id,
-    account_id: session()?.user?.id || null,
-    account_type: rule.account_type,
-    activity_status: status,
-    status_label: status,
-    updated_by: rule.name,
-    created_at: now,
-    updated_at: now
-  };
-  await rest(`/rest/v1/${STATUS_TABLE}?on_conflict=id`, {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(row)
+  await rest(`/rest/v1/profiles?email=eq.${encodeURIComponent(currentEmail())}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      account_type: rule.account_type,
+      activity_status: status,
+      status_label: status,
+      status_updated_by: rule.name,
+      status_updated_at: now,
+      updated_at: now
+    })
   }, true);
-  renderStatusRows([row]);
+  renderStatusRows([{ email: currentEmail(), account_type: rule.account_type, activity_status: status, status_label: status }]);
 }
 
 function bindActivityStatusForm() {
@@ -133,7 +136,7 @@ function bindActivityStatusForm() {
     window.setTimeout(() => {
       saveActivityStatusFromForm()
         .then(refreshActivityStatuses)
-        .catch((error) => console.warn('Activity status save failed:', error.message));
+        .catch((error) => console.warn('Profile status save failed:', error.message));
     }, 0);
   });
 }
