@@ -13,67 +13,53 @@
       dialog.admin-tab-fullpage,dialog.portal-tab-view.admin-tab-fullpage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:#f8fafc!important;overflow:hidden!important;z-index:2147483600!important;}
       dialog.admin-tab-fullpage::backdrop,dialog.portal-tab-view.admin-tab-fullpage::backdrop{background:#f8fafc!important;backdrop-filter:none!important;}
       dialog.admin-tab-fullpage .modal-card,dialog.portal-tab-view.admin-tab-fullpage .modal-card,body.ui-light-cards-enabled dialog.admin-tab-fullpage .modal-card,body.ui-light-cards-enabled dialog.portal-tab-view.admin-tab-fullpage .modal-card{width:100vw!important;max-width:none!important;min-height:100dvh!important;height:100dvh!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#f8fafc!important;display:grid!important;grid-template-rows:auto 1fr!important;overflow:hidden!important;}
-      dialog.admin-tab-fullpage .modal-header,dialog.portal-tab-view.admin-tab-fullpage .modal-header{position:sticky!important;top:0!important;z-index:20!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:16px!important;width:100%!important;min-height:74px!important;padding:14px clamp(16px,3vw,36px)!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid #e2e8f0!important;box-shadow:0 10px 30px rgba(15,23,42,.07)!important;backdrop-filter:blur(14px)!important;}
-      dialog.admin-tab-fullpage .modal-header h2,dialog.admin-tab-fullpage .modal-header h3,dialog.portal-tab-view.admin-tab-fullpage .modal-header h2,dialog.portal-tab-view.admin-tab-fullpage .modal-header h3{margin:0!important;font-size:clamp(1.25rem,2vw,1.75rem)!important;color:#0f172a!important;letter-spacing:-.035em!important;}
+      dialog.admin-tab-fullpage .modal-header,dialog.portal-tab-view.admin-tab-fullpage .modal-header{position:sticky!important;top:0!important;z-index:20!important;display:grid!important;grid-template-columns:auto minmax(180px,1fr) auto!important;align-items:center!important;gap:14px!important;width:100%!important;min-height:74px!important;padding:14px clamp(16px,3vw,36px)!important;background:linear-gradient(135deg,#fff,#eef6ff)!important;border-bottom:1px solid #dbe4ef!important;box-shadow:0 16px 38px rgba(15,23,42,.08)!important;backdrop-filter:blur(14px)!important;}
+      dialog.admin-tab-fullpage .modal-header h2,dialog.admin-tab-fullpage .modal-header h3,dialog.portal-tab-view.admin-tab-fullpage .modal-header h2,dialog.portal-tab-view.admin-tab-fullpage .modal-header h3{margin:0!important;font-size:clamp(1.25rem,2vw,1.8rem)!important;font-weight:900!important;color:#0f172a!important;letter-spacing:-.04em!important;}
       dialog.admin-tab-fullpage .modal-header p,dialog.portal-tab-view.admin-tab-fullpage .modal-header p{margin:.2rem 0 0!important;color:#64748b!important;}
-      dialog.admin-tab-fullpage .portal-tab-back,dialog.portal-tab-view.admin-tab-fullpage .portal-tab-back{border-radius:999px!important;min-height:42px!important;padding:0 16px!important;background:#fff!important;border:1px solid #cbd5e1!important;}
-      dialog.admin-tab-fullpage .icon-button,dialog.portal-tab-view.admin-tab-fullpage .icon-button{flex:0 0 auto!important;}
+      dialog.admin-tab-fullpage .portal-tab-back,dialog.portal-tab-view.admin-tab-fullpage .portal-tab-back{border-radius:999px!important;min-height:42px!important;padding:0 16px!important;background:#fff!important;border:1px solid #cbd5e1!important;white-space:nowrap!important;}
+      dialog.admin-tab-fullpage .modal-header .icon-button[data-close],dialog.portal-tab-view.admin-tab-fullpage .modal-header .icon-button[data-close]{display:none!important;}
+      .admin-tab-header-tools{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;flex-wrap:wrap!important;min-width:0!important;}
+      .admin-tab-header-tools .event-request-filters{display:flex!important;align-items:center!important;gap:10px!important;flex-wrap:wrap!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;}
+      .admin-tab-header-tools .event-request-filters label{min-width:145px!important;max-width:220px!important;font-size:.68rem!important;gap:4px!important;}
+      .admin-tab-header-tools .event-request-filters label:first-child{min-width:220px!important;}
+      .admin-tab-header-tools .event-request-filters input,.admin-tab-header-tools .event-request-filters select{min-height:38px!important;border-radius:999px!important;background:#fff!important;box-shadow:0 8px 20px rgba(15,23,42,.06)!important;}
       dialog.admin-tab-fullpage .modal-card>:not(.modal-header),dialog.portal-tab-view.admin-tab-fullpage .modal-card>:not(.modal-header){min-height:0!important;overflow:auto!important;padding:clamp(14px,2.4vw,32px)!important;}
       dialog.admin-tab-fullpage .modal-actions,dialog.portal-tab-view.admin-tab-fullpage .modal-actions{margin:0!important;}
-      dialog.admin-tab-fullpage .form-grid,dialog.portal-tab-view.admin-tab-fullpage .form-grid,body.ui-light-cards-enabled dialog.admin-tab-fullpage .form-grid,body.ui-light-cards-enabled dialog.portal-tab-view.admin-tab-fullpage .form-grid{margin:clamp(14px,2vw,24px)!important;padding:18px!important;border:1px solid #e2e8f0!important;border-radius:22px!important;background:#fff!important;box-shadow:0 12px 34px rgba(15,23,42,.07)!important;}
       dialog.admin-tab-fullpage #eventRequestsList,dialog.portal-tab-view.admin-tab-fullpage #eventRequestsList,dialog.admin-tab-fullpage #announcementsList,dialog.portal-tab-view.admin-tab-fullpage #announcementsList,dialog.admin-tab-fullpage #usersList,dialog.portal-tab-view.admin-tab-fullpage #usersList,dialog.admin-tab-fullpage #accountRequestsList,dialog.portal-tab-view.admin-tab-fullpage #accountRequestsList{width:100%!important;}
-      dialog.admin-tab-fullpage #eventRequestFilters,dialog.portal-tab-view.admin-tab-fullpage #eventRequestFilters{margin:0 0 18px!important;}
       body.portal-tab-open .topbar,body.portal-tab-open .sidebar,body.portal-tab-open .calendar-panel{visibility:hidden!important;}
-      @media(max-width:760px){dialog.admin-tab-fullpage .modal-header,dialog.portal-tab-view.admin-tab-fullpage .modal-header{min-height:66px!important;padding:12px 14px!important;}dialog.admin-tab-fullpage .portal-tab-back,dialog.portal-tab-view.admin-tab-fullpage .portal-tab-back{padding:0 12px!important;font-size:.9rem!important;}dialog.admin-tab-fullpage .modal-card>:not(.modal-header),dialog.portal-tab-view.admin-tab-fullpage .modal-card>:not(.modal-header){padding:12px!important;}}
+      #announcementsModal .modal-card>form#announcementForm{display:grid!important;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.1fr)!important;gap:18px!important;align-items:start!important;margin:0!important;padding:clamp(16px,2.4vw,30px)!important;background:transparent!important;border:0!important;box-shadow:none!important;}
+      #announcementsModal .announcement-preview-card,#announcementsModal .announcement-input-card{background:#fff!important;border:1px solid #dbe4ef!important;border-radius:24px!important;box-shadow:0 16px 42px rgba(15,23,42,.08)!important;padding:18px!important;}
+      #announcementsModal .announcement-preview-card{position:sticky!important;top:18px!important;}
+      #announcementsModal .announcement-preview-card .announcement-live-preview{display:block!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;}
+      #announcementsModal .announcement-input-card{display:grid!important;gap:16px!important;}
+      #announcementsModal .announcement-input-card label{display:flex!important;flex-direction:column!important;gap:8px!important;}
+      #announcementsModal .announcement-input-card input,#announcementsModal .announcement-input-card textarea{border:1px solid #cbd5e1!important;border-radius:14px!important;padding:12px!important;background:#f8fafc!important;}
+      #announcementsModal .modal-actions.split-actions{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;flex-wrap:wrap!important;margin-top:2px!important;padding-top:14px!important;border-top:1px solid #e2e8f0!important;}
+      #announcementsModal .modal-actions.split-actions>div{display:flex!important;gap:10px!important;flex-wrap:wrap!important;}
+      #announcementsModal .modal-actions button{min-height:42px!important;border-radius:999px!important;padding-inline:16px!important;}
+      #eventRequestsModal #eventRequestsList.event-request-detail-grid{display:flex!important;flex-direction:row!important;grid-template-rows:none!important;grid-auto-flow:unset!important;grid-auto-columns:unset!important;gap:16px!important;overflow-x:auto!important;overflow-y:hidden!important;padding:4px 4px 24px!important;scroll-snap-type:x proximity!important;}
+      #eventRequestsModal .event-request-detail-card{flex:0 0 min(560px,78vw)!important;max-width:min(560px,78vw)!important;min-height:calc(100dvh - 190px)!important;scroll-snap-align:start!important;}
+      #eventRequestsModal .er-card-actions{position:sticky!important;bottom:0!important;background:linear-gradient(180deg,rgba(255,255,255,.88),#fff)!important;z-index:2!important;display:flex!important;gap:8px!important;flex-wrap:wrap!important;justify-content:flex-end!important;}
+      #eventRequestsModal .er-card-actions button{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:40px!important;min-width:88px!important;}
+      #usersModal #usersList{display:flex!important;flex-direction:column!important;gap:14px!important;overflow-y:auto!important;overflow-x:hidden!important;}
+      #usersModal #usersList>.activity-item,#usersModal #accountRequestsList>.activity-item{width:100%!important;max-width:none!important;}
+      #usersModal .ui-card-list{display:flex!important;flex-direction:column!important;}
+      @media(max-width:860px){dialog.admin-tab-fullpage .modal-header,dialog.portal-tab-view.admin-tab-fullpage .modal-header{grid-template-columns:1fr!important;align-items:stretch!important;min-height:66px!important;padding:12px 14px!important;}.admin-tab-header-tools{justify-content:stretch!important;}.admin-tab-header-tools .event-request-filters{flex-direction:column!important;align-items:stretch!important;width:100%!important;}.admin-tab-header-tools .event-request-filters label,.admin-tab-header-tools .event-request-filters label:first-child{max-width:none!important;min-width:0!important;width:100%!important;}dialog.admin-tab-fullpage .portal-tab-back,dialog.portal-tab-view.admin-tab-fullpage .portal-tab-back{padding:0 12px!important;font-size:.9rem!important;}dialog.admin-tab-fullpage .modal-card>:not(.modal-header),dialog.portal-tab-view.admin-tab-fullpage .modal-card>:not(.modal-header){padding:12px!important;}#announcementsModal .modal-card>form#announcementForm{grid-template-columns:1fr!important;padding:12px!important;}#announcementsModal .announcement-preview-card{position:static!important;}#eventRequestsModal #eventRequestsList.event-request-detail-grid{flex-direction:column!important;overflow-x:hidden!important;overflow-y:auto!important;padding:2px 2px 20px!important;}#eventRequestsModal .event-request-detail-card{flex:0 0 auto!important;max-width:none!important;width:100%!important;min-height:auto!important;}#eventRequestsModal .er-card-actions{justify-content:stretch!important;}#eventRequestsModal .er-card-actions button{flex:1 1 120px!important;}}
     `;
     document.head.appendChild(style);
   }
 
-  function ensureDialog(dialog) {
-    if (!dialog) return;
-    dialog.classList.add('admin-tab-fullpage', 'portal-tab-view');
-    dialog.querySelector('.modal-card')?.classList.add('admin-tab-page-shell');
-    const header = dialog.querySelector('.modal-header');
-    if (!header || header.querySelector('.portal-tab-back')) return;
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'secondary-button portal-tab-back';
-    back.textContent = '← Back to Calendar';
-    back.addEventListener('click', () => {
-      dialog.close();
-      updateOpenState();
-      window.CONNECT_STATE?.calendar?.updateSize?.();
-    });
-    header.prepend(back);
-  }
-
-  function updateOpenState() {
-    document.body.classList.toggle('portal-tab-open', TAB_IDS.some((id) => document.getElementById(id)?.open));
-  }
-
-  function applyOnce() {
-    TAB_IDS.forEach((id) => ensureDialog(document.getElementById(id)));
-    updateOpenState();
-  }
-
-  function scheduleStateUpdate() {
-    clearTimeout(stateTimer);
-    stateTimer = setTimeout(updateOpenState, 80);
-  }
-
-  function init() {
-    injectStyle();
-    applyOnce();
-    TAB_IDS.forEach((id) => {
-      const dialog = document.getElementById(id);
-      if (!dialog) return;
-      new MutationObserver(scheduleStateUpdate).observe(dialog, { attributes: true, attributeFilter: ['open'] });
-    });
-    document.addEventListener('click', (event) => {
-      if (event.target.closest('#eventRequestsButton,#announcementsButton,#usersButton,[data-close]')) setTimeout(updateOpenState, 120);
-    }, true);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else queueMicrotask(init);
+  function closeAdminTab(dialog) { dialog?.close?.(); document.body.classList.remove('portal-tab-open'); window.CONNECT_STATE?.calendar?.updateSize?.(); }
+  function ensureTools(header) { let tools = header.querySelector('.admin-tab-header-tools'); if (!tools) { tools = document.createElement('div'); tools.className = 'admin-tab-header-tools'; header.appendChild(tools); } return tools; }
+  function ensureDialog(dialog) { if (!dialog) return; dialog.classList.add('admin-tab-fullpage','portal-tab-view'); dialog.querySelector('.modal-card')?.classList.add('admin-tab-page-shell'); const header = dialog.querySelector('.modal-header'); if (!header) return; header.querySelectorAll('.icon-button[data-close]').forEach((b)=>{b.hidden=true;b.setAttribute('aria-hidden','true')}); let back = header.querySelector('.portal-tab-back'); if (!back) { back = document.createElement('button'); back.type='button'; back.className='secondary-button portal-tab-back'; back.textContent='← Back to Calendar'; back.addEventListener('click',()=>closeAdminTab(dialog)); header.prepend(back); } ensureTools(header); }
+  function updateOpenState() { document.body.classList.toggle('portal-tab-open', TAB_IDS.some((id)=>document.getElementById(id)?.open)); }
+  function moveEventFiltersToHeader() { const filters=document.getElementById('eventRequestFilters'); const tools=document.querySelector('#eventRequestsModal .admin-tab-header-tools'); if(filters&&tools&&filters.parentElement!==tools) tools.appendChild(filters); }
+  function splitAnnouncementCards() { const form=document.getElementById('announcementForm'); const preview=form?.querySelector('.announcement-live-preview'); if(!form||!preview) return; if(!form.querySelector('.announcement-input-card')) { const inputCard=document.createElement('div'); inputCard.className='announcement-input-card'; [...form.children].forEach((child)=>{ if(child!==preview&&child.tagName!=='INPUT') inputCard.appendChild(child); }); form.appendChild(inputCard); } if(!form.querySelector('.announcement-preview-card')) { const previewCard=document.createElement('div'); previewCard.className='announcement-preview-card'; previewCard.appendChild(preview); form.prepend(previewCard); } }
+  function addEventCardShortcutButtons() { document.querySelectorAll('#eventRequestsList .event-request-detail-card').forEach((card)=>{ const actions=card.querySelector('.er-card-actions'); const id=card.dataset.requestId; if(!actions||!id||actions.dataset.finalButtons==='1') return; const remove=document.createElement('button'); remove.type='button'; remove.className='secondary-button'; remove.dataset.action='event-view'; remove.dataset.id=id; remove.textContent='Remove'; const edit=document.createElement('button'); edit.type='button'; edit.className='secondary-button'; edit.dataset.action='event-view'; edit.dataset.id=id; edit.textContent='Edit'; actions.prepend(edit); actions.prepend(remove); actions.dataset.finalButtons='1'; }); }
+  function restoreNotificationRedirect() { const list=document.getElementById('notificationsList'); if(!list||list.dataset.redirectReady==='1') return; list.dataset.redirectReady='1'; list.addEventListener('click',(event)=>{ const card=event.target.closest('.activity-item'); if(!card||event.target.closest('button,[data-action]')) return; const openButton=card.querySelector('[data-action="notification-open"]'); if(openButton) openButton.click(); }); }
+  function enhanceNotificationTargets(){ document.querySelectorAll('#notificationsList .activity-item').forEach((card)=>{ if(card.dataset.clickHint==='1') return; if(card.querySelector('[data-action="notification-open"]')){ card.dataset.clickHint='1'; card.style.cursor='pointer'; card.title='Click to open related schedule'; } }); }
+  function runAll(){ TAB_IDS.forEach((id)=>ensureDialog(document.getElementById(id))); moveEventFiltersToHeader(); splitAnnouncementCards(); addEventCardShortcutButtons(); restoreNotificationRedirect(); enhanceNotificationTargets(); updateOpenState(); }
+  function scheduleStateUpdate(){ clearTimeout(stateTimer); stateTimer=setTimeout(()=>{updateOpenState();runAll();},80); }
+  function init(){ injectStyle(); runAll(); TAB_IDS.forEach((id)=>{ const dialog=document.getElementById(id); if(!dialog)return; new MutationObserver(scheduleStateUpdate).observe(dialog,{attributes:true,attributeFilter:['open']}); }); let timer=0; new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(runAll,120)}).observe(document.body,{childList:true,subtree:true}); document.addEventListener('click',(event)=>{ if(event.target.closest('#eventRequestsButton,#announcementsButton,#usersButton,#notificationsButton,[data-close]')) setTimeout(runAll,160); },true); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else queueMicrotask(init);
 })();
