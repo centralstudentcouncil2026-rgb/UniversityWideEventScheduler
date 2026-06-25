@@ -1,3 +1,4 @@
+import './single-day-span-fix.js?v=20260625-single-day-span-v1';
 (() => {
   if (window.__publicApprovedOriginalsGuard) return;
   window.__publicApprovedOriginalsGuard = true;
