@@ -10,13 +10,29 @@
     const css = document.createElement('style');
     css.id = 'admin-tabs-inline-style';
     css.textContent = `
+      .admin-tab-page,
+      .admin-tab-page .modal-card{
+        border-radius:0!important;
+        margin:0!important;
+        max-width:none!important;
+        width:100vw!important;
+      }
+      .admin-tab-page .modal-card{
+        overflow:hidden!important;
+      }
       .admin-tab-page .modal-header{
         grid-template-columns:auto minmax(180px,1fr) auto!important;
         align-items:center!important;
         gap:14px!important;
         background:linear-gradient(135deg,#facc15 0%,#eab308 62%,#ca8a04 100%)!important;
         border-bottom:4px solid #2563eb!important;
+        border-radius:0 0 22px 0!important;
         box-shadow:0 14px 30px rgba(7,28,61,.14)!important;
+        box-sizing:border-box!important;
+        margin:0!important;
+        max-width:none!important;
+        overflow:hidden!important;
+        width:100%!important;
       }
       .admin-tab-page .modal-header>div{min-width:0!important;}
       .admin-tab-page .modal-header .icon-button[data-close]{display:none!important;}
