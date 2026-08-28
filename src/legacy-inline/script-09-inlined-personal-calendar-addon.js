@@ -771,7 +771,9 @@
   }
 
   function closePersonalCalendar() {
-    if (!personalMode) return;
+    const hasPersonalUi = document.body.classList.contains('personal-calendar-perspective') || document.body.classList.contains('personal-search-expanded');
+    const hasSavedState = Boolean(savedDashboardUi || savedCalendarCreateHandlers || savedMainEvents || savedMainCategories);
+    if (!personalMode && !hasPersonalUi && !hasSavedState) return;
     const menu = document.getElementById('mobileMenuButton');
     const view = document.getElementById('viewSelector');
     const create = document.getElementById('createEventButton');
@@ -796,7 +798,10 @@
     document.getElementById('calendar')?.style.removeProperty('--personal-calendar-height');
     restoreCalendarCreateHandlers();
     restoreMainEvents();
-    dashboardCalendar()?.changeView?.(savedDashboardUi?.viewValue === 'multiMonthYear' ? 'multiMonthYear' : 'dayGridMonth');
+    const restoredView = savedDashboardUi?.viewValue === 'multiMonthYear' ? 'multiMonthYear' : 'dayGridMonth';
+    dashboardCalendar()?.changeView?.(restoredView);
+    dashboardCalendar()?.refetchEvents?.();
+    dashboardCalendar()?.updateSize?.();
     savedDashboardUi = null;
     window.CSC_SAVE_DASHBOARD_RELOAD_STATE?.();
   }
@@ -1985,7 +1990,15 @@
       }
     }, true);
     document.addEventListener('click', (event) => {
-      if (personalMode && event.target.closest('#mobileMenuButton')) {
+      const isPersonalUiActive = personalMode || document.body.classList.contains('personal-calendar-perspective');
+      if (isPersonalUiActive && event.target.closest('#dashboardButton')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closePersonalCalendar();
+        window.setTimeout(() => document.getElementById('dashboardButton')?.click(), 0);
+        return;
+      }
+      if (isPersonalUiActive && event.target.closest('#mobileMenuButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
         closePersonalCalendar();
