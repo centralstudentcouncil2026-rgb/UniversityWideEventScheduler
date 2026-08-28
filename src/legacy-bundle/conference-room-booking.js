@@ -36,6 +36,16 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   function clean(value) { return String(value || '').replace(/\s+/g, ' ').trim(); }
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); }
   function cap(value) { return String(value || '').split('_').join(' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+  function jsonArray(value) {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string' || !value.trim()) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
   function dateTime(value) {
     if (!value) return '';
     const date = new Date(value);
@@ -140,6 +150,14 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       Authorization: `Bearer ${session()?.access_token || key}`,
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal'
+    };
+  }
+  function dbReadHeaders(authenticated = Boolean(session()?.access_token)) {
+    const key = supabaseKey();
+    return {
+      apikey: key,
+      Authorization: `Bearer ${authenticated ? session()?.access_token || key : key}`,
+      'Content-Type': 'application/json'
     };
   }
   function supabaseKey() {
@@ -248,6 +266,62 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     state()?.calendar?.refetchEvents?.();
     state()?.calendar?.render?.();
     window.dispatchEvent(new CustomEvent('csc:store-rendered'));
+  }
+  function conferenceBookingFromRow(row = {}) {
+    const occurrences = jsonArray(row.occurrences);
+    return {
+      ...row,
+      record_type: 'schedule',
+      schedule_source: row.schedule_source || row.created_by_role || (row.requires_approval === false ? 'admin' : 'organization'),
+      created_by_role: row.created_by_role || row.schedule_source || (row.requires_approval === false ? 'admin' : 'organization'),
+      requires_approval: row.requires_approval !== false,
+      schedule_type: row.schedule_type || 'conference_room_booking',
+      event_type: row.event_type || row.booking_type || 'Conference Room Booking',
+      venue: row.venue || ROOM_VENUE,
+      title: row.title || row.organization_name || BOOKING_TITLE,
+      category_id: row.category_id || 'meeting',
+      approval_status: row.approval_status || 'pending',
+      event_status: row.event_status || 'planned',
+      privacy_level: row.privacy_level || 'internal',
+      occurrences: occurrences.length ? occurrences : [{ date: String(row.start_time || '').slice(0, 10), start_time: row.start_time || '', end_time: row.end_time || '' }],
+      attendee_names: jsonArray(row.attendee_names),
+      notification_read_by: row.notification_read_by && typeof row.notification_read_by === 'object' ? row.notification_read_by : {},
+      updated_at: row.updated_at || row.created_at || new Date().toISOString()
+    };
+  }
+  function mergeDatabaseBookings(rows = []) {
+    const currentStore = store();
+    if (!currentStore) return;
+    if (!Array.isArray(currentStore.events)) currentStore.events = [];
+    const conferenceEvents = rows.filter((row) => row && row.id).map(conferenceBookingFromRow);
+    currentStore.events = [...currentStore.events.filter((event) => !isConference(event)), ...conferenceEvents];
+    refresh();
+    window.dispatchEvent(new CustomEvent('csc:store-rendered'));
+  }
+  async function fetchConferenceBookings(authenticated = Boolean(session()?.access_token)) {
+    const response = await fetch(`${supabaseUrl()}/rest/v1/conference_room_bookings?select=*&order=start_time.asc`, {
+      headers: dbReadHeaders(authenticated)
+    });
+    const payload = response.status === 204 ? [] : await response.json().catch(() => []);
+    if (!response.ok) throw new Error(payload?.message || payload?.error || `Conference room bookings fetch failed (${response.status})`);
+    return Array.isArray(payload) ? payload : [];
+  }
+  async function refreshBookingsFromDatabase() {
+    if (!supabaseUrl() || !supabaseKey()) return;
+    try {
+      mergeDatabaseBookings(await fetchConferenceBookings(true));
+    } catch (error) {
+      try {
+        await window.CSC_RELOAD_MAIN_DASHBOARD_STORE?.();
+        refresh();
+        return;
+      } catch {}
+      try {
+        mergeDatabaseBookings(await fetchConferenceBookings(false));
+      } catch (fallbackError) {
+        console.warn('Conference room bookings could not be fetched:', fallbackError || error);
+      }
+    }
   }
   async function deleteBookingFromDatabase(booking) {
     if (!booking?.id) throw new Error('Conference room booking id is missing.');
@@ -867,6 +941,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     try { sessionStorage.setItem(ACTIVE_KEY, '1'); } catch {}
     initCalendar();
     resizeCalendarSoon();
+    refreshBookingsFromDatabase();
   }
   function closePage() {
     const page = document.getElementById(PAGE_ID);
