@@ -559,13 +559,18 @@ function cleanCalendarTitle(value) {
 }
 
 function initializeCalendar() {
+  const mainDashboardCalendarEvents = (info, success) => {
+    monthSpanLabels.clear();
+    success(calendarEvents(isConnectedGridFetch(info), connectedGridViewType(info)));
+  };
+  window.CSC_MAIN_DASHBOARD_CALENDAR_EVENTS = mainDashboardCalendarEvents;
   state.calendar = new FullCalendar.Calendar($('calendar'), {
     initialView: 'dayGridMonth', firstDay: 0, height: '100%', expandRows: true, nowIndicator: true,
     selectable: true, selectMirror: true, selectMinDistance: 3, longPressDelay: 220, selectLongPressDelay: 220,
     eventLongPressDelay: 300, editable: true, eventResizableFromStart: true, slotEventOverlap: false, slotMinTime: '00:00:00',
     slotMaxTime: '24:00:00', slotDuration: '00:30:00', snapDuration: '00:15:00', allDaySlot: false, forceEventDuration: true, nextDayThreshold: '00:00:00', dayMaxEvents: false, dayMaxEventRows: true, fixedWeekCount: false, showNonCurrentDates: false, headerToolbar: false,
     views: { multiMonthYear: { type: 'multiMonth', duration: { months: 12 }, multiMonthMaxColumns: 3 } },
-    events: (info, success) => { monthSpanLabels.clear(); success(calendarEvents(isConnectedGridFetch(info), connectedGridViewType(info))); },
+    events: mainDashboardCalendarEvents,
     eventContent: renderCalendarEventContent,
     moreLinkClick: 'popover',
     moreLinkContent: (args) => `${args.num} more`,

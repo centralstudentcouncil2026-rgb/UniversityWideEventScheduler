@@ -589,7 +589,7 @@
       slotMinTime: typeof calendar.getOption === 'function' ? calendar.getOption('slotMinTime') : null,
       slotMaxTime: typeof calendar.getOption === 'function' ? calendar.getOption('slotMaxTime') : null,
       scrollTime: typeof calendar.getOption === 'function' ? calendar.getOption('scrollTime') : null,
-      events: typeof calendar.getOption === 'function' ? calendar.getOption('events') : null
+      events: (typeof calendar.getOption === 'function' ? calendar.getOption('events') : null) || window.CSC_MAIN_DASHBOARD_CALENDAR_EVENTS || null
     };
     calendar.setOption('selectable', true);
     calendar.setOption('editable', true);
@@ -647,7 +647,7 @@
   function restoreCalendarCreateHandlers() {
     const calendar = savedCalendarCreateHandlers?.calendar || dashboardCalendar();
     if (!calendar?.setOption || !savedCalendarCreateHandlers) return;
-    const originalEvents = savedCalendarCreateHandlers.events;
+    const originalEvents = savedCalendarCreateHandlers.events || window.CSC_MAIN_DASHBOARD_CALENDAR_EVENTS || null;
     try { calendar.getEventSources?.().forEach((source) => source?.remove?.()); } catch {}
     calendar.removeAllEvents?.();
     calendar.setOption('dateClick', savedCalendarCreateHandlers.dateClick || null);
@@ -664,7 +664,9 @@
     calendar.setOption('slotMinTime', savedCalendarCreateHandlers.slotMinTime);
     calendar.setOption('slotMaxTime', savedCalendarCreateHandlers.slotMaxTime);
     calendar.setOption('scrollTime', savedCalendarCreateHandlers.scrollTime);
-    if (originalEvents) calendar.setOption('events', originalEvents);
+    if (originalEvents) {
+      calendar.addEventSource?.(originalEvents);
+    }
     calendar.refetchEvents?.();
     calendar.rerenderEvents?.();
     calendar.updateSize?.();
