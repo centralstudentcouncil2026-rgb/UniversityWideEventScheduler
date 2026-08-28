@@ -1,99 +1,32 @@
-# CSC S.Y.N.C. — Systemized Year-round Network Calendar
+# CSC S.Y.N.C. Organization Dashboard — Codex Modular Handoff
 
-CSC S.Y.N.C. is a static university organization calendar connected to a fresh
-Supabase backend. It does not use the original scheduler Supabase project.
+This ZIP was prepared so Codex can understand and refactor the organization dashboard more easily.
 
-## Deployment
+## What is inside
 
-The frontend is configured for Supabase project `lcmyqhyxtipzovmgbdtf`. The
-backend stores the CSC S.Y.N.C. scheduler payload in Supabase behind Auth-backed
-RPCs and Row Level Security.
+- `org-dashboard.html` — untouched current compacted dashboard fallback.
+- `legacy/original-compacted/` — original dashboard and original uploaded ZIP.
+- `src/legacy-bundle/` — virtual modules extracted from the embedded `moduleSources` object.
+- `src/legacy-inline/` — every inline script extracted from `org-dashboard.html` in original order.
+- `src/legacy-external-scripts/` — standalone JS files from the uploaded ZIP.
+- `src/features/` — feature-based organization folders for future cleanup.
+- `src/services/` — planned service layer for Supabase/data operations.
+- `src/ui/` — UI polish, mobile, modal, sidebar, and visual fix scripts.
+- `styles/` — extracted CSS and planned split CSS files.
+- `docs/` — module map, bug-fix guide, extraction report, and structure tree.
 
-GitHub Pages publishes the static frontend from the `main` branch root:
+## Current source summary
 
-https://centralstudentcouncil2026-rgb.github.io/UniversityWideEventScheduler/
+- Main dashboard: `org-dashboard.html`
+- Approximate line count: 11,242 lines
+- Inline script tags extracted: 14
+- Inline style tags extracted: 5
+- Virtual modules extracted: 11
+- Files in uploaded ZIP: 8
 
-Pushing a commit to `main` updates the public site automatically. The
-`.nojekyll` marker keeps GitHub Pages in direct static-file mode.
+## Recommended Codex instruction
 
-The backend uses Supabase Auth, a JSON scheduler state table, role-aware RPCs,
-and Row Level Security. Public viewers can read the approved calendar without
-an account. Organization accounts require Manager approval. Elevated accounts
-are assigned by the Manager from inside the Accounts panel.
+Paste this into Codex:
 
-Public viewers do not need an account. They receive a month-only overview and
-can select a date to inspect its public events. New organization accounts are
-submitted from the public registration form and remain unavailable until the
-Manager approves them from the Accounts panel.
+> Read `CODEX_PROMPT.md` first. Preserve current behavior first. Do not optimize yet. Make the organization dashboard modular using the provided structure, then fix only the specific bug I mention.
 
-Active organization accounts can post events directly. Admin-blocked periods
-prevent posting, while schedule overlaps remain visible warnings. Events marked
-internal remain visible only to the posting organization and admins.
-
-## User Manual
-
-### Public Calendar
-
-- Open the public site to view approved public events without logging in.
-- Use the Month or Year view to scan university-wide activity.
-- Select a calendar date to inspect the public events scheduled for that day.
-- Open the menu on phone or tablet to view announcements and posted status cards.
-
-### Organization Portal
-
-- Sign in through the organization access link.
-- Post university events from the sidebar.
-- Create single-day or multi-day events, including per-day custom times.
-- Edit or remove events created by the signed-in organization.
-- View approved public events from other organizations and CSC.
-- Raise concerns for admin review.
-
-### Admin Portal
-
-- Sign in through the admin access link.
-- Review, approve, reject, edit, or remove calendar events.
-- Manage blocked dates and times that prevent event posting.
-- Manage announcements, categories, organizations, accounts, and activity logs.
-- Use account presets and toggles to control each account's available tools.
-- Update CSC President and OIC (Off Campus/In Campus Coordinator) status cards when authorized.
-
-### Calendar Behavior
-
-- Week and day views keep overlapping events visible.
-- Multi-day week events use connected horizontal and vertical line styling.
-- Month and year views keep multi-day events visually connected.
-- Public events show only public-safe details.
-- Internal events remain visible only to the posting organization and admins.
-
-### Mobile and Tablet Use
-
-- The same public, organization, and admin sites adapt to phone, tablet, and desktop sizes.
-- On touch devices, the sidebar becomes a drawer opened by the menu button.
-- Rotate the device freely; the calendar resizes after viewport and orientation changes.
-
-## Run Locally
-
-```bash
-python -m http.server 5173
-```
-
-Open `http://127.0.0.1:5173/index.html`.
-
-## Backend
-
-`schema.sql` documents the CSC S.Y.N.C. Auth/RPC backend applied to project
-`lcmyqhyxtipzovmgbdtf`. The authoritative migrations are recorded in that
-project's Supabase migration history.
-
-## Supabase MCP For Codex
-
-Use this MCP target for CSC S.Y.N.C. project work in Codex:
-
-```bash
-codex mcp add supabase --url https://mcp.supabase.com/mcp?project_ref=lcmyqhyxtipzovmgbdtf
-codex mcp login supabase
-```
-
-Then run `/mcp` inside Codex to verify authentication. The deployed frontend
-points at `lcmyqhyxtipzovmgbdtf.supabase.co`; verify the intended backend
-target before applying migrations or changing live data.

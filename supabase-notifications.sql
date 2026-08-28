@@ -1,6 +1,0 @@
--- DEPRECATED / DO NOT RUN
--- Notifications no longer require a separate scheduler_notifications table.
--- The frontend now derives notifications directly from public.calendar_items:
---   - Admins see pending schedule rows as Event Request notifications.
---   - Creators see approved/rejected schedule rows as result notifications.
--- Keep using calendar_items as the single source of truth.

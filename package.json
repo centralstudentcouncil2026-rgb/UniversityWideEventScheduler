@@ -1,0 +1,9 @@
+{
+  "name": "csc-sync-org-codex-modular-handoff",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Codex handoff package for modularizing the CSC S.Y.N.C. organization dashboard",
+  "scripts": {
+    "structure": "node scripts/print-structure.js"
+  }
+}
