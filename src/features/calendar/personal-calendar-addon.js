@@ -181,6 +181,8 @@
       body.personal-calendar-perspective #personalCalendarHost .fc-scrollgrid th{border-color:rgba(100,116,139,.34)!important;border-style:solid!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day-frame{min-height:0!important;background:rgba(255,255,255,.44)!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day-number{display:block!important;color:#0f172a!important;font-weight:700!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event-harness{margin-inline:2px!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event{box-sizing:border-box!important;margin-inline:0!important;max-width:calc(100% - 4px)!important;width:calc(100% - 4px)!important;}
       body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence,
       body.personal-calendar-perspective #personalCalendarHost .gcal-month-event,
       body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-main,
@@ -341,7 +343,8 @@
         body.personal-calendar-perspective.personal-search-expanded #personalCalendarHeaderSearch::placeholder{color:#64748b!important;opacity:1!important;}
       }
       body.portal-shell #mobileMenuButton{align-items:center!important;justify-content:center!important;min-width:clamp(40px,10vw,52px)!important;width:clamp(40px,10vw,52px)!important;height:clamp(40px,10vw,52px)!important;padding:0!important;}
-      body.portal-shell #mobileMenuButton span{border-radius:999px!important;display:block!important;height:clamp(2px,.7vw,3px)!important;width:clamp(20px,5.8vw,28px)!important;}
+      body.portal-shell #mobileMenuButton::before{content:none!important;}
+      body.portal-shell #mobileMenuButton span{background:#0f172a!important;border-radius:999px!important;display:block!important;height:clamp(2px,.55vw,3px)!important;width:clamp(18px,4.9vw,26px)!important;}
       body.personal-calendar-perspective .topbar{align-items:center!important;display:flex!important;flex-wrap:nowrap!important;gap:clamp(6px,1.5vw,12px)!important;overflow:hidden!important;padding-inline:clamp(6px,2vw,16px)!important;}
       body.personal-calendar-perspective .brand-area{display:flex!important;align-items:center!important;flex:1 1 auto!important;gap:clamp(6px,1.6vw,10px)!important;min-width:0!important;overflow:hidden!important;}
       body.personal-calendar-perspective .brand-logo{flex:0 0 auto!important;height:clamp(34px,9vw,48px)!important;width:clamp(34px,9vw,48px)!important;}
@@ -351,7 +354,7 @@
       body.personal-calendar-perspective #mobileMenuButton,
       body.personal-calendar-perspective .period-controls .icon-button,
       body.personal-calendar-perspective #notificationsButton{align-items:center!important;aspect-ratio:1/1!important;border-radius:999px!important;display:inline-flex!important;flex:0 0 auto!important;height:clamp(38px,9.8vw,52px)!important;justify-content:center!important;min-height:clamp(38px,9.8vw,52px)!important;min-width:clamp(38px,9.8vw,52px)!important;padding:0!important;width:clamp(38px,9.8vw,52px)!important;}
-      body.personal-calendar-perspective #mobileMenuButton::before{font-size:clamp(1.05rem,4.8vw,1.45rem)!important;}
+      body.personal-calendar-perspective #mobileMenuButton::before{content:none!important;}
       body.personal-calendar-perspective .calendar-nav{align-items:center!important;display:flex!important;flex:0 1 auto!important;gap:clamp(5px,1.4vw,10px)!important;justify-content:flex-end!important;min-width:0!important;overflow:visible!important;}
       body.personal-calendar-perspective .period-controls{align-items:center!important;display:inline-flex!important;flex:0 0 auto!important;gap:clamp(5px,1.4vw,8px)!important;}
       body.personal-calendar-perspective #viewSelector{border-radius:999px!important;flex:0 1 clamp(82px,18vw,132px)!important;font-size:clamp(.78rem,3vw,1rem)!important;min-height:clamp(38px,9.8vw,52px)!important;min-width:clamp(76px,18vw,104px)!important;overflow:hidden!important;padding-inline:clamp(10px,3vw,18px)!important;text-align:center!important;text-overflow:ellipsis!important;text-align-last:center!important;white-space:nowrap!important;width:auto!important;}
@@ -369,7 +372,7 @@
         body.personal-calendar-perspective #mobileMenuButton,
         body.personal-calendar-perspective .period-controls .icon-button,
         body.personal-calendar-perspective #notificationsButton{height:34px!important;min-height:34px!important;min-width:34px!important;width:34px!important;}
-        body.personal-calendar-perspective #mobileMenuButton span{height:2px!important;width:20px!important;}
+        body.personal-calendar-perspective #mobileMenuButton span{height:2px!important;width:18px!important;}
         body.personal-calendar-perspective #mobileMenuButton::before{font-size:1rem!important;}
         body.personal-calendar-perspective .calendar-nav,
         body.personal-calendar-perspective .period-controls{gap:4px!important;}
@@ -377,6 +380,15 @@
         body.personal-calendar-perspective .brand-area{flex:1 1 min(30vw,118px)!important;}
         body.personal-calendar-perspective .brand-copy h1{font-size:clamp(.78rem,4.1vw,1rem)!important;max-width:min(30vw,116px)!important;}
         body.personal-calendar-perspective #viewSelector{flex-basis:clamp(62px,18vw,82px)!important;font-size:.75rem!important;min-height:34px!important;min-width:clamp(58px,17vw,72px)!important;padding-inline:8px!important;}
+        body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event-harness{margin-inline:1px!important;}
+        body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event{max-width:calc(100% - 2px)!important;width:calc(100% - 2px)!important;}
+        body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .gcal-month-event .fc-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .gcal-month-event .fc-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-content{font-size:9.5px!important;font-weight:800!important;gap:1px!important;line-height:1.05!important;}
       }
     `;
     document.head.appendChild(style);
