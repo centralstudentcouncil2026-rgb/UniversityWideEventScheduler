@@ -234,6 +234,27 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     state()?.calendar?.render?.();
     window.dispatchEvent(new CustomEvent('csc:store-rendered'));
   }
+  async function deleteBookingFromDatabase(booking) {
+    if (!booking?.id) throw new Error('Conference room booking id is missing.');
+    if (!supabaseUrl() || !supabaseKey()) throw new Error('Supabase config is missing for conference room booking.');
+    const response = await fetch(bookingSaveUrl(booking.id, true), {
+      method: 'DELETE',
+      headers: dbHeaders()
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(supabaseErrorMessage(payload, response.status));
+    }
+  }
+  function removeLocalBooking(id) {
+    const currentStore = store();
+    if (!currentStore || !Array.isArray(currentStore.events)) return;
+    currentStore.events = currentStore.events.filter((event) => event.id !== id);
+    state()?.calendar?.getEventById?.(id)?.remove?.();
+    state()?.calendar?.refetchEvents?.();
+    state()?.calendar?.render?.();
+    window.dispatchEvent(new CustomEvent('csc:store-rendered'));
+  }
   async function databaseBookingConflict(startTime, endTime, ignoreId = '', statuses = ['pending', 'approved']) {
     if (!supabaseUrl() || !supabaseKey()) return null;
     const params = new URLSearchParams({
@@ -643,20 +664,16 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   }
   async function cancelBooking(booking) {
     if (!booking || (!canApproveConferenceBookings() && booking.created_by !== user().id)) return;
-    if (!confirm(`Cancel conference room booking for ${booking.organization_name || booking.title}?`)) return;
-    const previousBooking = { ...booking };
-    booking.event_status = 'cancelled';
-    booking.updated_at = new Date().toISOString();
+    if (!confirm(`Delete conference room booking for ${booking.organization_name || booking.title}?`)) return;
     try {
-      await saveBookingToDatabase(booking);
+      await deleteBookingFromDatabase(booking);
     } catch (error) {
-      Object.assign(booking, previousBooking);
-      api().showToast?.(`Conference room booking cancel could not be saved to database: ${error.message}`, 'error');
+      api().showToast?.(`Conference room booking could not be deleted from database: ${error.message}`, 'error');
       return;
     }
-    upsertLocalBooking(booking);
-    api().log?.('conference_room_booking_cancelled', `${user().full_name} cancelled a conference room booking.`, api().scheduleAuditSnapshot?.(booking) || booking);
-    api().showToast?.('Conference room booking cancelled.', 'success');
+    removeLocalBooking(booking.id);
+    api().log?.('conference_room_booking_deleted', `${user().full_name} deleted a conference room booking.`, api().scheduleAuditSnapshot?.(booking) || booking);
+    api().showToast?.('Conference room booking deleted.', 'success');
     refresh();
   }
   function resetConferenceRoomRuntime() {
