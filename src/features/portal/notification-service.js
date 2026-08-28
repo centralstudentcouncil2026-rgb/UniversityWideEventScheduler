@@ -703,7 +703,11 @@ function notificationKeySet(notices = currentUserNotifications()) {
 async function mergeConferenceRoomBookings(payload = {}) {
   const s = store();
   if (!s || !Array.isArray(s.events)) return;
-  s.events = s.events.filter((event) => !isConferenceRoomBooking(event));
+  const rows = await rest('/rest/v1/conference_room_bookings?select=*&order=start_time.asc', {}, Boolean(session()?.access_token))
+    .catch(() => rest('/rest/v1/conference_room_bookings?select=*&order=start_time.asc', {}, false))
+    .catch(() => []);
+  const conferenceEvents = (Array.isArray(rows) ? rows : []).filter((row) => row && row.id).map(conferenceBookingEvent);
+  s.events = [...s.events.filter((event) => !isConferenceRoomBooking(event)), ...conferenceEvents];
   document.dispatchEvent(new CustomEvent('conference-room-bookings-updated', { detail: { payload } }));
 }
 

@@ -49,10 +49,16 @@ async function loadConcernsTable(authenticated=false){
   }
 }
 async function loadConferenceRoomBookingsTable(authenticated=false){
-  if(!authenticated)return[];
   try{
-    return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},true);
+    return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},authenticated);
   }catch(error){
+    if(authenticated){
+      try{
+        return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},false);
+      }catch(fallbackError){
+        console.warn('CONNECT conference room public fallback unavailable:',fallbackError);
+      }
+    }
     console.warn('CONNECT conference room sync unavailable:',error);
     return[];
   }
