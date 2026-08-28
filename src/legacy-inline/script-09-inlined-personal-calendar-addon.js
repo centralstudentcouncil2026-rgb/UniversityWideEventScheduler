@@ -812,6 +812,24 @@
     window.CSC_SAVE_DASHBOARD_RELOAD_STATE?.();
   }
 
+  function clearSavedPersonalCalendarState() {
+    window.CSC_PENDING_PERSONAL_CALENDAR_RESTORE = null;
+    try {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith('csc_sync_dashboard_reload_state_')) localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
+  function redirectToMainDashboard() {
+    clearSavedPersonalCalendarState();
+    const target = new URL('org-dashboard.html', window.location.href);
+    target.searchParams.set('dashboard', 'main');
+    target.searchParams.set('t', String(Date.now()));
+    window.location.replace(target.href);
+  }
+
   function openPersonalForm(item = null, date = '') {
     openNativeScheduleModal(item, date);
   }
@@ -2000,14 +2018,13 @@
       if (isPersonalUiActive && event.target.closest('#dashboardButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        closePersonalCalendar();
-        window.setTimeout(() => document.getElementById('dashboardButton')?.click(), 0);
+        redirectToMainDashboard();
         return;
       }
       if (isPersonalUiActive && event.target.closest('#mobileMenuButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        closePersonalCalendar();
+        redirectToMainDashboard();
         return;
       }
       if (personalMode && event.target.closest('#createEventButton')) {
