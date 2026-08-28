@@ -10755,6 +10755,27 @@ await import(moduleUrls[moduleOrder.at(-1)]);
     }
   }
 </style>
-</body>
+<script id="csc-sync-logout-fix-v1">
+(() => {
+  const SESSION_KEY = 'core_supabase_auth_session';
+  const logoutSelectors = '#logoutButton, #modalLogoutButton, [data-logout], [data-action="logout"]';
+
+  function logout(event) {
+    const button = event.target && event.target.closest ? event.target.closest(logoutSelectors) : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    try { sessionStorage.removeItem('sb-auth-token'); } catch {}
+    try { localStorage.removeItem('sb-auth-token'); } catch {}
+    window.CONNECT_AUTHENTICATED_USER = null;
+    window.CONNECT_BOOTSTRAP_STORE = null;
+    window.location.replace(new URL('./index.html', window.location.href).href);
+  }
+
+  document.addEventListener('click', logout, true);
+})();
+</script></body>
   
 </html>
