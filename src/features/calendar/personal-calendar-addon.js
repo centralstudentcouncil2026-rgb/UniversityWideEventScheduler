@@ -2018,13 +2018,13 @@
       if (isPersonalUiActive && event.target.closest('#dashboardButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        redirectToMainDashboard();
+        closePersonalCalendar();
         return;
       }
       if (isPersonalUiActive && event.target.closest('#mobileMenuButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        redirectToMainDashboard();
+        closePersonalCalendar();
         return;
       }
       if (personalMode && event.target.closest('#createEventButton')) {
