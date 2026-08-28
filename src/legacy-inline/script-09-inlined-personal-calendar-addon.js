@@ -415,6 +415,26 @@
     calendar?.updateSize?.();
   }
 
+  function reloadMainDashboardCalendarItems() {
+    const reloadStore = window.CSC_RELOAD_MAIN_DASHBOARD_STORE;
+    if (typeof reloadStore !== 'function') return;
+    Promise.resolve(reloadStore()).then(() => {
+      const calendar = dashboardCalendar();
+      const mainEvents = window.CSC_MAIN_DASHBOARD_CALENDAR_EVENTS;
+      if (calendar && typeof mainEvents === 'function') {
+        try { calendar.getEventSources?.().forEach((source) => source?.remove?.()); } catch {}
+        calendar.removeAllEvents?.();
+        calendar.addEventSource?.(mainEvents);
+      }
+      calendar?.refetchEvents?.();
+      calendar?.rerenderEvents?.();
+      calendar?.updateSize?.();
+    }).catch((error) => {
+      console.warn('Main dashboard schedules could not be reloaded after closing personal calendar:', error);
+      dashboardCalendar()?.refetchEvents?.();
+    });
+  }
+
   function ensureHeaderSearch() {
     let search = document.getElementById('personalCalendarHeaderSearch');
     if (search) return search;
@@ -812,6 +832,7 @@
     dashboardCalendar()?.updateSize?.();
     savedDashboardUi = null;
     window.CSC_SAVE_DASHBOARD_RELOAD_STATE?.();
+    reloadMainDashboardCalendarItems();
   }
 
   function clearSavedPersonalCalendarState() {

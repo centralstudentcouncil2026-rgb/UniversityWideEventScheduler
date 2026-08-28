@@ -175,6 +175,7 @@ async function init() {
     state.store = store;
     window.CONNECT_STATE = state;
     window.CSC_SAVE_DASHBOARD_RELOAD_STATE = saveDashboardReloadStateNow;
+    window.CSC_RELOAD_MAIN_DASHBOARD_STORE = reloadStore;
     restoreDashboardReloadState();
     bindEvents();
     populateStaticOptions();
