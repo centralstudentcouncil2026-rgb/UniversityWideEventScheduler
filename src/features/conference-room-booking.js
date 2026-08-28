@@ -101,6 +101,21 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     try { return JSON.parse(sessionStorage.getItem('core_supabase_auth_session') || 'null'); }
     catch { return null; }
   }
+  function isReloadNavigation() {
+    const entry = performance.getEntriesByType?.('navigation')?.[0];
+    if (entry?.type) return entry.type === 'reload';
+    return performance.navigation?.type === 1;
+  }
+  function restorePageAfterReload(attempt = 0) {
+    let shouldRestore = false;
+    try { shouldRestore = sessionStorage.getItem(ACTIVE_KEY) === '1'; } catch {}
+    if (!shouldRestore || !isReloadNavigation()) return;
+    if (!state()?.store && attempt < 40) {
+      window.setTimeout(() => restorePageAfterReload(attempt + 1), 100);
+      return;
+    }
+    openPage();
+  }
   function authUserId() {
     return uuid(session()?.user?.id || window.CONNECT_AUTHENTICATED_USER?.auth_id || window.CONNECT_AUTHENTICATED_USER?.auth_user_id);
   }
@@ -945,6 +960,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     style();
     ensureUi();
     window.addEventListener('csc:store-rendered', refresh);
+    restorePageAfterReload();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else queueMicrotask(init);
