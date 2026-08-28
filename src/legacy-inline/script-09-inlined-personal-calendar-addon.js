@@ -647,6 +647,9 @@
   function restoreCalendarCreateHandlers() {
     const calendar = savedCalendarCreateHandlers?.calendar || dashboardCalendar();
     if (!calendar?.setOption || !savedCalendarCreateHandlers) return;
+    const originalEvents = savedCalendarCreateHandlers.events;
+    try { calendar.getEventSources?.().forEach((source) => source?.remove?.()); } catch {}
+    calendar.removeAllEvents?.();
     calendar.setOption('dateClick', savedCalendarCreateHandlers.dateClick || null);
     calendar.setOption('select', savedCalendarCreateHandlers.select || null);
     calendar.setOption('eventClick', savedCalendarCreateHandlers.eventClick || null);
@@ -661,7 +664,10 @@
     calendar.setOption('slotMinTime', savedCalendarCreateHandlers.slotMinTime);
     calendar.setOption('slotMaxTime', savedCalendarCreateHandlers.slotMaxTime);
     calendar.setOption('scrollTime', savedCalendarCreateHandlers.scrollTime);
-    if (savedCalendarCreateHandlers.events) calendar.setOption('events', savedCalendarCreateHandlers.events);
+    if (originalEvents) calendar.setOption('events', originalEvents);
+    calendar.refetchEvents?.();
+    calendar.rerenderEvents?.();
+    calendar.updateSize?.();
     savedCalendarCreateHandlers = null;
   }
 
