@@ -62,6 +62,80 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const text = String(value || '');
     return text.length === 16 ? text : localInput(value);
   }
+  function dateOnly(value) {
+    const text = String(value || '');
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function timeOnly(value) {
+    const text = String(value || '');
+    const match = text.match(/T(\d{2}:\d{2})/);
+    if (match) return match[1];
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+  function combineLocal(date, time) {
+    return date && time ? `${date}T${time}` : '';
+  }
+  function addRepeatStep(date, repeatRule) {
+    const next = new Date(`${date}T00:00`);
+    if (Number.isNaN(next.getTime())) return '';
+    if (repeatRule === 'daily') next.setDate(next.getDate() + 1);
+    else if (repeatRule === 'weekly') next.setDate(next.getDate() + 7);
+    else if (repeatRule === 'monthly') next.setMonth(next.getMonth() + 1);
+    else return '';
+    return dateOnly(next);
+  }
+  function defaultRepeatUntil(startTime, repeatRule) {
+    const startDate = dateOnly(startTime);
+    if (!startDate || repeatRule === 'none') return '';
+    const date = new Date(`${startDate}T00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setMonth(date.getMonth() + 1);
+    date.setDate(date.getDate() - 1);
+    return dateOnly(date);
+  }
+  function buildOccurrences(startTime, endTime, repeatRule = 'none', repeatUntil = '') {
+    const startDate = dateOnly(startTime);
+    const endDate = dateOnly(endTime) || startDate;
+    const startClock = timeOnly(startTime);
+    const endClock = timeOnly(endTime);
+    if (!startDate || !startClock || !endClock) return [];
+    const rule = ['daily', 'weekly', 'monthly'].includes(repeatRule) ? repeatRule : 'none';
+    const untilDate = rule === 'none' ? startDate : (dateOnly(repeatUntil) || defaultRepeatUntil(startTime, rule));
+    const occurrences = [];
+    let currentStartDate = startDate;
+    let currentEndDate = endDate;
+    for (let index = 0; index < 80; index += 1) {
+      if (currentStartDate > untilDate) break;
+      const occurrenceStart = combineLocal(currentStartDate, startClock);
+      const occurrenceEnd = combineLocal(currentEndDate, endClock);
+      if (occurrenceStart && occurrenceEnd && new Date(occurrenceEnd) > new Date(occurrenceStart)) {
+        occurrences.push({ id: createId(), date: currentStartDate, start_time: occurrenceStart, end_time: occurrenceEnd });
+      }
+      if (rule === 'none') break;
+      currentStartDate = addRepeatStep(currentStartDate, rule);
+      currentEndDate = addRepeatStep(currentEndDate, rule);
+      if (!currentStartDate || !currentEndDate) break;
+    }
+    return occurrences;
+  }
+  function bookingOccurrences(booking = {}) {
+    const rows = jsonArray(booking.occurrences).filter((occurrence) => occurrence?.start_time && occurrence?.end_time);
+    return rows.length ? rows : [{ id: booking.id || createId(), date: dateOnly(booking.start_time), start_time: booking.start_time || '', end_time: booking.end_time || '' }];
+  }
+  function repeatLabel(booking = {}) {
+    const rule = String(booking.repeat_rule || booking.recurrence_type || 'none');
+    if (rule === 'daily') return 'Daily';
+    if (rule === 'weekly') return 'Weekly';
+    if (rule === 'monthly') return 'Monthly';
+    return 'Does not repeat';
+  }
   function active(event = {}) {
     return !['cancelled', 'disabled', 'completed'].includes(event.event_status || 'planned');
   }
@@ -93,13 +167,11 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   }
   function bookingConflict(startTime, endTime, ignoreId = '', statuses = ['pending', 'approved']) {
     const blockingStatuses = new Set(statuses);
-    return (store()?.events || []).find((event) =>
-      event.id !== ignoreId
-      && isConference(event)
-      && active(event)
-      && blockingStatuses.has(bookingStatus(event))
-      && overlaps(startTime, endTime, event.start_time, event.end_time)
-    ) || null;
+    const candidates = Array.isArray(startTime) ? startTime : [{ start_time: startTime, end_time: endTime }];
+    return (store()?.events || []).find((event) => {
+      if (event.id === ignoreId || !isConference(event) || !active(event) || !blockingStatuses.has(bookingStatus(event))) return false;
+      return candidates.some((candidate) => bookingOccurrences(event).some((occurrence) => overlaps(candidate.start_time, candidate.end_time, occurrence.start_time, occurrence.end_time)));
+    }) || null;
   }
   function approvedConflict(startTime, endTime, ignoreId = '') {
     return bookingConflict(startTime, endTime, ignoreId, ['approved']);
@@ -184,6 +256,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       start_time: booking.start_time,
       end_time: booking.end_time,
       occurrences: Array.isArray(booking.occurrences) ? booking.occurrences : [],
+      repeat_rule: booking.repeat_rule || 'none',
+      repeat_until: booking.repeat_until || null,
       expected_attendees: Math.max(1, Number.parseInt(booking.expected_attendees, 10) || 1),
       attendee_names: bookingAttendees(booking),
       activity_description: bookingActivityDescription(booking),
@@ -244,6 +318,37 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     }
     throw new Error('Conference room booking save failed because the database schema is missing too many columns.');
   }
+  async function saveBookingMirrorToCalendarItems(booking) {
+    if (!supabaseUrl() || !supabaseKey()) return;
+    let row = dbRow(booking);
+    const strippedColumns = new Set();
+    const existingBooking = (store()?.events || []).some((event) => event.id === booking.id);
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await fetch(`${supabaseUrl()}/rest/v1/calendar_items${existingBooking ? `?id=eq.${encodeURIComponent(row.id)}` : ''}`, {
+        method: existingBooking ? 'PATCH' : 'POST',
+        headers: dbHeaders(),
+        body: JSON.stringify(row)
+      });
+      if (response.ok) return;
+      const payload = await response.json().catch(() => ({}));
+      if (!existingBooking && response.status === 409) {
+        const patchResponse = await fetch(`${supabaseUrl()}/rest/v1/calendar_items?id=eq.${encodeURIComponent(row.id)}`, {
+          method: 'PATCH',
+          headers: dbHeaders(),
+          body: JSON.stringify(row)
+        });
+        if (patchResponse.ok) return;
+      }
+      const missing = missingBookingColumn(payload);
+      if (!missing || strippedColumns.has(missing) || !(missing in row)) {
+        console.warn('CONNECT conference room calendar_items mirror failed:', payload);
+        return;
+      }
+      strippedColumns.add(missing);
+      row = { ...row };
+      delete row[missing];
+    }
+  }
   function bookingSaveUrl(id, existingBooking) {
     const base = `${supabaseUrl()}/rest/v1/conference_room_bookings`;
     return existingBooking ? `${base}?id=eq.${encodeURIComponent(id)}` : base;
@@ -284,6 +389,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       event_status: row.event_status || 'planned',
       privacy_level: row.privacy_level || 'internal',
       occurrences: occurrences.length ? occurrences : [{ date: String(row.start_time || '').slice(0, 10), start_time: row.start_time || '', end_time: row.end_time || '' }],
+      repeat_rule: row.repeat_rule || row.recurrence_type || (occurrences.length > 1 ? 'weekly' : 'none'),
+      repeat_until: row.repeat_until || row.recurrence_until || '',
       attendee_names: jsonArray(row.attendee_names),
       notification_read_by: row.notification_read_by && typeof row.notification_read_by === 'object' ? row.notification_read_by : {},
       updated_at: row.updated_at || row.created_at || new Date().toISOString()
@@ -306,18 +413,52 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (!response.ok) throw new Error(payload?.message || payload?.error || `Conference room bookings fetch failed (${response.status})`);
     return Array.isArray(payload) ? payload : [];
   }
+  async function fetchCalendarItemConferenceBookings(authenticated = Boolean(session()?.access_token)) {
+    const params = new URLSearchParams({
+      select: '*',
+      record_type: 'eq.schedule',
+      schedule_type: 'eq.conference_room_booking',
+      order: 'start_time.asc'
+    });
+    const response = await fetch(`${supabaseUrl()}/rest/v1/calendar_items?${params.toString()}`, {
+      headers: dbReadHeaders(authenticated)
+    });
+    const payload = response.status === 204 ? [] : await response.json().catch(() => []);
+    if (!response.ok) throw new Error(payload?.message || payload?.error || `Conference room calendar-items fetch failed (${response.status})`);
+    return Array.isArray(payload) ? payload : [];
+  }
+  async function fetchAllConferenceBookings(authenticated = Boolean(session()?.access_token)) {
+    const [bookings, calendarItems] = await Promise.allSettled([
+      fetchConferenceBookings(authenticated),
+      fetchCalendarItemConferenceBookings(authenticated)
+    ]);
+    const rows = [
+      ...(bookings.status === 'fulfilled' ? bookings.value : []),
+      ...(calendarItems.status === 'fulfilled' ? calendarItems.value : [])
+    ];
+    const byId = new Map();
+    rows.forEach((row) => {
+      if (!row?.id) return;
+      const existing = byId.get(row.id);
+      if (!existing || new Date(row.updated_at || row.created_at || 0) >= new Date(existing.updated_at || existing.created_at || 0)) byId.set(row.id, row);
+    });
+    if (!rows.length) {
+      const reason = bookings.reason || calendarItems.reason;
+      if (reason) throw reason;
+    }
+    return [...byId.values()];
+  }
   async function refreshBookingsFromDatabase() {
     if (!supabaseUrl() || !supabaseKey()) return;
     try {
-      mergeDatabaseBookings(await fetchConferenceBookings(true));
+      mergeDatabaseBookings(await fetchAllConferenceBookings(true));
     } catch (error) {
       try {
         await window.CSC_RELOAD_MAIN_DASHBOARD_STORE?.();
         refresh();
-        return;
       } catch {}
       try {
-        mergeDatabaseBookings(await fetchConferenceBookings(false));
+        mergeDatabaseBookings(await fetchAllConferenceBookings(false));
       } catch (fallbackError) {
         console.warn('Conference room bookings could not be fetched:', fallbackError || error);
       }
@@ -334,6 +475,10 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       const payload = await response.json().catch(() => ({}));
       throw new Error(supabaseErrorMessage(payload, response.status));
     }
+    fetch(`${supabaseUrl()}/rest/v1/calendar_items?id=eq.${encodeURIComponent(booking.id)}`, {
+      method: 'DELETE',
+      headers: dbHeaders()
+    }).catch((error) => console.warn('Conference room calendar_items mirror delete failed:', error));
   }
   function removeLocalBooking(id) {
     const currentStore = store();
@@ -347,7 +492,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   async function databaseBookingConflict(startTime, endTime, ignoreId = '', statuses = ['pending', 'approved']) {
     if (!supabaseUrl() || !supabaseKey()) return null;
     const params = new URLSearchParams({
-      select: 'id,title,organization_name,start_time,end_time,approval_status,event_status,venue,schedule_type',
+      select: 'id,title,organization_name,start_time,end_time,occurrences,approval_status,event_status,venue,schedule_type',
       record_type: 'eq.schedule',
       approval_status: `in.(${statuses.join(',')})`,
       limit: '1000'
@@ -357,12 +502,13 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     });
     if (!response.ok) return null;
     const rows = await response.json().catch(() => []);
+    const candidates = Array.isArray(startTime) ? startTime : [{ start_time: startTime, end_time: endTime }];
     return (Array.isArray(rows) ? rows : []).find((event) =>
       event.id !== ignoreId
       && isConference(event)
       && active(event)
       && statuses.includes(bookingStatus(event))
-      && overlaps(startTime, endTime, event.start_time, event.end_time)
+      && candidates.some((candidate) => bookingOccurrences(event).some((occurrence) => overlaps(candidate.start_time, candidate.end_time, occurrence.start_time, occurrence.end_time)))
     ) || null;
   }
   async function databaseReservedConflict(startTime, endTime, ignoreId = '') {
@@ -544,6 +690,9 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const current = user();
     const startTime = localIso(form.start.value);
     const endTime = localIso(form.end.value);
+    const repeatRule = clean(form.repeat_rule?.value || 'none');
+    const repeatUntil = dateOnly(form.repeat_until?.value || defaultRepeatUntil(startTime, repeatRule));
+    const occurrences = buildOccurrences(startTime, endTime, repeatRule, repeatUntil);
     const organizationName = organizationNameForAccount(current);
     const attendees = formAttendees(form);
     const activityDescription = clean(form.activity_description.value);
@@ -578,9 +727,11 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       venue: ROOM_VENUE,
       schedule_type: 'conference_room_booking',
       event_type: 'Conference Room Booking',
-      start_time: startTime,
-      end_time: endTime,
-      occurrences: [{ id: createId(), date: startTime.slice(0, 10), start_time: startTime, end_time: endTime }],
+      start_time: occurrences[0]?.start_time || startTime,
+      end_time: occurrences[occurrences.length - 1]?.end_time || endTime,
+      occurrences,
+      repeat_rule: repeatRule,
+      repeat_until: repeatRule === 'none' ? '' : repeatUntil,
       expected_attendees: Math.max(1, attendees.length),
       attendee_names: attendees,
       activity_description: activityDescription,
@@ -597,16 +748,16 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     return booking;
   }
   function renderEvents() {
-    return visibleBookings().map((booking) => ({
-      id: booking.id,
+    return visibleBookings().flatMap((booking) => bookingOccurrences(booking).map((occurrence, index) => ({
+      id: `${booking.id}:${occurrence.id || index}`,
       title: bookingOrganizationName(booking) || 'Organization',
-      start: booking.start_time,
-      end: booking.end_time,
+      start: occurrence.start_time,
+      end: occurrence.end_time,
       backgroundColor: booking.approval_status === 'approved' ? '#2563eb' : '#d97706',
       borderColor: booking.approval_status === 'approved' ? '#1d4ed8' : '#b45309',
-      editable: booking.created_by === user().id || canApproveConferenceBookings(),
-      extendedProps: { booking }
-    }));
+      editable: bookingOccurrences(booking).length === 1 && (booking.created_by === user().id || canApproveConferenceBookings()),
+      extendedProps: { booking, occurrence }
+    })));
   }
   function refresh() {
     if (!calendar) return;
@@ -630,6 +781,12 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     form.organization_name.readOnly = true;
     form.start.value = localInput(range?.start || new Date());
     form.end.value = localInput(range?.end || new Date(Date.now() + 60 * 60 * 1000));
+    if (form.repeat_rule) form.repeat_rule.value = 'none';
+    if (form.repeat_until) {
+      form.repeat_until.value = '';
+      form.repeat_until.disabled = true;
+      form.repeat_until.required = false;
+    }
     form.activity_description.value = '';
     form.activity_description_other.value = '';
     toggleActivityOther(form);
@@ -650,17 +807,20 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (!booking.start_time || !booking.end_time || new Date(booking.end_time) <= new Date(booking.start_time)) {
       return api().showToast?.('End time must be later than start time.', 'error');
     }
-    const conflict = reservedConflict(booking.start_time, booking.end_time);
+    if (!booking.occurrences.length) return api().showToast?.('Choose a valid repeat date range.', 'error');
+    const conflict = reservedConflict(booking.occurrences);
     if (conflict) return api().showToast?.('The conference room already has a pending or approved booking for this time.', 'error');
-    const databaseConflict = await databaseReservedConflict(booking.start_time, booking.end_time);
+    const databaseConflict = await databaseReservedConflict(booking.occurrences);
     if (databaseConflict) return api().showToast?.('The conference room already has a pending or approved booking for this time.', 'error');
     try {
       await saveBookingToDatabase(booking);
+      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       api().showToast?.(`Conference room booking could not be saved to database: ${error.message}`, 'error');
       return;
     }
     upsertLocalBooking(booking);
+    window.setTimeout(refreshBookingsFromDatabase, 800);
     if (booking.approval_status === 'pending') notifyAdmins(booking);
     api().log?.('conference_room_booking_created', `${user().full_name} created a conference room booking.`, api().scheduleAuditSnapshot?.(booking) || booking);
     api().showToast?.(booking.approval_status === 'pending' ? 'Conference room booking submitted for approval.' : 'Conference room booking saved.', 'success');
@@ -688,6 +848,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       detailRow('Activity Description', bookingActivityDescription(booking)),
       detailRow('Start', dateTime(booking.start_time)),
       detailRow('End', dateTime(booking.end_time)),
+      detailRow('Repeat', repeatLabel(booking)),
+      detailRow('Repeat Until', booking.repeat_until),
       detailRow('List of Attendees', attendeeListText(booking)),
       detailRow('Contact Person', bookingContactPerson(booking)),
       detailRow('Contact Info', bookingContactInfo(booking)),
@@ -707,8 +869,9 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     document.getElementById(DETAILS_ID)?.close?.();
   }
   function pendingConflictSummary(booking) {
+    const candidates = bookingOccurrences(booking);
     return (store()?.events || [])
-      .filter((event) => event.id !== booking.id && isConference(event) && active(event) && event.approval_status === 'pending' && overlaps(booking.start_time, booking.end_time, event.start_time, event.end_time))
+      .filter((event) => event.id !== booking.id && isConference(event) && active(event) && event.approval_status === 'pending' && candidates.some((candidate) => bookingOccurrences(event).some((occurrence) => overlaps(candidate.start_time, candidate.end_time, occurrence.start_time, occurrence.end_time))))
       .slice(0, 4)
       .map((event) => `${event.organization_name || event.title || 'Organization'} (${dateTime(event.start_time)} - ${dateTime(event.end_time)})`)
       .join('\n');
@@ -720,9 +883,9 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const remarks = clean(dialog.querySelector('[name="conference_room_remarks"]')?.value || '');
     if (status === 'rejected' && !remarks) return api().showToast?.('Remarks are required when rejecting a reservation.', 'error');
     if (status === 'approved') {
-      const conflict = approvedConflict(booking.start_time, booking.end_time, booking.id);
+      const conflict = approvedConflict(bookingOccurrences(booking), '', booking.id);
       if (conflict) return api().showToast?.('The conference room is already approved for this time.', 'error');
-      const databaseConflict = await databaseApprovedConflict(booking.start_time, booking.end_time, booking.id);
+      const databaseConflict = await databaseApprovedConflict(bookingOccurrences(booking), '', booking.id);
       if (databaseConflict) return api().showToast?.('The conference room is already approved for this time.', 'error');
       const pending = pendingConflictSummary(booking);
       if (pending && !confirm(`Conflict warning: pending conference room reservations overlap this schedule.\n\n${pending}\n\nApprove this reservation anyway?`)) return;
@@ -739,6 +902,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     booking.updated_at = now;
     try {
       await saveBookingToDatabase(booking);
+      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       Object.assign(booking, previousBooking);
       api().showToast?.(`Conference room booking review could not be saved to database: ${error.message}`, 'error');
@@ -829,6 +993,17 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
             <label>Start<input name="start" type="datetime-local" required></label>
             <label>End<input name="end" type="datetime-local" required></label>
           </div>
+          <div class="form-grid two">
+            <label>Repeat
+              <select name="repeat_rule">
+                <option value="none">Does not repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </label>
+            <label>Repeat Until<input name="repeat_until" type="date" disabled></label>
+          </div>
           <label>Activity Description
             <select name="activity_description" required>
               <option value="">Select activity</option>
@@ -870,6 +1045,19 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     document.getElementById('conferenceRoomCancel')?.addEventListener('click', closeForm);
     document.getElementById(FORM_ID)?.addEventListener('submit', submitBooking);
     document.getElementById(FORM_ID)?.elements?.activity_description?.addEventListener('change', (event) => toggleActivityOther(event.currentTarget.form));
+    document.getElementById(FORM_ID)?.elements?.repeat_rule?.addEventListener('change', (event) => {
+      const form = event.currentTarget.form;
+      const enabled = event.currentTarget.value !== 'none';
+      form.repeat_until.disabled = !enabled;
+      form.repeat_until.required = enabled;
+      form.repeat_until.value = enabled ? (form.repeat_until.value || defaultRepeatUntil(form.start.value, event.currentTarget.value)) : '';
+    });
+    document.getElementById(FORM_ID)?.elements?.start?.addEventListener('change', (event) => {
+      const form = event.currentTarget.form;
+      if (form.repeat_rule?.value && form.repeat_rule.value !== 'none') {
+        form.repeat_until.value = defaultRepeatUntil(form.start.value, form.repeat_rule.value);
+      }
+    });
     document.getElementById(FORM_ID)?.querySelector('[data-add-attendee]')?.addEventListener('click', () => addAttendeeRow());
     document.getElementById('conferenceRoomDetailsClose')?.addEventListener('click', closeBookingDetails);
     document.getElementById('conferenceRoomDetailsCancel')?.addEventListener('click', () => {
@@ -1017,9 +1205,12 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     booking.start_time = startTime;
     booking.end_time = endTime;
     booking.occurrences = [{ id: booking.occurrences?.[0]?.id || createId(), date: startTime.slice(0, 10), start_time: startTime, end_time: endTime }];
+    booking.repeat_rule = 'none';
+    booking.repeat_until = '';
     booking.updated_at = new Date().toISOString();
     try {
       await saveBookingToDatabase(booking);
+      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       Object.assign(booking, previousBooking);
       api().showToast?.(`Conference room booking update could not be saved to database: ${error.message}`, 'error');
