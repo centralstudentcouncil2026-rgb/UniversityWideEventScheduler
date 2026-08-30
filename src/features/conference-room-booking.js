@@ -413,8 +413,59 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     state()?.calendar?.render?.();
     window.dispatchEvent(new CustomEvent('csc:store-rendered'));
   }
+  function hasStoredValue(value) {
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === 'object') return Object.keys(value).length > 0;
+    return value !== null && value !== undefined && String(value).trim() !== '';
+  }
+  function repeatValue(value) {
+    const text = String(value || '').trim();
+    return text && text !== 'none' ? text : '';
+  }
+  function mergeConferenceRows(left = {}, right = {}) {
+    if (!left?.id) return right || {};
+    if (!right?.id) return left || {};
+    const leftUpdated = new Date(left.updated_at || left.created_at || 0);
+    const rightUpdated = new Date(right.updated_at || right.created_at || 0);
+    const base = rightUpdated >= leftUpdated ? { ...left, ...right } : { ...right, ...left };
+    const leftOccurrences = bookingOccurrences(left);
+    const rightOccurrences = bookingOccurrences(right);
+    if (leftOccurrences.length || rightOccurrences.length) {
+      base.occurrences = rightOccurrences.length >= leftOccurrences.length ? rightOccurrences : leftOccurrences;
+    }
+    [
+      'repeat_rule',
+      'repeat_until',
+      'recurrence_type',
+      'recurrence_until',
+      'attendee_names',
+      'activity_description',
+      'activity_description_other',
+      'contact_person',
+      'contact_info',
+      'public_description',
+      'purpose'
+    ].forEach((key) => {
+      if (!hasStoredValue(base[key])) base[key] = hasStoredValue(right[key]) ? right[key] : left[key];
+    });
+    if (!hasStoredValue(base.repeat_rule) && hasStoredValue(base.recurrence_type)) base.repeat_rule = base.recurrence_type;
+    if (!hasStoredValue(base.repeat_until) && hasStoredValue(base.recurrence_until)) base.repeat_until = base.recurrence_until;
+    const mergedOccurrences = bookingOccurrences(base);
+    const preservedRule = repeatValue(right.repeat_rule) || repeatValue(right.recurrence_type) || repeatValue(left.repeat_rule) || repeatValue(left.recurrence_type);
+    if (mergedOccurrences.length > 1 && (!repeatValue(base.repeat_rule) || base.repeat_rule === 'none')) {
+      base.repeat_rule = preservedRule || inferRepeatRule(mergedOccurrences);
+      base.recurrence_type = base.repeat_rule;
+    }
+    if (mergedOccurrences.length > 1 && !hasStoredValue(base.repeat_until)) {
+      base.repeat_until = dateOnly(mergedOccurrences[mergedOccurrences.length - 1].start_time || mergedOccurrences[mergedOccurrences.length - 1].date);
+      base.recurrence_until = base.repeat_until;
+    }
+    return base;
+  }
   function conferenceBookingFromRow(row = {}) {
-    const occurrences = jsonArray(row.occurrences);
+    const occurrences = bookingOccurrences({ ...row, occurrences: jsonArray(row.occurrences) });
+    const inferredRepeat = occurrences.length > 1 ? inferRepeatRule(occurrences) : 'none';
+    const repeatRule = repeatValue(row.repeat_rule) || repeatValue(row.recurrence_type) || inferredRepeat;
     return {
       ...row,
       record_type: 'schedule',
@@ -429,8 +480,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       approval_status: row.approval_status || 'pending',
       event_status: row.event_status || 'planned',
       privacy_level: row.privacy_level || 'internal',
-      occurrences: occurrences.length ? occurrences : [{ date: String(row.start_time || '').slice(0, 10), start_time: row.start_time || '', end_time: row.end_time || '' }],
-      repeat_rule: row.repeat_rule || row.recurrence_type || inferRepeatRule(occurrences),
+      occurrences,
+      repeat_rule: repeatRule,
       repeat_until: row.repeat_until || row.recurrence_until || (occurrences.length > 1 ? dateOnly(occurrences[occurrences.length - 1].start_time || occurrences[occurrences.length - 1].date) : ''),
       attendee_names: jsonArray(row.attendee_names),
       notification_read_by: row.notification_read_by && typeof row.notification_read_by === 'object' ? row.notification_read_by : {},
@@ -441,7 +492,11 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const currentStore = store();
     if (!currentStore) return;
     if (!Array.isArray(currentStore.events)) currentStore.events = [];
-    const conferenceEvents = rows.filter((row) => row && row.id).map(conferenceBookingFromRow);
+    const byId = new Map(currentStore.events.filter((event) => isConference(event) && event.id).map((event) => [event.id, event]));
+    rows.filter((row) => row && row.id).forEach((row) => {
+      byId.set(row.id, mergeConferenceRows(byId.get(row.id), row));
+    });
+    const conferenceEvents = [...byId.values()].map(conferenceBookingFromRow);
     currentStore.events = [...currentStore.events.filter((event) => !isConference(event)), ...conferenceEvents];
     refresh();
     window.dispatchEvent(new CustomEvent('csc:store-rendered'));
@@ -480,8 +535,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const byId = new Map();
     rows.forEach((row) => {
       if (!row?.id) return;
-      const existing = byId.get(row.id);
-      if (!existing || new Date(row.updated_at || row.created_at || 0) >= new Date(existing.updated_at || existing.created_at || 0)) byId.set(row.id, row);
+      byId.set(row.id, mergeConferenceRows(byId.get(row.id), row));
     });
     if (!rows.length) {
       const reason = bookings.reason || calendarItems.reason;
