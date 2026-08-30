@@ -125,9 +125,32 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     }
     return occurrences;
   }
+  function normalizeBookingOccurrence(booking = {}, occurrence = {}, index = 0) {
+    const date = dateOnly(occurrence.date || occurrence.start_time || booking.start_time);
+    const startClock = timeOnly(occurrence.start_time || booking.start_time);
+    const endClock = timeOnly(occurrence.end_time || booking.end_time);
+    if (!date || !startClock || !endClock) return null;
+    const start_time = combineLocal(date, startClock);
+    const endDate = dateOnly(occurrence.end_time) || date;
+    const end_time = combineLocal(endDate >= date ? endDate : date, endClock);
+    if (!start_time || !end_time || new Date(end_time) <= new Date(start_time)) return null;
+    return {
+      ...occurrence,
+      id: occurrence.id || `${booking.id || 'booking'}-${date}-${startClock}-${index}`,
+      date,
+      start_time,
+      end_time
+    };
+  }
   function bookingOccurrences(booking = {}) {
-    const rows = jsonArray(booking.occurrences).filter((occurrence) => occurrence?.start_time && occurrence?.end_time);
-    return rows.length ? rows : [{ id: booking.id || createId(), date: dateOnly(booking.start_time), start_time: booking.start_time || '', end_time: booking.end_time || '' }];
+    const rawRows = jsonArray(booking.occurrences).filter((occurrence) => occurrence?.start_time && occurrence?.end_time);
+    const rows = rawRows.length ? rawRows : [{ id: booking.id || createId(), date: dateOnly(booking.start_time), start_time: booking.start_time || '', end_time: booking.end_time || '' }];
+    const bySlot = new Map();
+    rows.map((occurrence, index) => normalizeBookingOccurrence(booking, occurrence, index)).filter(Boolean).forEach((occurrence) => {
+      const key = `${occurrence.date}|${occurrence.start_time}|${occurrence.end_time}`;
+      if (!bySlot.has(key)) bySlot.set(key, occurrence);
+    });
+    return [...bySlot.values()].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   }
   function repeatLabel(booking = {}) {
     const rule = String(booking.repeat_rule || booking.recurrence_type || 'none');
@@ -728,7 +751,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       schedule_type: 'conference_room_booking',
       event_type: 'Conference Room Booking',
       start_time: occurrences[0]?.start_time || startTime,
-      end_time: occurrences[occurrences.length - 1]?.end_time || endTime,
+      end_time: occurrences[0]?.end_time || endTime,
       occurrences,
       repeat_rule: repeatRule,
       repeat_until: repeatRule === 'none' ? '' : repeatUntil,
