@@ -320,6 +320,7 @@ function bindEvents() {
     window.setTimeout(scheduleDashboardReloadStateSave, 0);
   });
   window.addEventListener('beforeunload', saveDashboardReloadStateNow);
+  bindConcernsBackdropClose();
   document.addEventListener('pointerdown', handlePublicDialogPointerDown);
   document.addEventListener('keydown', handlePublicDialogKeyDown);
   const resizeCalendar = debounce(handleResize, 120);
@@ -339,6 +340,19 @@ function bindClickActions(actions) {
 
 function bindSubmitActions(actions) {
   Object.entries(actions).forEach(([id, handler]) => on(id, 'submit', handler));
+}
+
+function bindConcernsBackdropClose() {
+  const dialog = $('concernsModal');
+  if (!dialog || dialog.dataset.backdropCloseBound === '1') return;
+  dialog.dataset.backdropCloseBound = '1';
+  dialog.addEventListener('click', (event) => {
+    if (!dialog.open) return;
+    if (event.target !== dialog && event.target.closest?.('.modal-card')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeDialog('concernsModal');
+  });
 }
 
 function bindDelegatedLists(ids) {
