@@ -153,11 +153,27 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     return [...bySlot.values()].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   }
   function repeatLabel(booking = {}) {
-    const rule = String(booking.repeat_rule || booking.recurrence_type || 'none');
+    const occurrences = bookingOccurrences(booking);
+    const rule = String(booking.repeat_rule || booking.recurrence_type || inferRepeatRule(occurrences) || 'none');
     if (rule === 'daily') return 'Daily';
     if (rule === 'weekly') return 'Weekly';
     if (rule === 'monthly') return 'Monthly';
     return 'Does not repeat';
+  }
+  function inferRepeatRule(occurrences = []) {
+    if (!Array.isArray(occurrences) || occurrences.length < 2) return 'none';
+    const days = occurrences.map((occurrence) => dateOnly(occurrence.start_time || occurrence.date)).filter(Boolean);
+    if (days.length < 2) return 'none';
+    const deltas = days.slice(1).map((day, index) => Math.round((new Date(`${day}T00:00`) - new Date(`${days[index]}T00:00`)) / 86400000));
+    if (deltas.every((delta) => delta === 1)) return 'daily';
+    if (deltas.every((delta) => delta === 7)) return 'weekly';
+    return 'monthly';
+  }
+  function repeatUntilLabel(booking = {}) {
+    const explicit = dateOnly(booking.repeat_until || booking.recurrence_until);
+    if (explicit) return explicit;
+    const occurrences = bookingOccurrences(booking);
+    return occurrences.length > 1 ? dateOnly(occurrences[occurrences.length - 1].start_time || occurrences[occurrences.length - 1].date) : '';
   }
   function active(event = {}) {
     return !['cancelled', 'disabled', 'completed'].includes(event.event_status || 'planned');
@@ -281,6 +297,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       occurrences: Array.isArray(booking.occurrences) ? booking.occurrences : [],
       repeat_rule: booking.repeat_rule || 'none',
       repeat_until: booking.repeat_until || null,
+      recurrence_type: booking.repeat_rule || booking.recurrence_type || 'none',
+      recurrence_until: booking.repeat_until || booking.recurrence_until || null,
       expected_attendees: Math.max(1, Number.parseInt(booking.expected_attendees, 10) || 1),
       attendee_names: bookingAttendees(booking),
       activity_description: bookingActivityDescription(booking),
@@ -412,8 +430,8 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       event_status: row.event_status || 'planned',
       privacy_level: row.privacy_level || 'internal',
       occurrences: occurrences.length ? occurrences : [{ date: String(row.start_time || '').slice(0, 10), start_time: row.start_time || '', end_time: row.end_time || '' }],
-      repeat_rule: row.repeat_rule || row.recurrence_type || (occurrences.length > 1 ? 'weekly' : 'none'),
-      repeat_until: row.repeat_until || row.recurrence_until || '',
+      repeat_rule: row.repeat_rule || row.recurrence_type || inferRepeatRule(occurrences),
+      repeat_until: row.repeat_until || row.recurrence_until || (occurrences.length > 1 ? dateOnly(occurrences[occurrences.length - 1].start_time || occurrences[occurrences.length - 1].date) : ''),
       attendee_names: jsonArray(row.attendee_names),
       notification_read_by: row.notification_read_by && typeof row.notification_read_by === 'object' ? row.notification_read_by : {},
       updated_at: row.updated_at || row.created_at || new Date().toISOString()
@@ -854,7 +872,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     const text = value == null || String(value).trim() === '' ? 'Not provided' : String(value);
     return `<div class="conference-room-detail-row"><dt>${esc(label)}</dt><dd>${esc(text)}</dd></div>`;
   }
-  function openBookingDetails(booking) {
+  function openBookingDetails(booking, occurrence = null) {
     if (!booking) return;
     ensureUi();
     const dialog = document.getElementById(DETAILS_ID);
@@ -869,10 +887,10 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       detailRow('Organization', bookingOrganizationName(booking)),
       detailRow('Venue', ROOM_VENUE),
       detailRow('Activity Description', bookingActivityDescription(booking)),
-      detailRow('Start', dateTime(booking.start_time)),
-      detailRow('End', dateTime(booking.end_time)),
+      detailRow('Start', dateTime(occurrence?.start_time || booking.start_time)),
+      detailRow('End', dateTime(occurrence?.end_time || booking.end_time)),
       detailRow('Repeat', repeatLabel(booking)),
-      detailRow('Repeat Until', booking.repeat_until),
+      detailRow('Repeat Until', repeatUntilLabel(booking)),
       detailRow('List of Attendees', attendeeListText(booking)),
       detailRow('Contact Person', bookingContactPerson(booking)),
       detailRow('Contact Info', bookingContactInfo(booking)),
@@ -1183,7 +1201,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       allDaySlot: false,
       height: '100%',
       select: (info) => openForm({ start: info.start, end: info.end }),
-      eventClick: (info) => openBookingDetails(info.event.extendedProps.booking),
+      eventClick: (info) => openBookingDetails(info.event.extendedProps.booking, info.event.extendedProps.occurrence),
       eventDrop: async (info) => moveBooking(info),
       eventResize: async (info) => moveBooking(info),
       events: renderEvents()
