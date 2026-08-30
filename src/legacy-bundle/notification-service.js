@@ -703,12 +703,31 @@ function notificationKeySet(notices = currentUserNotifications()) {
 async function mergeConferenceRoomBookings(payload = {}) {
   const s = store();
   if (!s || !Array.isArray(s.events)) return;
-  const rows = await rest('/rest/v1/conference_room_bookings?select=*&order=start_time.asc', {}, Boolean(session()?.access_token))
-    .catch(() => rest('/rest/v1/conference_room_bookings?select=*&order=start_time.asc', {}, false))
-    .catch(() => []);
+  const rows = await fetchConferenceRoomRows(Boolean(session()?.access_token));
   const conferenceEvents = (Array.isArray(rows) ? rows : []).filter((row) => row && row.id).map(conferenceBookingEvent);
   s.events = [...s.events.filter((event) => !isConferenceRoomBooking(event)), ...conferenceEvents];
   document.dispatchEvent(new CustomEvent('conference-room-bookings-updated', { detail: { payload } }));
+}
+
+async function fetchConferenceRoomRows(authenticated = false) {
+  const rows = [];
+  const queries = [
+    '/rest/v1/conference_room_bookings?select=*&order=start_time.asc',
+    '/rest/v1/calendar_items?select=*&record_type=eq.schedule&schedule_type=eq.conference_room_booking&order=start_time.asc'
+  ];
+  for (const query of queries) {
+    try {
+      const result = await rest(query, {}, authenticated);
+      if (Array.isArray(result)) rows.push(...result);
+    } catch (error) {
+      if (!authenticated) continue;
+      try {
+        const result = await rest(query, {}, false);
+        if (Array.isArray(result)) rows.push(...result);
+      } catch {}
+    }
+  }
+  return dedupeConferenceRoomRows(rows);
 }
 
 function conferenceBookingEvent(row = {}) {
@@ -728,6 +747,15 @@ function conferenceBookingEvent(row = {}) {
     occurrences: Array.isArray(row.occurrences) ? row.occurrences : [{ date: String(row.start_time || '').slice(0, 10), start_time: row.start_time || '', end_time: row.end_time || '' }],
     updated_at: row.updated_at || row.created_at || new Date().toISOString()
   };
+}
+
+function dedupeConferenceRoomRows(rows = []) {
+  const byId = new Map();
+  rows.filter((row) => row && row.id).forEach((row) => {
+    const existing = byId.get(row.id);
+    if (!existing || new Date(row.updated_at || row.created_at || 0) >= new Date(existing.updated_at || existing.created_at || 0)) byId.set(row.id, row);
+  });
+  return [...byId.values()];
 }
 
 function dedupeNotifications(notices) {

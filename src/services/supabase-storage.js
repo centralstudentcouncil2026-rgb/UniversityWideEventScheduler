@@ -7,6 +7,7 @@ const CALENDAR_DEFAULTS=Object.freeze({id:null,record_type:null,schedule_source:
 const AUTHENTICATED_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&order=created_at.asc';
 const CONFERENCE_ROOM_BOOKINGS_QUERY='/rest/v1/conference_room_bookings?select=*&order=start_time.asc';
 const PUBLIC_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&record_type=eq.schedule&approval_status=eq.approved&event_status=in.(planned,finalized)&or=(privacy_level.is.null,privacy_level.neq.internal)&order=created_at.asc';
+const CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&record_type=eq.schedule&schedule_type=eq.conference_room_booking&order=start_time.asc';
 let lastEventIds=new Set(), refreshSessionPromise=null;
 function session(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{return null}}
 function sessionExpiryMs(value=session()){
@@ -49,19 +50,36 @@ async function loadConcernsTable(authenticated=false){
   }
 }
 async function loadConferenceRoomBookingsTable(authenticated=false){
+  const rows=[];
   try{
-    return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},authenticated);
+    const tableRows=await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},authenticated);
+    if(Array.isArray(tableRows))rows.push(...tableRows);
   }catch(error){
     if(authenticated){
       try{
-        return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},false);
+        const tableRows=await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},false);
+        if(Array.isArray(tableRows))rows.push(...tableRows);
       }catch(fallbackError){
         console.warn('CONNECT conference room public fallback unavailable:',fallbackError);
       }
     }
     console.warn('CONNECT conference room sync unavailable:',error);
-    return[];
   }
+  try{
+    const calendarRows=await request(CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY,{},authenticated);
+    if(Array.isArray(calendarRows))rows.push(...calendarRows);
+  }catch(error){
+    if(authenticated){
+      try{
+        const calendarRows=await request(CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY,{},false);
+        if(Array.isArray(calendarRows))rows.push(...calendarRows);
+      }catch(fallbackError){
+        console.warn('CONNECT conference room calendar fallback unavailable:',fallbackError);
+      }
+    }
+    console.warn('CONNECT conference room calendar mirror unavailable:',error);
+  }
+  return dedupeConferenceRoomRows(rows);
 }
 export async function loadAuthenticatedStore(){if(!session()?.access_token)throw new Error('Your session expired. Please log in again.');const store=await loadRelationalStore(true);await mergeAuthenticatedProfiles(store);await mergeBlockedTimes(store,true);enforceAuthenticatedIdentity(store);rememberEventIds(store);return store}
 async function loadRelationalStore(authenticated=false){
@@ -78,7 +96,8 @@ async function loadRelationalStore(authenticated=false){
   const users=(profiles||[]).map(profileToUser);
   const activityStatuses=(profiles||[]).map(profileToActivityStatus).filter(Boolean);
   const normalizeSchedule=(item)=>({...item,record_type:'schedule',organization_name:organizationNames.get(item.organization_id)||item.organization_name||'',occurrences:jsonArray(item.occurrences)});
-  const conferenceEvents=(Array.isArray(conferenceBookings)?conferenceBookings:[]).filter((item)=>item&&item.id).map((item)=>normalizeSchedule({...item,record_type:'schedule',schedule_type:item.schedule_type||'conference_room_booking',venue:item.venue||'Conference Room',title:item.title||item.organization_name||'Conference Room Booking',event_type:item.event_type||item.booking_type||'Conference Room Booking',approval_status:item.approval_status||'pending',event_status:item.event_status||'planned',privacy_level:item.privacy_level||'internal'}));
+  const conferenceRows=dedupeConferenceRoomRows([...(Array.isArray(conferenceBookings)?conferenceBookings:[]),...items.filter((item)=>item.record_type==='schedule'&&isConferenceRoomScheduleRecord(item))]);
+  const conferenceEvents=conferenceRows.filter((item)=>item&&item.id).map((item)=>normalizeSchedule({...item,record_type:'schedule',schedule_type:item.schedule_type||'conference_room_booking',venue:item.venue||'Conference Room',title:item.title||item.organization_name||'Conference Room Booking',event_type:item.event_type||item.booking_type||'Conference Room Booking',approval_status:item.approval_status||'pending',event_status:item.event_status||'planned',privacy_level:item.privacy_level||'internal'}));
   return normalizeStore({version:4,currentUserId:authenticatedUserId()||'public',users,activityStatuses,pendingAccounts:(profiles||[]).filter(isPendingOrganizationProfile).map(profileToAccountRequest),organizations:organizations||[],categories:[],announcements:announcements||[],concerns:Array.isArray(concerns)?dedupeConcernRecordsForPersistence(concerns):[],blockedTimes:items.filter((item)=>item.record_type==='blocked_time').map((item)=>({...item,record_type:'blocked_time',block_source:'admin',created_by_role:'admin',requires_approval:false})),events:[...items.filter((item)=>item.record_type==='schedule'&&!isConferenceRoomScheduleRecord(item)).map(normalizeSchedule),...conferenceEvents]})
 }
 async function mergeAuthenticatedProfiles(store){try{const profiles=await request('/rest/v1/profiles?select=*&order=created_at.asc',{},true);profiles.forEach((profile)=>mergeProfileUser(store,profile));store.pendingAccounts=profiles.filter(isPendingOrganizationProfile).map(profileToAccountRequest)}catch(error){console.warn('CONNECT account data merge unavailable:',error)}}
@@ -89,6 +108,7 @@ function profileToActivityStatus(profile={}){const email=String(profile.email||'
 function mergeProfileUser(store,profile){if(!profile?.id)return;if(!Array.isArray(store.users))store.users=[];const isOrganizationAccount=profile.role==='organization_manager'||profile.account_preset==='organization';const existing=store.users.find((user)=>user.id===profile.id||String(user.email||'').toLowerCase()===String(profile.email||'').toLowerCase()||String(user.username||'').toLowerCase()===String(profile.username||'').toLowerCase());const messengerAccount=profile.messenger_account||profile.messengerAccount||existing?.messenger_account||existing?.messengerAccount||'';const next={id:profile.id,username:profile.username||profile.email||existing?.username||'',full_name:profile.full_name||existing?.full_name||profile.username||profile.email||'Account',role:profile.role||existing?.role||'organization_manager',account_preset:profile.account_preset||existing?.account_preset||(profile.role==='super_admin'?'manager':'organization'),account_type:profile.account_type||existing?.account_type||(isOrganizationAccount?'org':'CSC'),organization_id:profile.organization_id||existing?.organization_id||'',organization_name:profile.organization_name||existing?.organization_name||existing?.organizationName||'',organizationName:profile.organization_name||existing?.organizationName||existing?.organization_name||'',email:profile.email||existing?.email||'',aup_email:profile.email||existing?.aup_email||'',contact_number:profile.contact_number||profile.phone_number||existing?.contact_number||'',phone_number:profile.phone_number||profile.contact_number||existing?.phone_number||'',messenger_account:messengerAccount,messengerAccount,suspended_status:Boolean(profile.suspension_status||existing?.suspended_status),suspension_status:Boolean(profile.suspension_status||existing?.suspension_status),suspension_date:profile.suspension_date||existing?.suspension_date||'',deletion_logs:profile.deletion_logs||existing?.deletion_logs||[],modification_logs:profile.modification_logs||existing?.modification_logs||[],created_at:profile.created_at||existing?.created_at||new Date().toISOString(),updated_at:profile.updated_at||existing?.updated_at||profile.created_at||new Date().toISOString(),permissions:{...(existing?.permissions||{}),...jsonObject(profile.permissions),enabled:Boolean(profile.is_enabled)}};if(existing)Object.assign(existing,next);else store.users.push(next)}
 function jsonObject(value){if(value&&typeof value==='object'&&!Array.isArray(value))return value;if(typeof value!=='string'||!value.trim())return{};try{const parsed=JSON.parse(value);return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{}}catch{return{}}}
 function jsonArray(value){if(Array.isArray(value))return value;if(typeof value!=='string'||!value.trim())return[];try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return[]}}
+function dedupeConferenceRoomRows(rows=[]){const byId=new Map();(rows||[]).filter((row)=>row&&row.id).forEach((row)=>{const existing=byId.get(row.id);if(!existing||new Date(row.updated_at||row.created_at||0)>=new Date(existing.updated_at||existing.created_at||0))byId.set(row.id,row)});return[...byId.values()]}
 function enforceAuthenticatedIdentity(store){const email=authenticatedEmail();const userId=authenticatedUserId();if(!email)return store;if(isAllowedAdminEmail(email))return ensureAllowedAdminStore(store,email,userId);const user=store.users.find((item)=>item.id===userId);if(user)store.currentUserId=user.id;return store}
 export async function saveStore(store,{skipRecordSync=false}={}){const persistenceStore=storeForPersistence(store);const tableFailures=skipRecordSync?[]:await syncRecordTables(persistenceStore);const statusFailures=await syncActivityStatusProfiles(persistenceStore);const criticalFailures=tableFailures.filter((failure)=>failure.table==='calendar_items');if(criticalFailures.length){console.warn('CONNECT relational table sync reported errors after store save:',tableFailures);const details=criticalFailures.map((failure)=>`${failure.table}: ${recordSyncFailureMessage(failure.error)}`).join(' ');throw new Error(`Database record sync failed. ${details}`)}if(statusFailures.length){const details=statusFailures.map((failure)=>`${failure.account_type}: ${recordSyncFailureMessage(failure.error)}`).join(' ');throw new Error(`Activity status sync failed. ${details}`)}if(tableFailures.length)console.warn('CONNECT non-calendar table sync reported errors after store save:',tableFailures);const deleteFailures=await cleanupRemovedEvents(store);if(deleteFailures.length)console.warn('CONNECT delete cleanup RPC reported errors after store save:',deleteFailures);broadcastStoreSync();return{deleteFailures,tableFailures,statusFailures}}
 function recordSyncFailureMessage(error){const message=String(error?.message||'Unknown error');if(/concerns|relation.*concerns.*does not exist/i.test(message))return'The concerns database update is not installed. Run supabase-concerns.sql in Supabase, refresh the portal, then save again.';if(/calendar_items|relation.*does not exist/i.test(message))return'The unified calendar database update is not installed. Run supabase-unified-calendar.sql in Supabase, refresh the portal, then save again.';return message}
