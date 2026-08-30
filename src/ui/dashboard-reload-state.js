@@ -13,7 +13,6 @@
   let restoredThisLoad = false;
   const tabButtons = [
     'eventRequestsButton',
-    'concernsButton',
     'usersButton',
     'conferenceRoomButton',
     'blockedTimesButton',
@@ -142,6 +141,10 @@
 
   function remember(id) {
     if (!id || id === 'notificationsButton') return;
+    if (id === 'concernsButton') {
+      rememberMainCalendar();
+      return;
+    }
     try { sessionStorage.setItem(activeKey, id); } catch {}
   }
 
@@ -211,6 +214,7 @@
 
     document.addEventListener('click', (event) => {
       if (event.target.closest('[data-close], .modal-close, .back-button, .portal-tab-back, [aria-label="Back"], [aria-label="Close"]')) {
+        if (event.target.closest('#concernsModal') || event.target.closest('[data-close="concernsModal"]')) rememberMainCalendar();
         window.setTimeout(() => {
           const activePage = document.querySelector('.admin-tab-page.is-active, .conference-room-page.is-active, dialog[open]');
           if (!activePage) rememberMainCalendar();

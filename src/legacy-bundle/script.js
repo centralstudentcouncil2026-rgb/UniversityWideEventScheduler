@@ -3718,7 +3718,10 @@ function openDialog(id) {
 
 function closeDialog(id) {
   if (id === 'detailsModal') suppressDetailsReopen();
-  if (id === 'concernsModal') clearRestoredDialogState('concernsModal');
+  if (id === 'concernsModal') {
+    clearRestoredDialogState('concernsModal');
+    rememberMainDashboardTab();
+  }
   if (ADMIN_TAB_PAGE_IDS.has(id)) {
     closeAdminTabPage(id);
     return;
@@ -3740,10 +3743,17 @@ function clearRestoredDialogState(id) {
   } catch {}
 }
 
+function rememberMainDashboardTab() {
+  try { sessionStorage.setItem('csc_active_dashboard_tab_org', 'mainCalendar'); } catch {}
+}
+
 function openAdminTabPage(id) {
   const page = $(id);
   if (!page) return;
   ensureAdminTabPageHeader(page);
+  document.querySelectorAll('dialog[open]').forEach((dialog) => {
+    if (!ADMIN_TAB_PAGE_IDS.has(dialog.id)) closeDialog(dialog.id);
+  });
   document.querySelectorAll('.admin-tab-page.is-active').forEach((activePage) => {
     if (activePage.id !== id) closeAdminTabPage(activePage.id);
   });
