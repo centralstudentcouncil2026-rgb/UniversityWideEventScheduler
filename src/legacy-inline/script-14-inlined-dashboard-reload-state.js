@@ -13,6 +13,7 @@
   let restoredThisLoad = false;
   const tabButtons = [
     'eventRequestsButton',
+    'concernsButton',
     'usersButton',
     'conferenceRoomButton',
     'blockedTimesButton',
@@ -141,10 +142,6 @@
 
   function remember(id) {
     if (!id || id === 'notificationsButton') return;
-    if (id === 'concernsButton') {
-      rememberMainCalendar();
-      return;
-    }
     try { sessionStorage.setItem(activeKey, id); } catch {}
   }
 
@@ -154,6 +151,7 @@
 
   function restoredTargetId(buttonId) {
     if (buttonId === 'eventRequestsButton') return 'eventRequestsModal';
+    if (buttonId === 'concernsButton') return 'concernsModal';
     if (buttonId === 'usersButton') return 'usersModal';
     if (buttonId === 'conferenceRoomButton') return 'conferenceRoomModal';
     return '';

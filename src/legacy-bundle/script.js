@@ -47,7 +47,7 @@ const FILTER_IDS = ['filterOrganization', 'filterVenue', 'filterCategory', 'filt
 const ADMIN_TAB_PAGE_IDS = new Set(['eventRequestsModal', 'usersModal']);
 const DASHBOARD_RELOAD_STATE_VERSION = 1;
 const DASHBOARD_RELOAD_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 14;
-const RESTORABLE_DIALOG_IDS = new Set(['dashboardModal', 'filtersModal', 'notificationsModal', 'blockedTimesModal', 'categoriesModal', 'activityLogModal']);
+const RESTORABLE_DIALOG_IDS = new Set(['dashboardModal', 'filtersModal', 'notificationsModal', 'blockedTimesModal', 'categoriesModal', 'activityLogModal', 'concernsModal']);
 const DEFAULT_ANNOUNCEMENT = {
   title: 'CSC S.Y.N.C. is ready for scheduling',
   content: 'Student organizations may now coordinate university-wide events through CSC S.Y.N.C.',
@@ -3503,11 +3503,12 @@ function restoreDashboardAreaAfterReload() {
   }
   const id = state.pendingReloadDialogId;
   state.pendingReloadDialogId = '';
-  if (!id || id === 'concernsModal') return;
+  if (!id) return;
   const openers = {
     dashboardModal: openDashboard,
     filtersModal: () => openDialog('filtersModal'),
     notificationsModal: openNotifications,
+    concernsModal: openConcerns,
     eventRequestsModal: openEventRequests,
     blockedTimesModal: openBlockedTimes,
     categoriesModal: openCategories,
