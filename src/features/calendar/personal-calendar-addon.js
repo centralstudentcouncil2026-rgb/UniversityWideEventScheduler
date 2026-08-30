@@ -390,6 +390,15 @@
         body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-title,
         body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-content{font-size:9.5px!important;font-weight:800!important;gap:1px!important;line-height:1.05!important;}
       }
+      body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:44px!important;align-items:center!important;}
+      body.personal-calendar-perspective #viewSelector{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;flex:0 0 122px!important;min-width:112px!important;max-width:132px!important;border-radius:999px!important;font-size:1rem!important;line-height:1!important;padding:0 18px!important;}
+      body.personal-calendar-perspective .period-controls .icon-button,
+      body.personal-calendar-perspective #notificationsButton{align-items:center!important;aspect-ratio:1/1!important;box-sizing:border-box!important;flex:0 0 var(--personal-calendar-control-size)!important;height:var(--personal-calendar-control-size)!important;justify-content:center!important;max-height:var(--personal-calendar-control-size)!important;max-width:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;min-width:var(--personal-calendar-control-size)!important;border-radius:999px!important;padding:0!important;width:var(--personal-calendar-control-size)!important;}
+      body.personal-calendar-perspective #personalCalendarHeaderSearch{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;border-radius:999px!important;}
+      @media (max-width: 420px){
+        body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:40px!important;}
+        body.personal-calendar-perspective #viewSelector{flex-basis:104px!important;min-width:96px!important;max-width:110px!important;font-size:.9rem!important;padding:0 14px!important;}
+      }
     `;
     document.head.appendChild(style);
   }
