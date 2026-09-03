@@ -1211,7 +1211,7 @@ function matchesFilters(event) {
 }
 
 function openEventModal(range, record = null) {
-  const canOpenForm = record ? canEditEvent(state.store, record) : canCreateEvents(state.store);
+  const canOpenForm = record ? canOpenScheduleForm(record) : canCreateEvents(state.store);
   if (!requirePermission(canOpenForm, record ? 'You cannot edit this event.' : 'You cannot create schedules.')) return;
   renderFormOptions();
   state.formMode = record ? 'edit' : 'create';
@@ -1236,7 +1236,7 @@ function openEventModal(range, record = null) {
   $('eventPublicDescription').value = record?.public_description || ''; $('eventPurpose').value = record?.purpose || '';
   if ($('eventRepeat')) $('eventRepeat').value = record?.recurrence_type || 'none';
   if ($('eventRepeatUntil')) $('eventRepeatUntil').value = dateInput(record?.recurrence_until || record?.repeat_until || '');
-  $('deleteEventButton').hidden = !canDeleteEvent(state.store, record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
+  $('deleteEventButton').hidden = !canDeleteScheduleRecord(record); $('cancelEventButton').hidden = !record || record.event_status === 'cancelled';
   openDialog('eventModal');
 }
 
@@ -1434,7 +1434,12 @@ function repeatControlValue(id, fallbackId, fallback = '') {
 }
 
 function isRepeatRule(value) {
-  return ['daily', 'weekly', 'monthly', 'yearly'].includes(value);
+  return ['daily', 'weekly', 'monthly', 'yearly'].includes(normalizedRepeatRule(value));
+}
+
+function normalizedRepeatRule(value) {
+  const rule = String(value || '').trim().toLowerCase();
+  return ['daily', 'weekly', 'monthly', 'yearly'].includes(rule) ? rule : 'none';
 }
 
 function defaultRepeatUntil(startDate, repeatRule) {
@@ -1565,6 +1570,19 @@ function calendarMoveAllowed(dropInfo, event) {
 
 function scheduleSummary(event) {
   return eventOccurrences(event).map((item) => `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`).join('\n');
+}
+
+function recurrenceDetailSummary(record, occurrences = []) {
+  const rule = normalizedRepeatRule(record?.recurrence_type || record?.repeat_rule || record?.repeat);
+  if (!isRepeatRule(rule)) return '';
+  const labels = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
+  const until = record.recurrence_until || record.repeat_until || repeatUntilFromOccurrences(occurrences);
+  return until ? `${labels[rule]} until ${formatDateOnly(until)}` : labels[rule];
+}
+
+function repeatUntilFromOccurrences(occurrences = []) {
+  const last = occurrences[occurrences.length - 1] || {};
+  return last.start_time || last.date || '';
 }
 
 function setScheduleSaving(saving) {
@@ -1711,7 +1729,7 @@ async function saveEvent(candidate) {
   candidate = schedulePersistencePayload(candidate);
   const existingIndex = state.store.events.findIndex((event) => event.id === candidate.id);
   const existing = existingIndex >= 0 ? state.store.events[existingIndex] : null;
-  const canSave = existing ? canEditEvent(state.store, existing) : canCreateEvents(state.store);
+  const canSave = existing ? canEditScheduleRecord(existing) : canCreateEvents(state.store);
   if (!requirePermission(canSave, existing ? 'You cannot edit this event.' : 'You cannot create schedules.')) return false;
   if (existing && isManager(state.store) && existing.approval_status === 'approved' && !existing.revision_of) {
     if (hasOpenScheduleRequest(existing.id, 'edit')) return showToast('An edit request is already pending for this schedule.', 'error');
@@ -1818,7 +1836,8 @@ function openDetails(props) {
     const occurrences = eventOccurrences(record);
     const selectedOccurrence = props.occurrence || occurrences[0];
     const scheduleLabel = selectedOccurrence ? `${formatDateTime(selectedOccurrence.start_time)} to ${formatTime(selectedOccurrence.end_time)}` : scheduleSummary(record);
-    const allSchedulesLabel = occurrences.length > 1
+    const recurrenceSummary = recurrenceDetailSummary(record, occurrences);
+    const allSchedulesLabel = !recurrenceSummary && occurrences.length > 1
       ? occurrences.map((occurrence, index) => `${index + 1}. ${formatDateTime(occurrence.start_time)} to ${formatTime(occurrence.end_time)}`).join('\n')
       : '';
     const data = {
@@ -1826,6 +1845,7 @@ function openDetails(props) {
       Category: category.name || record.category_id || 'Uncategorized',
       Venue: record.venue || 'Not specified',
       Schedule: scheduleLabel,
+      Repeat: recurrenceSummary,
       'All Schedule Dates': allSchedulesLabel,
       'Expected Attendees': record.expected_attendees || 'Not specified',
       'Privacy Level': privacyLabel(record.privacy_level),
@@ -1913,15 +1933,38 @@ function isAdminCreatedSchedule(record) {
 function ownsOrganizationSchedule(record) {
   if (!record || !isManager(state.store)) return false;
   const user = currentUser(state.store);
+  const userOrgName = String(user.organization_name || user.organizationName || '').trim().toLowerCase();
+  const recordOrgName = String(record.organization_name || '').trim().toLowerCase();
   return Boolean(
     isOrganizationSchedule(record)
-    && record.created_by
-    && record.created_by === user.id
+    && (
+      record.created_by === user.id
+      || (!record.created_by && record.organization_id && user.organization_id && record.organization_id === user.organization_id)
+      || (!record.created_by && recordOrgName && userOrgName && recordOrgName === userOrgName)
+    )
   );
 }
 
 function isApprovedOriginalOrganizationSchedule(record) {
   return Boolean(record?.approval_status === 'approved' && !record.revision_of && isOrganizationSchedule(record));
+}
+
+function isPendingOriginalOrganizationSchedule(record) {
+  return Boolean(record?.approval_status === 'pending' && !record.revision_of && isOrganizationSchedule(record));
+}
+
+function canOpenScheduleForm(record) {
+  if (!record) return canCreateEvents(state.store);
+  if (ownsOrganizationSchedule(record) && isPendingOriginalOrganizationSchedule(record)) return true;
+  return canEditEvent(state.store, record);
+}
+
+function canEditScheduleRecord(record) {
+  return canEditEvent(state.store, record) || (ownsOrganizationSchedule(record) && isPendingOriginalOrganizationSchedule(record));
+}
+
+function canDeleteScheduleRecord(record) {
+  return canDeleteEvent(state.store, record) || (ownsOrganizationSchedule(record) && isPendingOriginalOrganizationSchedule(record));
 }
 
 function setDetailsActionLabels(record) {
@@ -1943,8 +1986,13 @@ function detailsActionVisibility(record) {
     return visibility;
   }
   if (ownsOrganizationSchedule(record)) {
-    visibility.delete = canDeleteEvent(state.store, record);
-    visibility.edit = canEditEvent(state.store, record);
+    if (isApprovedOriginalOrganizationSchedule(record) || isPendingOriginalOrganizationSchedule(record)) {
+      visibility.delete = true;
+      visibility.edit = true;
+    } else {
+      visibility.delete = canDeleteScheduleRecord(record);
+      visibility.edit = canEditScheduleRecord(record);
+    }
   }
   return visibility;
 }
@@ -2230,7 +2278,7 @@ function confirmDeleteEvent(event) {
     confirmAction(`Request removal of "${event.title}"?`, () => requestScheduleRemoval(event));
     return;
   }
-  if (!requirePermission(canDeleteEvent(state.store, event), 'You cannot delete this event.')) return;
+  if (!requirePermission(canDeleteScheduleRecord(event), 'You cannot delete this event.')) return;
   confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event));
 }
 function hasOpenScheduleRequest(scheduleId, requestType) {
@@ -4063,6 +4111,7 @@ function calendarFloatingIso(value) {
 function dateInput(value) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function timeInput(value) { return new Date(value).toTimeString().slice(0, 5); }
 function formatDateTime(value) { return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+function formatDateOnly(value) { return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
 function formatTime(value) { return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
 function formatInputTime(value) { if (!value) return 'Choose time'; const [hour, minute] = value.split(':').map(Number); return new Date(2000, 0, 1, hour, minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
 function eventIsActive(event) { return !['cancelled', 'completed', 'draft'].includes(event.event_status); }
