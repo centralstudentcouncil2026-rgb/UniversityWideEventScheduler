@@ -7,7 +7,6 @@ const CALENDAR_DEFAULTS=Object.freeze({id:null,record_type:null,schedule_source:
 const AUTHENTICATED_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&order=created_at.asc';
 const CONFERENCE_ROOM_BOOKINGS_QUERY='/rest/v1/conference_room_bookings?select=*&order=start_time.asc';
 const PUBLIC_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&record_type=eq.schedule&approval_status=eq.approved&event_status=in.(planned,finalized)&or=(privacy_level.is.null,privacy_level.neq.internal)&order=created_at.asc';
-const CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY='/rest/v1/calendar_items?select=*&record_type=eq.schedule&schedule_type=eq.conference_room_booking&order=start_time.asc';
 let lastEventIds=new Set(), refreshSessionPromise=null;
 function session(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{return null}}
 function sessionExpiryMs(value=session()){
@@ -50,36 +49,19 @@ async function loadConcernsTable(authenticated=false){
   }
 }
 async function loadConferenceRoomBookingsTable(authenticated=false){
-  const rows=[];
   try{
-    const tableRows=await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},authenticated);
-    if(Array.isArray(tableRows))rows.push(...tableRows);
+    return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},authenticated);
   }catch(error){
     if(authenticated){
       try{
-        const tableRows=await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},false);
-        if(Array.isArray(tableRows))rows.push(...tableRows);
+        return await request(CONFERENCE_ROOM_BOOKINGS_QUERY,{},false);
       }catch(fallbackError){
         console.warn('CONNECT conference room public fallback unavailable:',fallbackError);
       }
     }
     console.warn('CONNECT conference room sync unavailable:',error);
+    return[];
   }
-  try{
-    const calendarRows=await request(CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY,{},authenticated);
-    if(Array.isArray(calendarRows))rows.push(...calendarRows);
-  }catch(error){
-    if(authenticated){
-      try{
-        const calendarRows=await request(CONFERENCE_ROOM_CALENDAR_ITEMS_QUERY,{},false);
-        if(Array.isArray(calendarRows))rows.push(...calendarRows);
-      }catch(fallbackError){
-        console.warn('CONNECT conference room calendar fallback unavailable:',fallbackError);
-      }
-    }
-    console.warn('CONNECT conference room calendar mirror unavailable:',error);
-  }
-  return dedupeConferenceRoomRows(rows);
 }
 export async function loadAuthenticatedStore(){if(!session()?.access_token)throw new Error('Your session expired. Please log in again.');const store=await loadRelationalStore(true);await mergeAuthenticatedProfiles(store);await mergeBlockedTimes(store,true);enforceAuthenticatedIdentity(store);rememberEventIds(store);return store}
 async function loadRelationalStore(authenticated=false){
@@ -96,7 +78,7 @@ async function loadRelationalStore(authenticated=false){
   const users=(profiles||[]).map(profileToUser);
   const activityStatuses=(profiles||[]).map(profileToActivityStatus).filter(Boolean);
   const normalizeSchedule=(item)=>({...item,record_type:'schedule',organization_name:organizationNames.get(item.organization_id)||item.organization_name||'',occurrences:jsonArray(item.occurrences)});
-  const conferenceRows=dedupeConferenceRoomRows([...(Array.isArray(conferenceBookings)?conferenceBookings:[]),...items.filter((item)=>item.record_type==='schedule'&&isConferenceRoomScheduleRecord(item))]);
+  const conferenceRows=dedupeConferenceRoomRows(Array.isArray(conferenceBookings)?conferenceBookings:[]);
   const conferenceEvents=conferenceRows.filter((item)=>item&&item.id).map((item)=>normalizeSchedule({...item,record_type:'schedule',schedule_type:item.schedule_type||'conference_room_booking',venue:item.venue||'Conference Room',title:item.title||item.organization_name||'Conference Room Booking',event_type:item.event_type||item.booking_type||'Conference Room Booking',approval_status:item.approval_status||'pending',event_status:item.event_status||'planned',privacy_level:item.privacy_level||'internal'}));
   return normalizeStore({version:4,currentUserId:authenticatedUserId()||'public',users,activityStatuses,pendingAccounts:(profiles||[]).filter(isPendingOrganizationProfile).map(profileToAccountRequest),organizations:organizations||[],categories:[],announcements:announcements||[],concerns:Array.isArray(concerns)?dedupeConcernRecordsForPersistence(concerns):[],blockedTimes:items.filter((item)=>item.record_type==='blocked_time').map((item)=>({...item,record_type:'blocked_time',block_source:'admin',created_by_role:'admin',requires_approval:false})),events:[...items.filter((item)=>item.record_type==='schedule'&&!isConferenceRoomScheduleRecord(item)).map(normalizeSchedule),...conferenceEvents]})
 }

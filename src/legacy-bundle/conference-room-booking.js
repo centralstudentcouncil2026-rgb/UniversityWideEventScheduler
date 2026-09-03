@@ -359,37 +359,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     }
     throw new Error('Conference room booking save failed because the database schema is missing too many columns.');
   }
-  async function saveBookingMirrorToCalendarItems(booking) {
-    if (!supabaseUrl() || !supabaseKey()) return;
-    let row = dbRow(booking);
-    const strippedColumns = new Set();
-    const existingBooking = (store()?.events || []).some((event) => event.id === booking.id);
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const response = await fetch(`${supabaseUrl()}/rest/v1/calendar_items${existingBooking ? `?id=eq.${encodeURIComponent(row.id)}` : ''}`, {
-        method: existingBooking ? 'PATCH' : 'POST',
-        headers: dbHeaders(),
-        body: JSON.stringify(row)
-      });
-      if (response.ok) return;
-      const payload = await response.json().catch(() => ({}));
-      if (!existingBooking && response.status === 409) {
-        const patchResponse = await fetch(`${supabaseUrl()}/rest/v1/calendar_items?id=eq.${encodeURIComponent(row.id)}`, {
-          method: 'PATCH',
-          headers: dbHeaders(),
-          body: JSON.stringify(row)
-        });
-        if (patchResponse.ok) return;
-      }
-      const missing = missingBookingColumn(payload);
-      if (!missing || strippedColumns.has(missing) || !(missing in row)) {
-        console.warn('CONNECT conference room calendar_items mirror failed:', payload);
-        return;
-      }
-      strippedColumns.add(missing);
-      row = { ...row };
-      delete row[missing];
-    }
-  }
   function bookingSaveUrl(id, existingBooking) {
     const base = `${supabaseUrl()}/rest/v1/conference_room_bookings`;
     return existingBooking ? `${base}?id=eq.${encodeURIComponent(id)}` : base;
@@ -509,38 +478,14 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (!response.ok) throw new Error(payload?.message || payload?.error || `Conference room bookings fetch failed (${response.status})`);
     return Array.isArray(payload) ? payload : [];
   }
-  async function fetchCalendarItemConferenceBookings(authenticated = Boolean(session()?.access_token)) {
-    const params = new URLSearchParams({
-      select: '*',
-      record_type: 'eq.schedule',
-      schedule_type: 'eq.conference_room_booking',
-      order: 'start_time.asc'
-    });
-    const response = await fetch(`${supabaseUrl()}/rest/v1/calendar_items?${params.toString()}`, {
-      headers: dbReadHeaders(authenticated)
-    });
-    const payload = response.status === 204 ? [] : await response.json().catch(() => []);
-    if (!response.ok) throw new Error(payload?.message || payload?.error || `Conference room calendar-items fetch failed (${response.status})`);
-    return Array.isArray(payload) ? payload : [];
-  }
   async function fetchAllConferenceBookings(authenticated = Boolean(session()?.access_token)) {
-    const [bookings, calendarItems] = await Promise.allSettled([
-      fetchConferenceBookings(authenticated),
-      fetchCalendarItemConferenceBookings(authenticated)
-    ]);
-    const rows = [
-      ...(bookings.status === 'fulfilled' ? bookings.value : []),
-      ...(calendarItems.status === 'fulfilled' ? calendarItems.value : [])
-    ];
+    const bookings = await fetchConferenceBookings(authenticated);
+    const rows = Array.isArray(bookings) ? bookings : [];
     const byId = new Map();
     rows.forEach((row) => {
       if (!row?.id) return;
       byId.set(row.id, mergeConferenceRows(byId.get(row.id), row));
     });
-    if (!rows.length) {
-      const reason = bookings.reason || calendarItems.reason;
-      if (reason) throw reason;
-    }
     return [...byId.values()];
   }
   async function refreshBookingsFromDatabase() {
@@ -570,10 +515,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       const payload = await response.json().catch(() => ({}));
       throw new Error(supabaseErrorMessage(payload, response.status));
     }
-    fetch(`${supabaseUrl()}/rest/v1/calendar_items?id=eq.${encodeURIComponent(booking.id)}`, {
-      method: 'DELETE',
-      headers: dbHeaders()
-    }).catch((error) => console.warn('Conference room calendar_items mirror delete failed:', error));
   }
   function removeLocalBooking(id) {
     const currentStore = store();
@@ -909,7 +850,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (databaseConflict) return api().showToast?.('The conference room already has a pending or approved booking for this time.', 'error');
     try {
       await saveBookingToDatabase(booking);
-      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       api().showToast?.(`Conference room booking could not be saved to database: ${error.message}`, 'error');
       return;
@@ -997,7 +937,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     booking.updated_at = now;
     try {
       await saveBookingToDatabase(booking);
-      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       Object.assign(booking, previousBooking);
       api().showToast?.(`Conference room booking review could not be saved to database: ${error.message}`, 'error');
@@ -1305,7 +1244,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     booking.updated_at = new Date().toISOString();
     try {
       await saveBookingToDatabase(booking);
-      await saveBookingMirrorToCalendarItems(booking);
     } catch (error) {
       Object.assign(booking, previousBooking);
       api().showToast?.(`Conference room booking update could not be saved to database: ${error.message}`, 'error');

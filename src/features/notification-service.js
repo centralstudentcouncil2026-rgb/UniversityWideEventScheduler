@@ -710,24 +710,19 @@ async function mergeConferenceRoomBookings(payload = {}) {
 }
 
 async function fetchConferenceRoomRows(authenticated = false) {
-  const rows = [];
-  const queries = [
-    '/rest/v1/conference_room_bookings?select=*&order=start_time.asc',
-    '/rest/v1/calendar_items?select=*&record_type=eq.schedule&schedule_type=eq.conference_room_booking&order=start_time.asc'
-  ];
-  for (const query of queries) {
-    try {
-      const result = await rest(query, {}, authenticated);
-      if (Array.isArray(result)) rows.push(...result);
-    } catch (error) {
-      if (!authenticated) continue;
+  const query = '/rest/v1/conference_room_bookings?select=*&order=start_time.asc';
+  try {
+    const result = await rest(query, {}, authenticated);
+    return dedupeConferenceRoomRows(Array.isArray(result) ? result : []);
+  } catch (error) {
+    if (authenticated) {
       try {
         const result = await rest(query, {}, false);
-        if (Array.isArray(result)) rows.push(...result);
+        return dedupeConferenceRoomRows(Array.isArray(result) ? result : []);
       } catch {}
     }
   }
-  return dedupeConferenceRoomRows(rows);
+  return [];
 }
 
 function conferenceBookingEvent(row = {}) {
