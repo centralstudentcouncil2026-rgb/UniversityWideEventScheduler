@@ -249,10 +249,12 @@ function normalizedAttendeeCount(value){const count=Number.parseInt(String(value
 const APPROVAL_STATUSES=['pending','approved','rejected'];
 const EVENT_STATUSES=['planned','finalized','cancelled','disabled','completed'];
 const PRIVACY_LEVELS=['basic','public','internal'];
+const RECURRENCE_TYPES=['daily','weekly','monthly','yearly'];
 function normalizedScheduleSource(event={}){const source=String(event.schedule_source||event.source||event.created_by_role||event.createdByRole||'').trim().toLowerCase();if(source==='admin'||source==='super_admin'||source==='csc')return'admin';if(source==='organization'||source==='org'||source==='organization_manager'||source==='oic')return'organization';if(event.requires_approval===false)return'admin';return'organization'}
 function normalizedApprovalStatus(event={},scheduleSource=normalizedScheduleSource(event)){const status=String(event.approval_status||'').trim().toLowerCase();if(scheduleSource==='admin')return'approved';return APPROVAL_STATUSES.includes(status)?status:'pending'}
 function normalizedEventStatus(value){const status=String(value||'').trim().toLowerCase();return EVENT_STATUSES.includes(status)?status:'planned'}
 function normalizedPrivacyLevel(value){const privacy=String(value||'').trim().toLowerCase();return PRIVACY_LEVELS.includes(privacy)?privacy:'basic'}
+function normalizedRepeatRule(value){const recurrenceType=String(value||'').trim().toLowerCase();return RECURRENCE_TYPES.includes(recurrenceType)?recurrenceType:'none'}
 function isConferenceRoomScheduleRecord(event={}){const scheduleType=String(event.schedule_type||'').trim().toLowerCase();const venue=String(event.venue||'').trim().toLowerCase();const title=String(event.title||'').trim().toLowerCase();return scheduleType==='conference_room_booking'||venue==='conference room'||title==='conference room booking'}
 function isRelationalScheduleReady(event={}){return Number(event.schedule_schema_version||0)>=2&&Boolean(event.title&&event.category_id&&event.venue)&&normalizedAttendeeCount(event.expected_attendees)>=1&&PRIVACY_LEVELS.includes(normalizedPrivacyLevel(event.privacy_level))&&Boolean(event.contact_person)&&/^\d{11}$/.test(String(event.contact_info||''))&&Boolean(event.public_description&&event.purpose)&&Boolean(event.start_time&&event.end_time)&&new Date(event.end_time)>new Date(event.start_time)}
 function shouldTryLegacyAuthFallback(error){return /invalid login credentials|invalid credentials|user not found/i.test(String(error?.message||''))}
