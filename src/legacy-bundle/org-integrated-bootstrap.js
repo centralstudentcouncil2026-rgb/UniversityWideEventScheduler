@@ -168,6 +168,8 @@ function waitForFullCalendar() {
 
 function loginErrorMessage(error) {
   const text = String(error?.message || '');
+  if (/email not confirmed|confirm.*email|not confirmed/i.test(text)) return 'Your AUP email is not confirmed yet. Open the Supabase confirmation email, then log in again.';
+  if (/profile|permission denied|row-level security|violates row-level security/i.test(text)) return 'Your login exists, but the organization profile is missing or not approved yet. Ask an admin to approve the account.';
   if (/invalid login credentials/i.test(text)) return 'Login failed. Please check your email and password.';
   if (/jwt expired|session expired/i.test(text)) return 'Your session expired. Please log in again.';
   if (/failed to fetch|network|supabase is unavailable/i.test(text)) return 'Could not reach Supabase. Check your connection and try again.';
