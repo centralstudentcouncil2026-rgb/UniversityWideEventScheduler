@@ -64,9 +64,25 @@ async function loadConferenceRoomBookingsTable(authenticated=false){
   }
 }
 export async function loadAuthenticatedStore(){if(!session()?.access_token)throw new Error('Your session expired. Please log in again.');const store=await loadRelationalStore(true);await mergeAuthenticatedProfiles(store);await mergeBlockedTimes(store,true);enforceAuthenticatedIdentity(store);rememberEventIds(store);return store}
+async function loadProfilesTable(authenticated=false){
+  if(!authenticated)return[];
+  try{
+    return await request('/rest/v1/profiles?select=*',{},true);
+  }catch(error){
+    const userId=authenticatedUserId();
+    if(userId){
+      try{
+        return await request(`/rest/v1/profiles?select=*&id=eq.${encodeURIComponent(userId)}`,{},true);
+      }catch(ownProfileError){
+        console.warn('CONNECT own profile fallback unavailable:',ownProfileError);
+      }
+    }
+    throw error;
+  }
+}
 async function loadRelationalStore(authenticated=false){
   const[profiles,organizations,calendarItems,announcements,concerns,conferenceBookings]=await Promise.all([
-    authenticated?request('/rest/v1/profiles?select=*',{},true):Promise.resolve([]),
+    loadProfilesTable(authenticated),
     request('/rest/v1/organizations?select=*'),
     request(authenticated?AUTHENTICATED_CALENDAR_ITEMS_QUERY:PUBLIC_CALENDAR_ITEMS_QUERY,{},authenticated),
     request('/rest/v1/announcements?select=*',{},authenticated),
