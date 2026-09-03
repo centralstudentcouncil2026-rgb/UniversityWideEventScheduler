@@ -72,6 +72,12 @@ function wireIntegratedAuth() {
       await authenticate(email, password);
       store = await loadAuthenticatedStore();
     } catch (error) {
+      console.error('Organization login failed:', {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        details: error?.details
+      });
       clearSession();
       setMessage(loginMessage, loginErrorMessage(error));
       button.disabled = false;
@@ -183,17 +189,39 @@ function waitForFullCalendar() {
 }
 
 function loginErrorMessage(error) {
-  const text = String(error?.message || '');
+  const text = errorDiagnosticText(error);
   if (/email not confirmed|confirm.*email|not confirmed/i.test(text)) return 'Your AUP email is not confirmed yet. Open the Supabase confirmation email, then log in again.';
   if (/profile|permission denied|row-level security|violates row-level security/i.test(text)) return 'Your login exists, but the organization profile is missing or not approved yet. Ask an admin to approve the account.';
-  if (/invalid login credentials/i.test(text)) return 'Login failed. Please check your email and password.';
+  if (/invalid login credentials|invalid_credentials/i.test(text)) return 'Login failed. Please check your email and password.';
   if (/jwt expired|session expired/i.test(text)) return 'Your session expired. Please log in again.';
   if (/failed to fetch|network|supabase is unavailable/i.test(text)) return 'Could not reach Supabase. Check your connection and try again.';
-  return 'Login failed. Please try again.';
+  return text ? `Login failed. ${shortErrorText(text)}` : 'Login failed. Please try again.';
 }
 
 function dashboardStartErrorMessage(error) {
-  const text = String(error?.message || '');
+  const text = errorDiagnosticText(error);
   if (/FullCalendar failed to load/i.test(text)) return 'Your account was verified, but the calendar engine did not load. Hard refresh the page and try again.';
-  return 'Your account was verified, but the dashboard could not finish loading. Hard refresh the page and try again.';
+  return text ? `Your account was verified, but the dashboard could not finish loading. ${shortErrorText(text)}` : 'Your account was verified, but the dashboard could not finish loading. Hard refresh the page and try again.';
+}
+
+function errorDiagnosticText(error) {
+  const parts = [
+    error?.message,
+    error?.code && `code ${error.code}`,
+    error?.status && `status ${error.status}`
+  ];
+  if (error?.details) {
+    try {
+      parts.push(JSON.stringify(error.details));
+    } catch {
+      parts.push(String(error.details));
+    }
+  }
+  return parts.filter(Boolean).map(String).join(' ');
+}
+
+function shortErrorText(text) {
+  const cleaned = String(text).replace(/\s+/g, ' ').trim();
+  if (!cleaned) return 'Please try again.';
+  return cleaned.length > 180 ? `${cleaned.slice(0, 177)}...` : cleaned;
 }
