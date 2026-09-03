@@ -139,9 +139,7 @@ function plfToast(message, type = 'info') {
 }
 function plfOwnsSchedule(row = {}) {
   const user = plfPortalUser();
-  const userOrgName = String(user.organization_name || user.organizationName || '').trim().toLowerCase();
-  const rowOrgName = String(row.organization_name || '').trim().toLowerCase();
-  return plfIsOrgUser() && row.record_type === 'schedule' && (row.created_by === user.id || (row.organization_id && user.organization_id && row.organization_id === user.organization_id) || (rowOrgName && userOrgName && rowOrgName === userOrgName));
+  return plfIsOrgUser() && row.record_type === 'schedule' && row.created_by && row.created_by === user.id;
 }
 function plfApprovedOriginal(row = {}) {
   return row.approval_status === 'approved' && !row.revision_of && !plfIsCancellationRequest(row);
@@ -154,7 +152,12 @@ function plfOrgFormSnapshot(seed = {}) {
   const endDate = scheduleType === 'multi_day' ? get('eventEndDate') : startDate;
   const approvedOriginal = plfApprovedOriginal(seed);
   const now = new Date().toISOString();
+  const repeatRule = plfRepeatRule(get('eventRepeat') || get('eventRecurrenceType') || seed.repeat_rule || seed.recurrence_type || 'none');
+  const repeatUntil = repeatRule === 'none' ? '' : (get('eventRepeatUntil') || get('eventRecurrenceUntil') || seed.repeat_until || seed.recurrence_until || '');
   const occurrence = { id: approvedOriginal ? crypto.randomUUID() : (seed.occurrences?.[0]?.id || crypto.randomUUID()), date: startDate, start_time: plfLocalIso(startDate, get('eventStart')), end_time: plfLocalIso(endDate, get('eventEnd')) };
+  const occurrences = plfBuildRepeatedOccurrences(seed, occurrence, repeatRule, repeatUntil);
+  const firstOccurrence = occurrences[0] || occurrence;
+  const lastOccurrence = occurrences[occurrences.length - 1] || occurrence;
   return {
     ...(approvedOriginal ? {} : seed),
     id: approvedOriginal ? crypto.randomUUID() : (seed.id || get('eventId') || crypto.randomUUID()),
@@ -162,10 +165,10 @@ function plfOrgFormSnapshot(seed = {}) {
     category_id: get('eventCategory'),
     title: get('eventTitle').trim(),
     venue: get('eventVenue').trim(),
-    schedule_type: scheduleType,
-    start_time: occurrence.start_time,
-    end_time: occurrence.end_time,
-    occurrences: [occurrence],
+    schedule_type: occurrences.length > 1 && plfDate(firstOccurrence.start_time) === plfDate(firstOccurrence.end_time) ? 'single_day' : scheduleType,
+    start_time: firstOccurrence.start_time,
+    end_time: lastOccurrence.end_time,
+    occurrences,
     expected_attendees: Number.parseInt(get('eventAttendees'), 10) || 1,
     privacy_level: get('eventPrivacy') || 'basic',
     contact_person: get('eventContactPerson').trim(),
@@ -178,9 +181,12 @@ function plfOrgFormSnapshot(seed = {}) {
     revision_of: approvedOriginal ? seed.id : (seed.revision_of || null),
     original_schedule_id: approvedOriginal ? seed.id : (seed.original_schedule_id || seed.revision_of || null),
     revision_status: approvedOriginal ? 'pending' : (seed.revision_status || null),
+    request_type: approvedOriginal ? 'edit' : (seed.request_type || null),
+    request_reason: seed.request_reason || null,
+    requester_id: approvedOriginal ? user.id : (seed.requester_id || user.id),
     revision_created_at: approvedOriginal ? now : (seed.revision_created_at || null),
     revision_submitted_at: approvedOriginal ? now : (seed.revision_submitted_at || null),
-    revision_history: approvedOriginal ? [...(seed.revision_history || []), { revision_id: crypto.randomUUID(), submitted_at: now, submitted_by: user.id, status: 'pending' }] : (seed.revision_history || []),
+    revision_history: approvedOriginal ? [...(seed.revision_history || []), { revision_id: crypto.randomUUID(), submitted_at: now, submitted_by: user.id, request_type: 'edit', status: 'pending' }] : (seed.revision_history || []),
     event_status: seed.event_status === 'cancelled' ? 'planned' : (seed.event_status || 'planned'),
     notification_status: 'unread',
     created_by: user.id,
@@ -188,6 +194,50 @@ function plfOrgFormSnapshot(seed = {}) {
     updated_at: now,
     schedule_schema_version: 2
   };
+}
+function plfRepeatRule(value) {
+  const rule = String(value || '').trim().toLowerCase();
+  return ['daily', 'weekly', 'monthly', 'yearly'].includes(rule) ? rule : 'none';
+}
+function plfDaysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+function plfAddRepeatInterval(date, rule, anchorDay = date.getDate()) {
+  const next = new Date(date);
+  if (rule === 'daily') next.setDate(next.getDate() + 1);
+  else if (rule === 'weekly') next.setDate(next.getDate() + 7);
+  else if (rule === 'monthly') {
+    const monthIndex = next.getMonth() + 1;
+    const year = next.getFullYear() + Math.floor(monthIndex / 12);
+    const month = monthIndex % 12;
+    next.setFullYear(year, month, Math.min(anchorDay, plfDaysInMonth(year, month)));
+  } else if (rule === 'yearly') {
+    const year = next.getFullYear() + 1;
+    next.setFullYear(year, next.getMonth(), Math.min(anchorDay, plfDaysInMonth(year, next.getMonth())));
+  }
+  return next;
+}
+function plfBuildRepeatedOccurrences(seed, occurrence, repeatRule, repeatUntil) {
+  if (repeatRule === 'none') return [occurrence];
+  const start = new Date(occurrence.start_time);
+  const end = new Date(occurrence.end_time);
+  const until = repeatUntil ? new Date(plfLocalIso(String(repeatUntil).slice(0, 10), plfTime(occurrence.end_time))) : null;
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || !until || Number.isNaN(until.getTime()) || until < start) return [occurrence];
+  const duration = end.getTime() - start.getTime();
+  const previous = Array.isArray(seed.occurrences) ? seed.occurrences : [];
+  const rows = [];
+  for (let cursor = new Date(start), index = 0; index < 730 && cursor <= until; index += 1) {
+    const itemEnd = new Date(cursor.getTime() + duration);
+    const date = plfDate(cursor);
+    rows.push({
+      id: previous[index]?.id || crypto.randomUUID(),
+      date,
+      start_time: plfLocalIso(date, plfTime(cursor)),
+      end_time: plfLocalIso(plfDate(itemEnd), plfTime(itemEnd))
+    });
+    cursor = plfAddRepeatInterval(cursor, repeatRule, start.getDate());
+  }
+  return rows.length ? rows : [occurrence];
 }
 function plfOrgDbRow(row) {
   return {
@@ -219,6 +269,9 @@ function plfOrgDbRow(row) {
     revision_of: row.revision_of || null,
     original_schedule_id: row.original_schedule_id || null,
     revision_status: row.revision_status || null,
+    request_type: row.request_type || null,
+    request_reason: row.request_reason || null,
+    requester_id: plfUuid(row.requester_id),
     revision_created_at: row.revision_created_at || null,
     revision_submitted_at: row.revision_submitted_at || null,
     revision_history: Array.isArray(row.revision_history) ? row.revision_history : [],

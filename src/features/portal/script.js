@@ -153,6 +153,7 @@ const state = {
   dashboardReloadSaveTimer: 0,
   formMode: 'create',
   editingScheduleId: '',
+  scheduleSaveInFlight: false,
   filters: { organization: '', venue: '', category: '', eventType: '', date: '', month: '', approval: '', eventStatus: '' },
   selectedPublicDate: '',
   search: ''
@@ -1250,6 +1251,9 @@ function readEventForm() {
   const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
   const endDate = schedule_type === 'multi_day' ? $('eventEndDate').value : $('eventDate').value;
+  const repeatRule = repeatControlValue('eventRepeat', 'eventRecurrenceType', existing?.repeat_rule || existing?.recurrence_type || 'none');
+  const repeatUntil = repeatControlValue('eventRepeatUntil', 'eventRecurrenceUntil', existing?.repeat_until || existing?.recurrence_until || '');
+  const effectiveRepeatUntil = repeatRule === 'none' ? '' : (repeatUntil || defaultRepeatUntil($('eventDate').value, repeatRule));
   const rowOccurrences = readOccurrenceRows().filter((item) => item.date && item.start_time && item.end_time);
   const fallbackOccurrence = {
     id: existing?.occurrences?.[0]?.id || createId(),
@@ -1257,14 +1261,26 @@ function readEventForm() {
     start_time: localIso($('eventDate').value, $('eventStart').value),
     end_time: localIso(endDate, $('eventEnd').value)
   };
-  const occurrences = rowOccurrences.length ? rowOccurrences : [fallbackOccurrence];
+  const repeatedOccurrences = buildRepeatedOccurrences({
+    existing,
+    startDate: $('eventDate').value,
+    endDate,
+    startTime: $('eventStart').value,
+    endTime: $('eventEnd').value,
+    repeatRule,
+    repeatUntil: effectiveRepeatUntil
+  });
+  const occurrences = repeatedOccurrences.length ? repeatedOccurrences : (rowOccurrences.length ? rowOccurrences : [fallbackOccurrence]);
   occurrences.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  const savedScheduleType = repeatedOccurrences.length && dateInput(repeatedOccurrences[0].start_time) === dateInput(repeatedOccurrences[0].end_time)
+    ? 'single_day'
+    : schedule_type;
   return syncEventRange({
     ...existing, id: existing?.id || (formMode === 'edit' ? editingScheduleId : '') || createId(), record_type: 'schedule', schedule_source: scheduleSource, created_by_role: scheduleSource, requires_approval: requiresApproval, title: cleanSingleLine($('eventTitle').value), event_type: category?.name || 'Schedule',
     organization_id: org?.id || '', organization_name: org?.organization_name || '', category_id: $('eventCategory').value,
-    venue: cleanSingleLine($('eventVenue').value), schedule_type, occurrences,
+    venue: cleanSingleLine($('eventVenue').value), schedule_type: savedScheduleType, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
-    contact_person: cleanSingleLine($('eventContactPerson').value) || defaultScheduleContactPerson(), contact_info: cleanSingleLine($('eventContactInfo').value) || defaultScheduleContactInfo(), repeat_rule: $('eventRepeat')?.value || existing?.repeat_rule || 'none', repeat_until: $('eventRepeatUntil')?.value || existing?.repeat_until || '', private_notes: existing?.private_notes || '',
+    contact_person: cleanSingleLine($('eventContactPerson').value) || defaultScheduleContactPerson(), contact_info: cleanSingleLine($('eventContactInfo').value) || defaultScheduleContactInfo(), repeat_rule: repeatRule, repeat_until: effectiveRepeatUntil, recurrence_type: repeatRule, recurrence_until: effectiveRepeatUntil, private_notes: existing?.private_notes || '',
     admin_notes: existing?.admin_notes || '', rejection_reason: resubmitsRejectedSchedule(existing) ? '' : existing?.rejection_reason || '', admin_recommendation: resubmitsRejectedSchedule(existing) ? '' : existing?.admin_recommendation || '',
     approval_date: resubmitsRejectedSchedule(existing) ? '' : existing?.approval_date || '', approved_by: existing?.approved_by || '', reviewed_by: existing?.reviewed_by || '', notification_status: existing?.notification_status || '',
     revision_of: existing?.revision_of || '', original_schedule_id: existing?.original_schedule_id || '', revision_status: existing?.revision_status || '',
@@ -1413,6 +1429,67 @@ function approvalStatusForSave(existing) {
   return existing?.approval_status || 'pending';
 }
 
+function repeatControlValue(id, fallbackId, fallback = '') {
+  return $(id)?.value || $(fallbackId)?.value || fallback;
+}
+
+function isRepeatRule(value) {
+  return ['daily', 'weekly', 'monthly', 'yearly'].includes(value);
+}
+
+function daysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function addRepeatInterval(date, rule, anchorDay = date.getDate()) {
+  const next = new Date(date);
+  if (rule === 'daily') next.setDate(next.getDate() + 1);
+  else if (rule === 'weekly') next.setDate(next.getDate() + 7);
+  else if (rule === 'monthly') {
+    const monthIndex = next.getMonth() + 1;
+    const year = next.getFullYear() + Math.floor(monthIndex / 12);
+    const month = monthIndex % 12;
+    next.setFullYear(year, month, Math.min(anchorDay, daysInMonth(year, month)));
+  } else if (rule === 'yearly') {
+    const year = next.getFullYear() + 1;
+    next.setFullYear(year, next.getMonth(), Math.min(anchorDay, daysInMonth(year, next.getMonth())));
+  }
+  return next;
+}
+
+function defaultRepeatUntil(startDate, repeatRule) {
+  if (!startDate || repeatRule === 'none') return '';
+  const until = new Date(localIso(startDate, '00:00'));
+  if (Number.isNaN(until.getTime())) return '';
+  until.setFullYear(until.getFullYear() + 1);
+  return dateInput(until);
+}
+
+function buildRepeatedOccurrences({ existing, startDate, endDate, startTime, endTime, repeatRule, repeatUntil }) {
+  const rule = isRepeatRule(repeatRule) ? repeatRule : 'none';
+  if (rule === 'none' || !startDate || !startTime || !endTime) return [];
+  const firstStart = new Date(localIso(startDate, startTime));
+  const firstEnd = new Date(localIso(endDate || startDate, endTime));
+  if (Number.isNaN(firstStart.getTime()) || Number.isNaN(firstEnd.getTime()) || firstEnd <= firstStart) return [];
+  const until = new Date(localIso(repeatUntil || startDate, endTime));
+  if (Number.isNaN(until.getTime()) || until < firstStart) return [];
+  const duration = firstEnd.getTime() - firstStart.getTime();
+  const anchorDay = firstStart.getDate();
+  const previous = Array.isArray(existing?.occurrences) ? existing.occurrences : [];
+  const rows = [];
+  for (let cursor = new Date(firstStart), index = 0; index < 730 && cursor <= until; index += 1) {
+    const end = new Date(cursor.getTime() + duration);
+    rows.push({
+      id: previous[index]?.id || createId(),
+      date: dateInput(cursor),
+      start_time: localIso(dateInput(cursor), timeInput(cursor)),
+      end_time: localIso(dateInput(end), timeInput(end))
+    });
+    cursor = addRepeatInterval(cursor, rule, anchorDay);
+  }
+  return rows;
+}
+
 function syncEventRange(event) {
   const occurrences = [...event.occurrences].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   return { ...event, occurrences, start_time: occurrences[0]?.start_time || '', end_time: occurrences.at(-1)?.end_time || '' };
@@ -1514,8 +1591,29 @@ function scheduleSummary(event) {
   return eventOccurrences(event).map((item) => `${formatDateTime(item.start_time)} to ${formatTime(item.end_time)}`).join('\n');
 }
 
-function submitEventForm(event) {
+function setScheduleSaving(saving) {
+  state.scheduleSaveInFlight = saving;
+  const form = $('eventForm');
+  if (form) form.dataset.saving = saving ? '1' : '0';
+  const buttons = [form?.querySelector('.modal-actions .primary-button'), $('agreementSubmitButton')].filter(Boolean);
+  buttons.forEach((button) => {
+    if (saving) {
+      button.dataset.defaultText = button.dataset.defaultText || button.textContent;
+      button.textContent = 'Saving...';
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    } else {
+      if (button.dataset.defaultText) button.textContent = button.dataset.defaultText;
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  });
+  if (!saving) updateAgreementButton();
+}
+
+async function submitEventForm(event) {
   event.preventDefault();
+  if (state.scheduleSaveInFlight) return;
   let candidate;
   try {
     candidate = readEventForm();
@@ -1538,6 +1636,15 @@ function submitEventForm(event) {
   state.editingScheduleId = editingScheduleId;
   state.pendingEvent = candidate;
   if (conflicts.length) log('event_conflict_warning', `"${candidate.title}" has schedule conflicts.`, { event_id: candidate.id, conflict_ids: candidate.conflict_event_ids });
+  if (isSuperAdmin(state.store)) {
+    setScheduleSaving(true);
+    try {
+      await openAgreementOrPersist(candidate, formMode);
+    } finally {
+      setScheduleSaving(false);
+    }
+    return;
+  }
   openAgreementOrPersist(candidate, formMode);
 }
 
@@ -1577,16 +1684,17 @@ function openAgreementOrPersist(candidate, formMode = state.formMode || candidat
 function updateAgreementButton() { $('agreementSubmitButton').disabled = !$('agreeRules').checked || !$('agreePrivacy').checked; $('agreementWarning').hidden = !$('agreementSubmitButton').disabled; }
 async function finishAgreement() {
   const button = $('agreementSubmitButton');
-  if (!button || button.disabled || !state.pendingEvent) return;
-  button.disabled = true;
-  button.textContent = 'Saving...';
-  const pendingMode = state.pendingEvent.form_mode || state.formMode || 'create';
-  const saved = pendingMode === 'edit'
-    ? await saveScheduleChanges(state.editingScheduleId || state.pendingEvent.id, state.pendingEvent, scheduleSaveRole())
-    : await createSchedule(state.pendingEvent);
-  if (saved) closeDialog('agreementModal');
-  button.textContent = 'I Agree and Post';
-  updateAgreementButton();
+  if (!button || button.disabled || !state.pendingEvent || state.scheduleSaveInFlight) return;
+  setScheduleSaving(true);
+  try {
+    const pendingMode = state.pendingEvent.form_mode || state.formMode || 'create';
+    const saved = pendingMode === 'edit'
+      ? await saveScheduleChanges(state.editingScheduleId || state.pendingEvent.id, state.pendingEvent, scheduleSaveRole())
+      : await createSchedule(state.pendingEvent);
+    if (saved) closeDialog('agreementModal');
+  } finally {
+    setScheduleSaving(false);
+  }
 }
 
 function scheduleSaveRole() {
@@ -1630,6 +1738,7 @@ async function saveEvent(candidate) {
   const canSave = existing ? canEditEvent(state.store, existing) : canCreateEvents(state.store);
   if (!requirePermission(canSave, existing ? 'You cannot edit this event.' : 'You cannot create schedules.')) return false;
   if (existing && isManager(state.store) && existing.approval_status === 'approved' && !existing.revision_of) {
+    if (hasOpenScheduleRequest(existing.id, 'edit')) return showToast('An edit request is already pending for this schedule.', 'error');
     const revision = createScheduleRevision(existing, candidate);
     state.store.events.push(revision);
     notifyAdmins({
@@ -1687,6 +1796,7 @@ async function saveEvent(candidate) {
 function createScheduleRevision(original, candidate) {
   const now = new Date().toISOString();
   const revisionId = createId();
+  const requestType = candidate.event_status === 'cancellation_requested' ? 'delete' : 'edit';
   return {
     ...candidate,
     id: revisionId,
@@ -1697,9 +1807,12 @@ function createScheduleRevision(original, candidate) {
     revision_of: original.id,
     original_schedule_id: original.id,
     revision_status: 'pending',
+    request_type: requestType,
+    request_reason: candidate.request_reason || candidate.reason || candidate.admin_recommendation || '',
+    requester_id: currentUser(state.store).id,
     revision_created_at: now,
     revision_submitted_at: now,
-    revision_history: [...(original.revision_history || []), { revision_id: revisionId, submitted_at: now, submitted_by: currentUser(state.store).id, status: 'pending' }],
+    revision_history: [...(original.revision_history || []), { revision_id: revisionId, submitted_at: now, submitted_by: currentUser(state.store).id, request_type: requestType, status: 'pending' }],
     approval_status: 'pending',
     approval_date: '',
     notification_status: '',
@@ -2127,12 +2240,33 @@ function deleteSelectedEvent() {
   }
   confirmDeleteEvent(record);
 }
-function deleteEventFromModal() { const event = state.store.events.find((item) => item.id === $('eventId').value); if (event) confirmDeleteEvent(event); }
-function confirmDeleteEvent(event) { if (!requirePermission(canDeleteEvent(state.store, event), 'You cannot delete this event.')) return; confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event)); }
+function deleteEventFromModal() {
+  const event = state.store.events.find((item) => item.id === $('eventId').value);
+  if (!event) return;
+  if (ownsOrganizationSchedule(event) && isApprovedOriginalOrganizationSchedule(event)) {
+    confirmAction(`Request removal of "${event.title}"?`, () => requestScheduleRemoval(event));
+    return;
+  }
+  confirmDeleteEvent(event);
+}
+function confirmDeleteEvent(event) {
+  if (ownsOrganizationSchedule(event) && isApprovedOriginalOrganizationSchedule(event)) {
+    confirmAction(`Request removal of "${event.title}"?`, () => requestScheduleRemoval(event));
+    return;
+  }
+  if (!requirePermission(canDeleteEvent(state.store, event), 'You cannot delete this event.')) return;
+  confirmAction(`Permanently delete "${event.title}"?`, () => deleteEvent(event));
+}
+function hasOpenScheduleRequest(scheduleId, requestType) {
+  return state.store.events.some((event) =>
+    event.revision_of === scheduleId
+    && (event.request_type || (event.event_status === 'cancellation_requested' ? 'delete' : 'edit')) === requestType
+    && ['pending', 'cancel_pending'].includes(event.revision_status || event.approval_status)
+  );
+}
 async function requestScheduleRemoval(original) {
   if (!requirePermission(ownsOrganizationSchedule(original) && isApprovedOriginalOrganizationSchedule(original), 'You cannot request removal for this schedule.')) return false;
-  const existingRequest = state.store.events.some((event) => event.revision_of === original.id && event.approval_status === 'pending' && event.event_status === 'cancellation_requested');
-  if (existingRequest) return showToast('A remove request is already pending for this schedule.', 'error');
+  if (hasOpenScheduleRequest(original.id, 'delete')) return showToast('A remove request is already pending for this schedule.', 'error');
   const request = createScheduleRevision(original, { ...original, event_status: 'cancellation_requested' });
   state.store.events.push(request);
   notifyAdmins({
