@@ -99,9 +99,8 @@ function plfFullSchedulePayload(row) {
     contact_info: row.contact_info || null,
     public_description: row.public_description || null,
     purpose: row.purpose || null,
-    repeat_rule: plfRepeatRule(row.recurrence_type || row.repeat_rule),
     repeat_until: row.recurrence_until || row.repeat_until || null,
-    recurrence_type: plfRepeatRule(row.recurrence_type || row.repeat_rule),
+    recurrence_type: plfRepeatRule(row.recurrence_type),
     recurrence_until: row.recurrence_until || row.repeat_until || null,
     approval_status: 'approved',
     admin_recommendation: row.admin_recommendation || null,
@@ -156,7 +155,7 @@ function plfOrgFormSnapshot(seed = {}) {
   const endDate = scheduleType === 'multi_day' ? get('eventEndDate') : startDate;
   const approvedOriginal = plfApprovedOriginal(seed);
   const now = new Date().toISOString();
-  const repeatRule = plfRepeatRule(get('eventRepeat') || get('eventRecurrenceType') || seed.repeat_rule || seed.recurrence_type || 'none');
+  const repeatRule = plfRepeatRule(get('eventRepeat') || get('eventRecurrenceType') || seed.recurrence_type || 'none');
   const repeatUntil = repeatRule === 'none' ? '' : (get('eventRepeatUntil') || get('eventRecurrenceUntil') || seed.repeat_until || seed.recurrence_until || '');
   const occurrence = { id: approvedOriginal ? crypto.randomUUID() : (seed.occurrences?.[0]?.id || crypto.randomUUID()), date: startDate, start_time: plfLocalIso(startDate, get('eventStart')), end_time: plfLocalIso(endDate, get('eventEnd')) };
   const occurrences = plfBuildRepeatedOccurrences(seed, occurrence, repeatRule, repeatUntil);

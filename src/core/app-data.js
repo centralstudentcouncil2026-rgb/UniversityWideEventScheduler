@@ -282,6 +282,8 @@ function normalizeEvent(event) {
   const lastOccurrence = occurrences[occurrences.length - 1] || {};
   const scheduleSource = normalizeScheduleSource(event);
   const approvalStatus = normalizeApprovalStatus(event.approval_status, scheduleSource);
+  const recurrenceType = normalizeRecurrenceType(event.recurrence_type);
+  const scheduleType = normalizedScheduleType(event, occurrences);
   const now = new Date().toISOString();
   return {
     ...event,
@@ -293,7 +295,8 @@ function normalizeEvent(event) {
     event_status: normalizeEventStatus(event.event_status),
     privacy_level: normalizePrivacyLevel(event.privacy_level, event.private_notes),
     private_notes: String(event.private_notes || '').replace(INTERNAL_PRIVACY_MARKER, '').trim(),
-    schedule_type: normalizedScheduleType(event, occurrences),
+    recurrence_type: recurrenceType === 'none' ? '' : recurrenceType,
+    schedule_type: scheduleType,
     expected_attendees: normalizedExpectedAttendees(event.expected_attendees),
     schedule_schema_version: isCurrentScheduleRecord({ ...event, privacy_level: normalizePrivacyLevel(event.privacy_level, event.private_notes) }) ? 2 : 1,
     occurrences,
@@ -326,13 +329,14 @@ function normalizeEvent(event) {
 
 function normalizedScheduleType(event = {}, occurrences = []) {
   const storedType = String(event.schedule_type || '').trim();
-  const repeatType = normalizeRecurrenceType(event.recurrence_type || event.repeat_rule || event.repeat);
+  const repeatType = normalizeRecurrenceType(event.recurrence_type);
+  const repeated = ['daily', 'weekly', 'monthly', 'yearly'].includes(repeatType);
   const spansDates = occurrences.some((occurrence) => {
     const startDate = String(occurrence.start_time || occurrence.date || '').slice(0, 10);
     const endDate = String(occurrence.end_time || occurrence.start_time || occurrence.date || '').slice(0, 10);
     return startDate && endDate && startDate !== endDate;
   });
-  if (repeatType !== 'none' && !spansDates) return 'single_day';
+  if (repeated && !spansDates) return 'single_day';
   if (storedType) return storedType;
   return spansDates ? 'multi_day' : 'single_day';
 }
@@ -554,7 +558,7 @@ function addRecurrenceInterval(date, rule, anchorDay) {
 }
 
 function expandRecurringOccurrences(event = {}, occurrenceRows = []) {
-  const rule = normalizeRecurrenceType(event.recurrence_type || event.repeat_rule || event.repeat);
+  const rule = normalizeRecurrenceType(event.recurrence_type);
   if (rule === 'none' || occurrenceRows.length !== 1) return occurrenceRows;
   const base = occurrenceRows[0];
   const start = safeDate(base.start_time || event.start_time);
