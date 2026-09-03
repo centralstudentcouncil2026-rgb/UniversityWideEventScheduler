@@ -1245,8 +1245,9 @@ function readEventForm() {
   const editingScheduleId = formMode === 'edit' ? (state.editingScheduleId || $('eventForm')?.dataset.editingScheduleId || $('eventId').value) : $('eventId').value;
   const existing = state.store.events.find((event) => event.id === editingScheduleId);
   const user = currentUser(state.store);
-  const scheduleSource = existing?.schedule_source || (isSuperAdmin(state.store) ? 'admin' : 'organization');
+  const scheduleSource = isManager(state.store) ? 'organization' : (existing?.schedule_source || (isSuperAdmin(state.store) ? 'admin' : 'organization'));
   const requiresApproval = scheduleSource !== 'admin';
+  const approvalStatus = approvalStatusForSave(existing, scheduleSource);
   const org = resolveScheduleOrganization(existing, user);
   const category = state.store.categories.find((item) => item.id === $('eventCategory').value);
   const schedule_type = $('eventScheduleType').value;
@@ -1281,11 +1282,11 @@ function readEventForm() {
     venue: cleanSingleLine($('eventVenue').value), schedule_type: savedScheduleType, occurrences,
     expected_attendees: Number($('eventAttendees').value), public_description: cleanMultiline($('eventPublicDescription').value), purpose: cleanMultiline($('eventPurpose').value),
     contact_person: cleanSingleLine($('eventContactPerson').value) || defaultScheduleContactPerson(), contact_info: cleanSingleLine($('eventContactInfo').value) || defaultScheduleContactInfo(), repeat_until: effectiveRepeatUntil, recurrence_type: repeatRule, recurrence_until: effectiveRepeatUntil, private_notes: existing?.private_notes || '',
-    admin_notes: existing?.admin_notes || '', rejection_reason: resubmitsRejectedSchedule(existing) ? '' : existing?.rejection_reason || '', admin_recommendation: resubmitsRejectedSchedule(existing) ? '' : existing?.admin_recommendation || '',
-    approval_date: resubmitsRejectedSchedule(existing) ? '' : existing?.approval_date || '', approved_by: existing?.approved_by || '', reviewed_by: existing?.reviewed_by || '', notification_status: existing?.notification_status || '',
+    admin_notes: existing?.admin_notes || '', rejection_reason: approvalStatus === 'pending' ? '' : existing?.rejection_reason || '', admin_recommendation: approvalStatus === 'pending' ? '' : existing?.admin_recommendation || '',
+    approval_date: approvalStatus === 'approved' ? existing?.approval_date || '' : '', approved_by: approvalStatus === 'approved' ? existing?.approved_by || '' : '', reviewed_by: approvalStatus === 'approved' ? existing?.reviewed_by || '' : '', notification_status: existing?.notification_status || '',
     revision_of: existing?.revision_of || '', original_schedule_id: existing?.original_schedule_id || '', revision_status: existing?.revision_status || '',
     revision_created_at: existing?.revision_created_at || '', revision_submitted_at: existing?.revision_submitted_at || '', revision_history: existing?.revision_history || [],
-    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: approvalStatusForSave(existing), created_by: existing?.created_by || currentUser(state.store).id,
+    event_status: existing?.event_status || 'planned', privacy_level: $('eventPrivacy').value, approval_status: approvalStatus, created_by: existing?.created_by || currentUser(state.store).id,
     schedule_schema_version: 2, created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(), conflict_event_ids: []
   });
 }
@@ -1423,9 +1424,10 @@ function resubmitsRejectedSchedule(existing) {
   return Boolean(existing && isManager(state.store) && existing.approval_status === 'rejected');
 }
 
-function approvalStatusForSave(existing) {
-  if (isSuperAdmin(state.store)) return 'approved';
+function approvalStatusForSave(existing, scheduleSource = existing?.schedule_source || (isSuperAdmin(state.store) ? 'admin' : 'organization')) {
+  if (isSuperAdmin(state.store)) return scheduleSource === 'admin' ? 'approved' : (existing?.approval_status || 'pending');
   if (resubmitsRejectedSchedule(existing)) return 'pending';
+  if (scheduleSource !== 'admin' && (!existing || existing.approval_status !== 'approved')) return 'pending';
   return existing?.approval_status || 'pending';
 }
 
