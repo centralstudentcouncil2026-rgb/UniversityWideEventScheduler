@@ -15,6 +15,7 @@ const USERNAME_PATTERN = /^[a-z0-9_.-]{3,32}$/;
 let dashboardStarted = false;
 
 wireIntegratedAuth();
+selectInitialAuthTab();
 await restoreExistingSession();
 
 function cleanLogin(value) {
@@ -140,6 +141,12 @@ function selectIntegratedAuthTab(name) {
     panel.hidden = !active;
   });
   document.getElementById(name === 'signup' ? 'integratedSignupEmail' : 'integratedLoginEmail')?.focus();
+}
+
+function selectInitialAuthTab() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedTab = String(params.get('auth') || params.get('tab') || window.location.hash.replace('#', '') || '').trim().toLowerCase();
+  if (requestedTab === 'signup' || requestedTab === 'sign-up') selectIntegratedAuthTab('signup');
 }
 
 async function restoreExistingSession() {
