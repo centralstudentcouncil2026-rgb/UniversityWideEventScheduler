@@ -12,6 +12,10 @@
     try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
   }
 
+  function hasActiveSession() {
+    return Boolean(session()?.access_token);
+  }
+
   function sessionExpiresSoon(value = session()) {
     const expiresAt = Number(value?.expires_at || 0);
     return Boolean(expiresAt && Date.now() / 1000 > expiresAt - 60);
@@ -254,8 +258,16 @@
   }
 
   async function loadConcerns() {
-    const rows = await rest('/rest/v1/concerns?select=*&order=created_at.desc', {}, 'return=minimal');
-    if (Array.isArray(rows)) syncStoreConcerns(rows);
+    if (!hasActiveSession()) {
+      renderConcerns();
+      return;
+    }
+    try {
+      const rows = await rest('/rest/v1/concerns?select=*&order=created_at.desc', {}, 'return=minimal');
+      if (Array.isArray(rows)) syncStoreConcerns(rows);
+    } catch (error) {
+      console.warn('Concerns could not be loaded for this session:', error.message || error);
+    }
     renderConcerns();
   }
 
