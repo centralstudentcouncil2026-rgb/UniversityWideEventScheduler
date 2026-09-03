@@ -35,6 +35,11 @@ function plfUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text) ? text : null;
 }
 
+function plfRepeatRule(value) {
+  const rule = String(value || '').trim().toLowerCase();
+  return ['daily', 'weekly', 'monthly', 'yearly'].includes(rule) ? rule : null;
+}
+
 function plfHeaders() {
   const key = window.SUPABASE_CONFIG?.publishableKey || window.SUPABASE_CONFIG?.anonKey || window.SUPABASE_CONFIG?.apiKey || window.SUPABASE_CONFIG?.apikey || '';
   return { apikey: key, Authorization: `Bearer ${plfSession()?.access_token || key}`, 'Content-Type': 'application/json' };
@@ -99,6 +104,10 @@ function plfFullSchedulePayload(row) {
     contact_info: row.contact_info || null,
     public_description: row.public_description || null,
     purpose: row.purpose || null,
+    repeat_rule: plfRepeatRule(row.recurrence_type || row.repeat_rule),
+    repeat_until: row.recurrence_until || row.repeat_until || null,
+    recurrence_type: plfRepeatRule(row.recurrence_type || row.repeat_rule),
+    recurrence_until: row.recurrence_until || row.repeat_until || null,
     approval_status: 'approved',
     admin_recommendation: row.admin_recommendation || null,
     approval_date: row.approval_date || new Date().toISOString(),
