@@ -67,19 +67,27 @@ function wireIntegratedAuth() {
     }
     button.disabled = true;
     setMessage(loginMessage, 'Checking your account...', 'success');
+    let store;
     try {
       await authenticate(email, password);
-      const store = await loadAuthenticatedStore();
-      if (!roleAllowed(store)) {
-        clearSession();
-        setMessage(loginMessage, roleError(store));
-        button.disabled = false;
-        return;
-      }
-      await startDashboard(store);
+      store = await loadAuthenticatedStore();
     } catch (error) {
       clearSession();
       setMessage(loginMessage, loginErrorMessage(error));
+      button.disabled = false;
+      return;
+    }
+    if (!roleAllowed(store)) {
+      clearSession();
+      setMessage(loginMessage, roleError(store));
+      button.disabled = false;
+      return;
+    }
+    try {
+      await startDashboard(store);
+    } catch (error) {
+      console.error('Organization dashboard startup failed:', error);
+      setMessage(loginMessage, dashboardStartErrorMessage(error));
       button.disabled = false;
     }
   });
@@ -146,7 +154,15 @@ async function startDashboard(store) {
   window.CONNECT_BOOTSTRAP_STORE = store;
   document.body.classList.add('portal-authenticated', 'dashboard-login-ready', 'org-dashboard-shell');
   document.body.classList.remove('dashboard-login-required', 'auth-active', 'is-public', 'public-shell');
-  await import('./calendar-logic-guard.js?v=20260625-start-end-dates-v6');await import('./portal-logic-fixes.js?v=20260625-org-announcements-v1');await waitForFullCalendar();await import('./script.js?v=20260625-org-announcements-v1');await import('./portal-wiring.js?v=20260625-concerns-sync-v1');await import('./activity-status-bridge.js?v=20260625-profile-status-v3');await import('./ui-light-cards.js?v=20260625-org-announcements-v1');await import('./portal-ui-polish.js?v=20260625-org-announcements-v1');await import('./conference-room-booking.js?v=20260812-conference-room-db-v4')
+  await import('./calendar-logic-guard.js?v=20260625-start-end-dates-v6');await import('./portal-logic-fixes.js?v=20260625-org-announcements-v1');await waitForFullCalendar();await import('./script.js?v=20260625-org-announcements-v1');await import('./portal-wiring.js?v=20260625-concerns-sync-v1');await importOptionalDashboardModule('./activity-status-bridge.js?v=20260625-profile-status-v3');await importOptionalDashboardModule('./ui-light-cards.js?v=20260625-org-announcements-v1');await importOptionalDashboardModule('./portal-ui-polish.js?v=20260625-org-announcements-v1');await importOptionalDashboardModule('./conference-room-booking.js?v=20260812-conference-room-db-v4')
+}
+
+async function importOptionalDashboardModule(specifier) {
+  try {
+    await import(specifier);
+  } catch (error) {
+    console.warn(`Optional dashboard module failed to load: ${specifier}`, error);
+  }
 }
 
 function waitForFullCalendar() {
@@ -174,4 +190,10 @@ function loginErrorMessage(error) {
   if (/jwt expired|session expired/i.test(text)) return 'Your session expired. Please log in again.';
   if (/failed to fetch|network|supabase is unavailable/i.test(text)) return 'Could not reach Supabase. Check your connection and try again.';
   return 'Login failed. Please try again.';
+}
+
+function dashboardStartErrorMessage(error) {
+  const text = String(error?.message || '');
+  if (/FullCalendar failed to load/i.test(text)) return 'Your account was verified, but the calendar engine did not load. Hard refresh the page and try again.';
+  return 'Your account was verified, but the dashboard could not finish loading. Hard refresh the page and try again.';
 }
