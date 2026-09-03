@@ -94,17 +94,12 @@
     return `${date}T${time || '00:00'}:00`;
   }
 
-  function addInterval(date, type) {
-    const next = new Date(date);
-    if (type === 'daily') next.setDate(next.getDate() + 1);
-    else if (type === 'weekly') next.setDate(next.getDate() + 7);
-    else if (type === 'monthly') next.setMonth(next.getMonth() + 1);
-    else if (type === 'yearly') next.setFullYear(next.getFullYear() + 1);
-    return next;
+  function pad(value) {
+    return String(value).padStart(2, '0');
   }
 
   function isoDate(date) {
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   }
 
   function defaultRecurrenceUntil(startDate, recurrenceType) {
@@ -120,19 +115,16 @@
     const finalDate = endDate || startDate;
     const firstStart = new Date(datetime(startDate, startTime));
     const firstEnd = new Date(datetime(finalDate, endTime));
-    const duration = Math.max(30 * 60 * 1000, firstEnd - firstStart);
+    if (Number.isNaN(firstStart.getTime()) || Number.isNaN(firstEnd.getTime()) || firstEnd <= firstStart) return [];
     if (type === 'none') {
-      return [{ id: createId(), date: startDate, start_time: firstStart.toISOString(), end_time: firstEnd.toISOString() }];
+      return [{ id: createId(), date: startDate, start_time: datetime(startDate, startTime), end_time: datetime(finalDate, endTime) }];
     }
-    const until = new Date(datetime(recurrenceUntil || startDate, endTime));
-    const rows = [];
-    let cursor = new Date(firstStart);
-    for (let index = 0; index < 730 && cursor <= until; index += 1) {
-      const end = new Date(cursor.getTime() + duration);
-      rows.push({ id: createId(), date: isoDate(cursor), start_time: cursor.toISOString(), end_time: end.toISOString() });
-      cursor = addInterval(cursor, type);
-    }
-    return rows;
+    return window.CSC_RECURRENCE?.buildRecurringOccurrences?.({
+      start_time: datetime(startDate, startTime),
+      end_time: datetime(finalDate, endTime),
+      recurrence_type: type,
+      recurrence_until: recurrenceUntil || startDate
+    }) || [];
   }
 
   function recurrenceLabel(value) {
@@ -181,6 +173,8 @@
       body.personal-calendar-perspective #personalCalendarHost .fc-scrollgrid th{border-color:rgba(100,116,139,.34)!important;border-style:solid!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day-frame{min-height:0!important;background:rgba(255,255,255,.44)!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day-number{display:block!important;color:#0f172a!important;font-weight:700!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event-harness{margin-inline:2px!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event{box-sizing:border-box!important;margin-inline:0!important;max-width:calc(100% - 4px)!important;width:calc(100% - 4px)!important;}
       body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence,
       body.personal-calendar-perspective #personalCalendarHost .gcal-month-event,
       body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-main,
@@ -339,6 +333,63 @@
           width:100%!important;
         }
         body.personal-calendar-perspective.personal-search-expanded #personalCalendarHeaderSearch::placeholder{color:#64748b!important;opacity:1!important;}
+      }
+      body.portal-shell #mobileMenuButton{align-items:center!important;justify-content:center!important;min-width:clamp(40px,10vw,52px)!important;width:clamp(40px,10vw,52px)!important;height:clamp(40px,10vw,52px)!important;padding:0!important;}
+      body.portal-shell #mobileMenuButton::before{content:none!important;}
+      body.portal-shell #mobileMenuButton span{background:#0f172a!important;border-radius:999px!important;display:block!important;height:clamp(2px,.55vw,3px)!important;width:clamp(18px,4.9vw,26px)!important;}
+      body.personal-calendar-perspective .topbar{align-items:center!important;display:flex!important;flex-wrap:nowrap!important;gap:clamp(6px,1.5vw,12px)!important;overflow:hidden!important;padding-inline:clamp(6px,2vw,16px)!important;}
+      body.personal-calendar-perspective .brand-area{display:flex!important;align-items:center!important;flex:1 1 auto!important;gap:clamp(6px,1.6vw,10px)!important;min-width:0!important;overflow:hidden!important;}
+      body.personal-calendar-perspective .brand-logo{flex:0 0 auto!important;height:clamp(34px,9vw,48px)!important;width:clamp(34px,9vw,48px)!important;}
+      body.personal-calendar-perspective .brand-copy{display:block!important;flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;}
+      body.personal-calendar-perspective .brand-copy h1{font-size:clamp(1rem,5.2vw,1.55rem)!important;line-height:1.05!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}
+      body.personal-calendar-perspective .brand-copy p{font-size:clamp(.62rem,2.7vw,.78rem)!important;line-height:1.05!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}
+      body.personal-calendar-perspective #mobileMenuButton,
+      body.personal-calendar-perspective .period-controls .icon-button,
+      body.personal-calendar-perspective #notificationsButton{align-items:center!important;aspect-ratio:1/1!important;border-radius:999px!important;display:inline-flex!important;flex:0 0 auto!important;height:clamp(38px,9.8vw,52px)!important;justify-content:center!important;min-height:clamp(38px,9.8vw,52px)!important;min-width:clamp(38px,9.8vw,52px)!important;padding:0!important;width:clamp(38px,9.8vw,52px)!important;}
+      body.personal-calendar-perspective #mobileMenuButton::before{content:none!important;}
+      body.personal-calendar-perspective .calendar-nav{align-items:center!important;display:flex!important;flex:0 1 auto!important;gap:clamp(5px,1.4vw,10px)!important;justify-content:flex-end!important;min-width:0!important;overflow:visible!important;}
+      body.personal-calendar-perspective .period-controls{align-items:center!important;display:inline-flex!important;flex:0 0 auto!important;gap:clamp(5px,1.4vw,8px)!important;}
+      body.personal-calendar-perspective #viewSelector{border-radius:999px!important;flex:0 1 clamp(82px,18vw,132px)!important;font-size:clamp(.78rem,3vw,1rem)!important;min-height:clamp(38px,9.8vw,52px)!important;min-width:clamp(76px,18vw,104px)!important;overflow:hidden!important;padding-inline:clamp(10px,3vw,18px)!important;text-align:center!important;text-overflow:ellipsis!important;text-align-last:center!important;white-space:nowrap!important;width:auto!important;}
+      @media (max-width: 640px){
+        body.personal-calendar-perspective .topbar{min-height:56px!important;}
+        body.personal-calendar-perspective .brand-logo,
+        body.personal-calendar-perspective .brand-copy p{display:none!important;}
+        body.personal-calendar-perspective .brand-area{flex:1 1 min(38vw,190px)!important;}
+        body.personal-calendar-perspective .brand-copy h1{font-size:clamp(.9rem,4.5vw,1.25rem)!important;max-width:min(36vw,184px)!important;}
+        body.personal-calendar-perspective #personalCalendarHeaderSearch{flex:0 0 clamp(38px,9.8vw,44px)!important;height:clamp(38px,9.8vw,44px)!important;max-width:clamp(38px,9.8vw,44px)!important;min-height:clamp(38px,9.8vw,44px)!important;min-width:clamp(38px,9.8vw,44px)!important;width:clamp(38px,9.8vw,44px)!important;}
+        body.personal-calendar-perspective.personal-search-expanded .brand-area{display:none!important;}
+      }
+      @media (max-width: 420px){
+        body.personal-calendar-perspective .topbar{gap:4px!important;padding-inline:4px!important;}
+        body.personal-calendar-perspective #mobileMenuButton,
+        body.personal-calendar-perspective .period-controls .icon-button,
+        body.personal-calendar-perspective #notificationsButton{height:34px!important;min-height:34px!important;min-width:34px!important;width:34px!important;}
+        body.personal-calendar-perspective #mobileMenuButton span{height:2px!important;width:18px!important;}
+        body.personal-calendar-perspective #mobileMenuButton::before{font-size:1rem!important;}
+        body.personal-calendar-perspective .calendar-nav,
+        body.personal-calendar-perspective .period-controls{gap:4px!important;}
+        body.personal-calendar-perspective #personalCalendarHeaderSearch{flex-basis:34px!important;height:34px!important;max-width:34px!important;min-height:34px!important;min-width:34px!important;width:34px!important;}
+        body.personal-calendar-perspective .brand-area{flex:1 1 min(30vw,118px)!important;}
+        body.personal-calendar-perspective .brand-copy h1{font-size:clamp(.78rem,4.1vw,1rem)!important;max-width:min(30vw,116px)!important;}
+        body.personal-calendar-perspective #viewSelector{flex-basis:clamp(62px,18vw,82px)!important;font-size:.75rem!important;min-height:34px!important;min-width:clamp(58px,17vw,72px)!important;padding-inline:8px!important;}
+        body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event-harness{margin-inline:1px!important;}
+        body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-event{max-width:calc(100% - 2px)!important;width:calc(100% - 2px)!important;}
+        body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .event-month-occurrence .fc-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .gcal-month-event .fc-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .gcal-month-event .fc-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-time,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-title,
+        body.personal-calendar-perspective #personalCalendarHost .personal-calendar-event-content{font-size:9.5px!important;font-weight:800!important;gap:1px!important;line-height:1.05!important;}
+      }
+      body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:44px!important;align-items:center!important;}
+      body.personal-calendar-perspective #viewSelector{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;flex:0 0 122px!important;min-width:112px!important;max-width:132px!important;border-radius:999px!important;font-size:1rem!important;line-height:1!important;padding:0 18px!important;}
+      body.personal-calendar-perspective .period-controls .icon-button,
+      body.personal-calendar-perspective #notificationsButton{align-items:center!important;aspect-ratio:1/1!important;box-sizing:border-box!important;flex:0 0 var(--personal-calendar-control-size)!important;height:var(--personal-calendar-control-size)!important;justify-content:center!important;max-height:var(--personal-calendar-control-size)!important;max-width:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;min-width:var(--personal-calendar-control-size)!important;border-radius:999px!important;padding:0!important;width:var(--personal-calendar-control-size)!important;}
+      body.personal-calendar-perspective #personalCalendarHeaderSearch{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;border-radius:999px!important;}
+      @media (max-width: 420px){
+        body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:40px!important;}
+        body.personal-calendar-perspective #viewSelector{flex-basis:104px!important;min-width:96px!important;max-width:110px!important;font-size:.9rem!important;padding:0 14px!important;}
       }
     `;
     document.head.appendChild(style);
@@ -614,6 +665,11 @@
     if (title) title.textContent = cleanDashboardTitle(value);
   }
 
+  function setPersonalDashboardTitle() {
+    const width = Math.floor(window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || 1024);
+    setDashboardTitle(width <= 380 ? 'Mine' : width <= 640 ? 'My Calendar' : 'My Own Calendar');
+  }
+
   function cleanDashboardTitle(value) {
     return String(value || 'Calendar')
       .replace(/\u2013|\u2014|\u00e2(?:\u20ac|\u0080)[\u201c\u201d\u0093\u0094]/g, ' - ')
@@ -824,7 +880,7 @@
     document.body.classList.add('personal-calendar-perspective');
     ensurePersonalViewOptions();
     syncHeaderSearchMode();
-    setDashboardTitle('My Own Calendar');
+    setPersonalDashboardTitle();
     if (view) view.value = 'dayGridMonth';
     if (headerOrgFilter) headerOrgFilter.value = 'all';
     if (sideOrgFilter) sideOrgFilter.value = 'all';
@@ -972,7 +1028,7 @@
       approval_status: 'approved',
       event_status: 'planned',
       start_time: occurrences[0].start_time,
-      end_time: occurrences[occurrences.length - 1].end_time,
+      end_time: recurrenceType === 'none' ? occurrences[occurrences.length - 1].end_time : occurrences[0].end_time,
       updated_at: new Date().toISOString()
     };
   }
@@ -2028,55 +2084,6 @@
     }
   }
 
-  function enhancePostedScheduleSubmit(event) {
-    if (event.target?.id !== 'eventForm') return;
-    const recurrenceType = document.getElementById('eventRecurrenceType')?.value || 'none';
-    if (recurrenceType === 'none') return;
-    const title = document.getElementById('eventTitle')?.value?.trim();
-    const startDate = document.getElementById('eventDate')?.value;
-    const endDate = document.getElementById('eventEndDate')?.value || startDate;
-    const startTime = document.getElementById('eventStart')?.value;
-    const endTime = document.getElementById('eventEnd')?.value;
-    const recurrenceUntil = document.getElementById('eventRecurrenceUntil')?.value || defaultRecurrenceUntil(startDate, recurrenceType);
-    const occurrences = buildOccurrences({ startDate, startTime, endDate, endTime, recurrenceType, recurrenceUntil });
-    if (!occurrences.length) return;
-    window.setTimeout(() => patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }), 1000);
-    window.setTimeout(() => patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }), 2600);
-  }
-
-  async function patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }) {
-    const uid = currentUserId();
-    if (!uid || !title) return;
-    const encodedTitle = encodeURIComponent(title);
-    const rows = await rest(`/rest/v1/${TABLE}?select=id,title,created_by,updated_at&record_type=eq.${PERSONAL_RECORD_TYPE}&title=eq.${encodedTitle}&created_by=eq.${encodeURIComponent(uid)}&order=updated_at.desc&limit=1`, {}, 'return=minimal').catch(() => []);
-    const row = Array.isArray(rows) ? rows[0] : null;
-    if (!row?.id) return;
-    await rest(`/rest/v1/${TABLE}?id=eq.${encodeURIComponent(row.id)}&record_type=eq.${PERSONAL_RECORD_TYPE}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
-        recurrence_type: recurrenceType,
-        recurrence_until: recurrenceUntil || null,
-        occurrences,
-        start_time: occurrences[0].start_time,
-        end_time: occurrences[occurrences.length - 1].end_time,
-        updated_at: new Date().toISOString()
-      })
-    }, 'return=minimal').catch(() => {});
-    const storeEvent = (window.CONNECT_STATE?.store?.events || []).find((event) => event.id === row.id);
-    if (storeEvent) {
-      Object.assign(storeEvent, {
-        schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
-        recurrence_type: recurrenceType,
-        recurrence_until: recurrenceUntil || '',
-        occurrences,
-        start_time: occurrences[0].start_time,
-        end_time: occurrences[occurrences.length - 1].end_time
-      });
-      window.CONNECT_STATE?.calendar?.refetchEvents?.();
-    }
-  }
-
   function bind() {
     const modal = document.getElementById('eventModal');
     if (modal && modal.dataset.personalCloseBound !== '1') {
@@ -2188,7 +2195,6 @@
       }
     }, true);
     document.addEventListener('submit', savePersonalEvent, true);
-    document.addEventListener('submit', enhancePostedScheduleSubmit, true);
     document.addEventListener('input', (event) => {
       if (personalMode && event.target?.id === 'personalCalendarHeaderSearch') void searchPublic();
     });
@@ -2228,11 +2234,13 @@
     if (window.CSC_PENDING_PERSONAL_CALENDAR_RESTORE) window.setTimeout(openPersonalCalendar, 0);
     window.addEventListener('resize', () => {
       if (!personalMode) return;
+      setPersonalDashboardTitle();
       syncHeaderSearchMode();
       schedulePersonalCalendarHeightSync();
     }, { passive: true });
     window.visualViewport?.addEventListener('resize', () => {
       if (!personalMode) return;
+      setPersonalDashboardTitle();
       syncHeaderSearchMode();
       schedulePersonalCalendarHeightSync();
     }, { passive: true });

@@ -1,4 +1,4 @@
-import { createId } from './app-data.js?v=20260625-status-sync-v1';
+import { buildRecurringOccurrences, createId } from './app-data.js?v=20260625-status-sync-v1';
 import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } from './app-rules.js?v=20260625-status-sync-v1';
 
 (() => {
@@ -82,15 +82,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   function combineLocal(date, time) {
     return date && time ? `${date}T${time}` : '';
   }
-  function addRepeatStep(date, repeatRule) {
-    const next = new Date(`${date}T00:00`);
-    if (Number.isNaN(next.getTime())) return '';
-    if (repeatRule === 'daily') next.setDate(next.getDate() + 1);
-    else if (repeatRule === 'weekly') next.setDate(next.getDate() + 7);
-    else if (repeatRule === 'monthly') next.setMonth(next.getMonth() + 1);
-    else return '';
-    return dateOnly(next);
-  }
   function defaultRepeatUntil(startTime, repeatRule) {
     const startDate = dateOnly(startTime);
     if (!startDate || repeatRule === 'none') return '';
@@ -108,22 +99,19 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (!startDate || !startClock || !endClock) return [];
     const rule = ['daily', 'weekly', 'monthly'].includes(repeatRule) ? repeatRule : 'none';
     const untilDate = rule === 'none' ? startDate : (dateOnly(repeatUntil) || defaultRepeatUntil(startTime, rule));
-    const occurrences = [];
-    let currentStartDate = startDate;
-    let currentEndDate = endDate;
-    for (let index = 0; index < 80; index += 1) {
-      if (currentStartDate > untilDate) break;
-      const occurrenceStart = combineLocal(currentStartDate, startClock);
-      const occurrenceEnd = combineLocal(currentEndDate, endClock);
-      if (occurrenceStart && occurrenceEnd && new Date(occurrenceEnd) > new Date(occurrenceStart)) {
-        occurrences.push({ id: createId(), date: currentStartDate, start_time: occurrenceStart, end_time: occurrenceEnd });
-      }
-      if (rule === 'none') break;
-      currentStartDate = addRepeatStep(currentStartDate, rule);
-      currentEndDate = addRepeatStep(currentEndDate, rule);
-      if (!currentStartDate || !currentEndDate) break;
+    if (rule === 'none') {
+      const occurrenceStart = combineLocal(startDate, startClock);
+      const occurrenceEnd = combineLocal(endDate, endClock);
+      return occurrenceStart && occurrenceEnd && new Date(occurrenceEnd) > new Date(occurrenceStart)
+        ? [{ id: createId(), date: startDate, start_time: occurrenceStart, end_time: occurrenceEnd }]
+        : [];
     }
-    return occurrences;
+    return buildRecurringOccurrences({
+      start_time: combineLocal(startDate, startClock),
+      end_time: combineLocal(endDate, endClock),
+      recurrence_type: rule,
+      recurrence_until: untilDate
+    });
   }
   function normalizeBookingOccurrence(booking = {}, occurrence = {}, index = 0) {
     const date = dateOnly(occurrence.date || occurrence.start_time || booking.start_time);
@@ -1115,8 +1103,10 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       .conference-room-header h3{margin:0!important;font-size:clamp(1.05rem,1.6vw,1.35rem)!important;}
       .conference-room-tools{display:flex!important;gap:10px!important;align-items:center!important;}
       .conference-room-tools button,.conference-room-header .portal-tab-back{min-height:40px!important;border-radius:999px!important;}
-      .conference-room-nav-button{align-items:center!important;aspect-ratio:1/1!important;background:#fff!important;border:1px solid #e2e8f0!important;color:#0f172a!important;display:inline-flex!important;font-size:1.65rem!important;font-weight:800!important;height:40px!important;justify-content:center!important;line-height:1!important;min-width:40px!important;padding:0!important;width:40px!important;}
-      .conference-room-notifications{width:40px!important;min-width:40px!important;padding:0!important;}
+      .conference-room-nav-button{align-items:center!important;aspect-ratio:1/1!important;background:rgba(255,255,255,.9)!important;border:1px solid rgba(100,116,139,.24)!important;border-radius:50%!important;box-shadow:0 8px 18px rgba(15,23,42,.08)!important;color:#071c3d!important;display:inline-flex!important;flex:0 0 44px!important;font-size:1.15rem!important;font-weight:900!important;height:44px!important;justify-content:center!important;line-height:1!important;max-width:44px!important;min-height:44px!important;min-width:44px!important;padding:0!important;width:44px!important;}
+      .conference-room-nav-button:hover{border-color:#2563eb!important;color:#1d4ed8!important;box-shadow:0 0 0 4px rgba(59,130,246,.14)!important;}
+      .conference-room-nav-button:active{transform:scale(.96)!important;}
+      .conference-room-notifications{height:44px!important;max-width:44px!important;min-height:44px!important;width:44px!important;min-width:44px!important;padding:0!important;}
       .conference-room-header #conferenceRoomBack{align-items:center!important;color:#0f172a!important;display:inline-flex!important;font-family:Arial,Helvetica,sans-serif!important;font-size:0!important;font-weight:900!important;height:40px!important;justify-content:center!important;line-height:1!important;min-height:40px!important;min-width:40px!important;overflow:hidden!important;padding:0!important;text-indent:0!important;width:40px!important;}
       .conference-room-header #conferenceRoomBack::before{content:none!important;display:none!important;}
       .conference-room-header #conferenceRoomBack::after{color:#0f172a!important;content:'\\2190'!important;display:block!important;font-family:Arial,Helvetica,sans-serif!important;font-size:22px!important;font-weight:900!important;line-height:1!important;text-indent:0!important;}
@@ -1149,7 +1139,7 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
       .conference-room-detail-row dt{color:#334155;font-size:.76rem;font-weight:900;text-transform:uppercase;}
       .conference-room-detail-row dd{color:#111827;margin:0;overflow-wrap:anywhere;}
       .conference-room-details-dialog footer{display:grid;grid-template-columns:auto 1fr auto auto;}
-      @media(max-width:720px){#conferenceRoomModal .conference-room-header{grid-template-columns:40px minmax(0,1fr) auto!important;padding:9px 10px!important;}#conferenceRoomModal .conference-room-header h3{font-size:1rem!important;}.conference-room-tools{gap:6px!important;}.conference-room-tools .conference-room-nav-button,.conference-room-tools .conference-room-notifications{height:36px!important;min-height:36px!important;min-width:36px!important;padding:0!important;width:36px!important;}.conference-room-tools .conference-room-nav-button{font-size:1.45rem!important;}#conferenceRoomModal .conference-room-body{height:calc(100dvh - 54px)!important;padding:8px!important;}#conferenceRoomCalendar{height:calc(100dvh - 70px)!important;max-height:calc(100dvh - 70px)!important;min-height:300px!important;}.conference-room-dialog .form-grid.two,.conference-room-detail-list{grid-template-columns:1fr;}.conference-room-details-dialog footer{grid-template-columns:1fr;}.conference-room-details-dialog footer span{display:none;}}
+      @media(max-width:720px){#conferenceRoomModal .conference-room-header{grid-template-columns:40px minmax(0,1fr) auto!important;padding:9px 10px!important;}#conferenceRoomModal .conference-room-header h3{font-size:1rem!important;}.conference-room-tools{gap:6px!important;}.conference-room-tools .conference-room-nav-button,.conference-room-tools .conference-room-notifications{flex-basis:36px!important;height:36px!important;max-width:36px!important;min-height:36px!important;min-width:36px!important;padding:0!important;width:36px!important;}.conference-room-tools .conference-room-nav-button{font-size:1.05rem!important;}#conferenceRoomModal .conference-room-body{height:calc(100dvh - 54px)!important;padding:8px!important;}#conferenceRoomCalendar{height:calc(100dvh - 70px)!important;max-height:calc(100dvh - 70px)!important;min-height:300px!important;}.conference-room-dialog .form-grid.two,.conference-room-detail-list{grid-template-columns:1fr;}.conference-room-details-dialog footer{grid-template-columns:1fr;}.conference-room-details-dialog footer span{display:none;}}
     `;
     document.head.appendChild(css);
   }

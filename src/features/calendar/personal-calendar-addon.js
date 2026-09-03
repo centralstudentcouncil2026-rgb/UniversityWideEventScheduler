@@ -94,17 +94,12 @@
     return `${date}T${time || '00:00'}:00`;
   }
 
-  function addInterval(date, type) {
-    const next = new Date(date);
-    if (type === 'daily') next.setDate(next.getDate() + 1);
-    else if (type === 'weekly') next.setDate(next.getDate() + 7);
-    else if (type === 'monthly') next.setMonth(next.getMonth() + 1);
-    else if (type === 'yearly') next.setFullYear(next.getFullYear() + 1);
-    return next;
+  function pad(value) {
+    return String(value).padStart(2, '0');
   }
 
   function isoDate(date) {
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   }
 
   function defaultRecurrenceUntil(startDate, recurrenceType) {
@@ -120,19 +115,16 @@
     const finalDate = endDate || startDate;
     const firstStart = new Date(datetime(startDate, startTime));
     const firstEnd = new Date(datetime(finalDate, endTime));
-    const duration = Math.max(30 * 60 * 1000, firstEnd - firstStart);
+    if (Number.isNaN(firstStart.getTime()) || Number.isNaN(firstEnd.getTime()) || firstEnd <= firstStart) return [];
     if (type === 'none') {
-      return [{ id: createId(), date: startDate, start_time: firstStart.toISOString(), end_time: firstEnd.toISOString() }];
+      return [{ id: createId(), date: startDate, start_time: datetime(startDate, startTime), end_time: datetime(finalDate, endTime) }];
     }
-    const until = new Date(datetime(recurrenceUntil || startDate, endTime));
-    const rows = [];
-    let cursor = new Date(firstStart);
-    for (let index = 0; index < 730 && cursor <= until; index += 1) {
-      const end = new Date(cursor.getTime() + duration);
-      rows.push({ id: createId(), date: isoDate(cursor), start_time: cursor.toISOString(), end_time: end.toISOString() });
-      cursor = addInterval(cursor, type);
-    }
-    return rows;
+    return window.CSC_RECURRENCE?.buildRecurringOccurrences?.({
+      start_time: datetime(startDate, startTime),
+      end_time: datetime(finalDate, endTime),
+      recurrence_type: type,
+      recurrence_until: recurrenceUntil || startDate
+    }) || [];
   }
 
   function recurrenceLabel(value) {
@@ -1036,7 +1028,7 @@
       approval_status: 'approved',
       event_status: 'planned',
       start_time: occurrences[0].start_time,
-      end_time: occurrences[occurrences.length - 1].end_time,
+      end_time: recurrenceType === 'none' ? occurrences[occurrences.length - 1].end_time : occurrences[0].end_time,
       updated_at: new Date().toISOString()
     };
   }
@@ -2092,55 +2084,6 @@
     }
   }
 
-  function enhancePostedScheduleSubmit(event) {
-    if (event.target?.id !== 'eventForm') return;
-    const recurrenceType = document.getElementById('eventRecurrenceType')?.value || 'none';
-    if (recurrenceType === 'none') return;
-    const title = document.getElementById('eventTitle')?.value?.trim();
-    const startDate = document.getElementById('eventDate')?.value;
-    const endDate = document.getElementById('eventEndDate')?.value || startDate;
-    const startTime = document.getElementById('eventStart')?.value;
-    const endTime = document.getElementById('eventEnd')?.value;
-    const recurrenceUntil = document.getElementById('eventRecurrenceUntil')?.value || defaultRecurrenceUntil(startDate, recurrenceType);
-    const occurrences = buildOccurrences({ startDate, startTime, endDate, endTime, recurrenceType, recurrenceUntil });
-    if (!occurrences.length) return;
-    window.setTimeout(() => patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }), 1000);
-    window.setTimeout(() => patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }), 2600);
-  }
-
-  async function patchRecentSchedule({ title, occurrences, recurrenceType, recurrenceUntil }) {
-    const uid = currentUserId();
-    if (!uid || !title) return;
-    const encodedTitle = encodeURIComponent(title);
-    const rows = await rest(`/rest/v1/${TABLE}?select=id,title,created_by,updated_at&record_type=eq.${PERSONAL_RECORD_TYPE}&title=eq.${encodedTitle}&created_by=eq.${encodeURIComponent(uid)}&order=updated_at.desc&limit=1`, {}, 'return=minimal').catch(() => []);
-    const row = Array.isArray(rows) ? rows[0] : null;
-    if (!row?.id) return;
-    await rest(`/rest/v1/${TABLE}?id=eq.${encodeURIComponent(row.id)}&record_type=eq.${PERSONAL_RECORD_TYPE}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
-        recurrence_type: recurrenceType,
-        recurrence_until: recurrenceUntil || null,
-        occurrences,
-        start_time: occurrences[0].start_time,
-        end_time: occurrences[occurrences.length - 1].end_time,
-        updated_at: new Date().toISOString()
-      })
-    }, 'return=minimal').catch(() => {});
-    const storeEvent = (window.CONNECT_STATE?.store?.events || []).find((event) => event.id === row.id);
-    if (storeEvent) {
-      Object.assign(storeEvent, {
-        schedule_type: occurrences.length > 1 ? 'multi_day' : 'single_day',
-        recurrence_type: recurrenceType,
-        recurrence_until: recurrenceUntil || '',
-        occurrences,
-        start_time: occurrences[0].start_time,
-        end_time: occurrences[occurrences.length - 1].end_time
-      });
-      window.CONNECT_STATE?.calendar?.refetchEvents?.();
-    }
-  }
-
   function bind() {
     const modal = document.getElementById('eventModal');
     if (modal && modal.dataset.personalCloseBound !== '1') {
@@ -2252,7 +2195,6 @@
       }
     }, true);
     document.addEventListener('submit', savePersonalEvent, true);
-    document.addEventListener('submit', enhancePostedScheduleSubmit, true);
     document.addEventListener('input', (event) => {
       if (personalMode && event.target?.id === 'personalCalendarHeaderSearch') void searchPublic();
     });

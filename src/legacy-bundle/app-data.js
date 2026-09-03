@@ -301,7 +301,7 @@ function normalizeEvent(event) {
     schedule_schema_version: isCurrentScheduleRecord({ ...event, privacy_level: normalizePrivacyLevel(event.privacy_level, event.private_notes) }) ? 2 : 1,
     occurrences,
     start_time: firstOccurrence.start_time || event.start_time || '',
-    end_time: lastOccurrence.end_time || event.end_time || '',
+    end_time: recurrenceType === 'none' ? (lastOccurrence.end_time || event.end_time || '') : (firstOccurrence.end_time || event.end_time || ''),
     organization_id: event.organization_id || '',
     organization_name: event.organization_name || event.organizationName || '',
     title: event.title || '',
@@ -515,7 +515,7 @@ function normalizeNotification(notification = {}) {
   };
 }
 
-function normalizeRecurrenceType(value) {
+export function normalizeRecurrenceType(value) {
   const recurrenceType = String(value || '').trim().toLowerCase();
   return RECURRENCE_TYPES.includes(recurrenceType) ? recurrenceType : 'none';
 }
@@ -530,6 +530,7 @@ function dateInputFromDate(date) {
 }
 
 function timeInputFromDate(date) {
+  if (!date) return '';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -541,47 +542,144 @@ function daysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }
 
-function addRecurrenceInterval(date, rule, anchorDay) {
-  const next = new Date(date);
-  if (rule === 'daily') next.setDate(next.getDate() + 1);
-  else if (rule === 'weekly') next.setDate(next.getDate() + 7);
-  else if (rule === 'monthly') {
-    const monthIndex = next.getMonth() + 1;
-    const year = next.getFullYear() + Math.floor(monthIndex / 12);
-    const month = monthIndex % 12;
-    next.setFullYear(year, month, Math.min(anchorDay, daysInMonth(year, month)));
-  } else if (rule === 'yearly') {
-    const year = next.getFullYear() + 1;
-    next.setFullYear(year, next.getMonth(), Math.min(anchorDay, daysInMonth(year, next.getMonth())));
+function dateAtLocalTime(date, timeSource) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), timeSource.getHours(), timeSource.getMinutes(), 0, 0);
+}
+
+function addCalendarDays(date, days) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days, date.getHours(), date.getMinutes(), 0, 0);
+}
+
+function addCalendarMonths(date, months) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1, date.getHours(), date.getMinutes(), 0, 0);
+}
+
+function monthlyRecurrenceRule(date) {
+  const weekday = date.getDay();
+  const ordinal = date.getDate() + 7 > daysInMonth(date.getFullYear(), date.getMonth())
+    ? 'last'
+    : ['first', 'second', 'third', 'fourth'][Math.floor((date.getDate() - 1) / 7)] || 'last';
+  return { weekday, ordinal };
+}
+
+function nthWeekdayOfMonth(year, monthIndex, weekday, ordinal) {
+  if (ordinal === 'last') {
+    const last = new Date(year, monthIndex, daysInMonth(year, monthIndex), 12, 0, 0, 0);
+    last.setDate(last.getDate() - ((last.getDay() - weekday + 7) % 7));
+    return last.getDate();
   }
-  return next;
+  const first = new Date(year, monthIndex, 1, 12, 0, 0, 0);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  const ordinalIndex = { first: 0, second: 1, third: 2, fourth: 3 }[ordinal] || 0;
+  const day = 1 + offset + (ordinalIndex * 7);
+  return Math.min(day, daysInMonth(year, monthIndex));
+}
+
+function recurrenceCursor(anchor, rule, index) {
+  if (rule === 'daily') return addCalendarDays(anchor, index);
+  if (rule === 'weekly') return addCalendarDays(anchor, index * 7);
+  if (rule === 'monthly') {
+    const target = addCalendarMonths(anchor, index);
+    const monthly = monthlyRecurrenceRule(anchor);
+    target.setDate(nthWeekdayOfMonth(target.getFullYear(), target.getMonth(), monthly.weekday, monthly.ordinal));
+    return dateAtLocalTime(target, anchor);
+  }
+  if (rule === 'yearly') {
+    const year = anchor.getFullYear() + index;
+    const month = anchor.getMonth();
+    const day = month === 1 && anchor.getDate() === 29 ? Math.min(29, daysInMonth(year, month)) : anchor.getDate();
+    return new Date(year, month, day, anchor.getHours(), anchor.getMinutes(), 0, 0);
+  }
+  return new Date(anchor);
+}
+
+function occurrenceId(baseId, previous = [], index = 0, date = '') {
+  return previous[index]?.id || (index === 0 ? baseId : `${baseId || createId()}::${date || index}`);
+}
+
+export function buildRecurringOccurrences({ start_time, end_time, recurrence_type, recurrence_until, repeat_until, previousOccurrences = [] } = {}) {
+  const rule = normalizeRecurrenceType(recurrence_type);
+  if (rule === 'none') return [];
+  const start = safeDate(start_time);
+  const end = safeDate(end_time);
+  const untilDate = String(recurrence_until || repeat_until || '').slice(0, 10);
+  const until = untilDate ? safeDate(localIsoFromParts(untilDate, timeInputFromDate(end || start || new Date()))) : null;
+  if (!start || !end || end <= start || !until || until < start) return [];
+  const rows = [];
+  const duration = end.getTime() - start.getTime();
+  const baseId = previousOccurrences[0]?.id || createId();
+  for (let index = 0; index < 730; index += 1) {
+    const cursor = recurrenceCursor(start, rule, index);
+    if (cursor > until) break;
+    const occurrenceEnd = new Date(cursor.getTime() + duration);
+    const date = dateInputFromDate(cursor);
+    rows.push({
+      id: occurrenceId(baseId, previousOccurrences, index, date),
+      date,
+      start_time: localIsoFromParts(date, timeInputFromDate(cursor)),
+      end_time: localIsoFromParts(dateInputFromDate(occurrenceEnd), timeInputFromDate(occurrenceEnd))
+    });
+  }
+  return rows;
+}
+
+function occurrenceSignature(occurrence = {}) {
+  return [
+    String(occurrence.date || occurrence.start_time || '').slice(0, 10),
+    timeInputFromDate(safeDate(occurrence.start_time)),
+    timeInputFromDate(safeDate(occurrence.end_time))
+  ].join('|');
+}
+
+export function inferRecurrenceTypeFromOccurrences(_record = {}, occurrences = []) {
+  const rows = [...(occurrences || [])]
+    .filter((item) => item?.start_time && item?.end_time)
+    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  if (rows.length < 2) return 'none';
+  const first = rows[0];
+  const last = rows.at(-1);
+  const expected = new Set(rows.map(occurrenceSignature));
+  for (const recurrenceType of ['daily', 'weekly', 'monthly', 'yearly']) {
+    const generated = buildRecurringOccurrences({
+      start_time: first.start_time,
+      end_time: first.end_time,
+      recurrence_type: recurrenceType,
+      recurrence_until: String(last.start_time || '').slice(0, 10),
+      previousOccurrences: rows
+    });
+    if (generated.length === rows.length && generated.every((item) => expected.has(occurrenceSignature(item)))) {
+      return recurrenceType;
+    }
+  }
+  return 'none';
 }
 
 function expandRecurringOccurrences(event = {}, occurrenceRows = []) {
   const rule = normalizeRecurrenceType(event.recurrence_type);
-  if (rule === 'none' || occurrenceRows.length !== 1) return occurrenceRows;
-  const base = occurrenceRows[0];
+  if (rule === 'none') return occurrenceRows;
+  const sortedRows = [...occurrenceRows].sort((a, b) => new Date(a.start_time || event.start_time || 0) - new Date(b.start_time || event.start_time || 0));
+  const base = sortedRows[0] || occurrenceFromRange(event.start_time, event.end_time);
   const start = safeDate(base.start_time || event.start_time);
   const end = safeDate(base.end_time || event.end_time);
   const untilDate = String(event.recurrence_until || event.repeat_until || '').slice(0, 10);
   const until = untilDate ? safeDate(localIsoFromParts(untilDate, timeInputFromDate(end || start || new Date()))) : null;
   if (!start || !end || end <= start || !until || until < start) return occurrenceRows;
-  const rows = [];
-  const duration = end.getTime() - start.getTime();
-  const anchorDay = start.getDate();
-  for (let cursor = new Date(start), index = 0; index < 730 && cursor <= until; index += 1) {
-    const occurrenceEnd = new Date(cursor.getTime() + duration);
-    rows.push({
-      id: index === 0 ? base.id : createId(),
-      date: dateInputFromDate(cursor),
-      start_time: localIsoFromParts(dateInputFromDate(cursor), timeInputFromDate(cursor)),
-      end_time: localIsoFromParts(dateInputFromDate(occurrenceEnd), timeInputFromDate(occurrenceEnd))
-    });
-    cursor = addRecurrenceInterval(cursor, rule, anchorDay);
-  }
+  const rows = buildRecurringOccurrences({
+    start_time: start,
+    end_time: end,
+    recurrence_type: rule,
+    recurrence_until: untilDate,
+    previousOccurrences: sortedRows
+  });
   return rows.length ? rows : occurrenceRows;
 }
 
 function occurrenceFromRange(start_time, end_time, id = createId()) {
   return { id, date: String(start_time || '').slice(0, 10), start_time, end_time };
 }
+
+globalThis.CSC_RECURRENCE = Object.freeze({
+  buildRecurringOccurrences,
+  inferRecurrenceTypeFromOccurrences,
+  normalizeRecurrenceType
+});

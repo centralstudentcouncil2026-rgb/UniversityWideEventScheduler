@@ -120,8 +120,8 @@ function plfFullSchedulePayload(row) {
 function plfEventById(id) { return (window.CONNECT_STATE?.store?.events || []).find((item) => item.id === id); }
 
 function plfLocalIso(date, time) {
-  const value = new Date(`${date}T${time}:00`);
-  return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+  if (!date || !time) return '';
+  return `${date}T${time}:00`;
 }
 function plfDate(value) {
   const date = new Date(value);
@@ -170,7 +170,7 @@ function plfOrgFormSnapshot(seed = {}) {
     venue: get('eventVenue').trim(),
     schedule_type: occurrences.length > 1 && plfDate(firstOccurrence.start_time) === plfDate(firstOccurrence.end_time) ? 'single_day' : scheduleType,
     start_time: firstOccurrence.start_time,
-    end_time: lastOccurrence.end_time,
+    end_time: repeatRule === 'none' ? lastOccurrence.end_time : firstOccurrence.end_time,
     occurrences,
     expected_attendees: Number.parseInt(get('eventAttendees'), 10) || 1,
     privacy_level: get('eventPrivacy') || 'basic',
@@ -202,44 +202,15 @@ function plfRepeatRule(value) {
   const rule = String(value || '').trim().toLowerCase();
   return ['daily', 'weekly', 'monthly', 'yearly'].includes(rule) ? rule : 'none';
 }
-function plfDaysInMonth(year, monthIndex) {
-  return new Date(year, monthIndex + 1, 0).getDate();
-}
-function plfAddRepeatInterval(date, rule, anchorDay = date.getDate()) {
-  const next = new Date(date);
-  if (rule === 'daily') next.setDate(next.getDate() + 1);
-  else if (rule === 'weekly') next.setDate(next.getDate() + 7);
-  else if (rule === 'monthly') {
-    const monthIndex = next.getMonth() + 1;
-    const year = next.getFullYear() + Math.floor(monthIndex / 12);
-    const month = monthIndex % 12;
-    next.setFullYear(year, month, Math.min(anchorDay, plfDaysInMonth(year, month)));
-  } else if (rule === 'yearly') {
-    const year = next.getFullYear() + 1;
-    next.setFullYear(year, next.getMonth(), Math.min(anchorDay, plfDaysInMonth(year, next.getMonth())));
-  }
-  return next;
-}
 function plfBuildRepeatedOccurrences(seed, occurrence, repeatRule, repeatUntil) {
   if (repeatRule === 'none') return [occurrence];
-  const start = new Date(occurrence.start_time);
-  const end = new Date(occurrence.end_time);
-  const until = repeatUntil ? new Date(plfLocalIso(String(repeatUntil).slice(0, 10), plfTime(occurrence.end_time))) : null;
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || !until || Number.isNaN(until.getTime()) || until < start) return [occurrence];
-  const duration = end.getTime() - start.getTime();
-  const previous = Array.isArray(seed.occurrences) ? seed.occurrences : [];
-  const rows = [];
-  for (let cursor = new Date(start), index = 0; index < 730 && cursor <= until; index += 1) {
-    const itemEnd = new Date(cursor.getTime() + duration);
-    const date = plfDate(cursor);
-    rows.push({
-      id: previous[index]?.id || crypto.randomUUID(),
-      date,
-      start_time: plfLocalIso(date, plfTime(cursor)),
-      end_time: plfLocalIso(plfDate(itemEnd), plfTime(itemEnd))
-    });
-    cursor = plfAddRepeatInterval(cursor, repeatRule, start.getDate());
-  }
+  const rows = window.CSC_RECURRENCE?.buildRecurringOccurrences?.({
+    start_time: occurrence.start_time,
+    end_time: occurrence.end_time,
+    recurrence_type: repeatRule,
+    recurrence_until: repeatUntil,
+    previousOccurrences: Array.isArray(seed.occurrences) ? seed.occurrences : []
+  }) || [];
   return rows.length ? rows : [occurrence];
 }
 function plfOrgDbRow(row) {

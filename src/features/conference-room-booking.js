@@ -1,4 +1,4 @@
-import { createId } from './app-data.js?v=20260625-status-sync-v1';
+import { buildRecurringOccurrences, createId } from './app-data.js?v=20260625-status-sync-v1';
 import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } from './app-rules.js?v=20260625-status-sync-v1';
 
 (() => {
@@ -82,15 +82,6 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
   function combineLocal(date, time) {
     return date && time ? `${date}T${time}` : '';
   }
-  function addRepeatStep(date, repeatRule) {
-    const next = new Date(`${date}T00:00`);
-    if (Number.isNaN(next.getTime())) return '';
-    if (repeatRule === 'daily') next.setDate(next.getDate() + 1);
-    else if (repeatRule === 'weekly') next.setDate(next.getDate() + 7);
-    else if (repeatRule === 'monthly') next.setMonth(next.getMonth() + 1);
-    else return '';
-    return dateOnly(next);
-  }
   function defaultRepeatUntil(startTime, repeatRule) {
     const startDate = dateOnly(startTime);
     if (!startDate || repeatRule === 'none') return '';
@@ -108,22 +99,19 @@ import { accountLoginEmail, currentUser, isManager, isSuperAdmin, overlaps } fro
     if (!startDate || !startClock || !endClock) return [];
     const rule = ['daily', 'weekly', 'monthly'].includes(repeatRule) ? repeatRule : 'none';
     const untilDate = rule === 'none' ? startDate : (dateOnly(repeatUntil) || defaultRepeatUntil(startTime, rule));
-    const occurrences = [];
-    let currentStartDate = startDate;
-    let currentEndDate = endDate;
-    for (let index = 0; index < 80; index += 1) {
-      if (currentStartDate > untilDate) break;
-      const occurrenceStart = combineLocal(currentStartDate, startClock);
-      const occurrenceEnd = combineLocal(currentEndDate, endClock);
-      if (occurrenceStart && occurrenceEnd && new Date(occurrenceEnd) > new Date(occurrenceStart)) {
-        occurrences.push({ id: createId(), date: currentStartDate, start_time: occurrenceStart, end_time: occurrenceEnd });
-      }
-      if (rule === 'none') break;
-      currentStartDate = addRepeatStep(currentStartDate, rule);
-      currentEndDate = addRepeatStep(currentEndDate, rule);
-      if (!currentStartDate || !currentEndDate) break;
+    if (rule === 'none') {
+      const occurrenceStart = combineLocal(startDate, startClock);
+      const occurrenceEnd = combineLocal(endDate, endClock);
+      return occurrenceStart && occurrenceEnd && new Date(occurrenceEnd) > new Date(occurrenceStart)
+        ? [{ id: createId(), date: startDate, start_time: occurrenceStart, end_time: occurrenceEnd }]
+        : [];
     }
-    return occurrences;
+    return buildRecurringOccurrences({
+      start_time: combineLocal(startDate, startClock),
+      end_time: combineLocal(endDate, endClock),
+      recurrence_type: rule,
+      recurrence_until: untilDate
+    });
   }
   function normalizeBookingOccurrence(booking = {}, occurrence = {}, index = 0) {
     const date = dateOnly(occurrence.date || occurrence.start_time || booking.start_time);
