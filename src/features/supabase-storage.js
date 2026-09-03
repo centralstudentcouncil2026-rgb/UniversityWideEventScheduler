@@ -80,12 +80,20 @@ async function loadProfilesTable(authenticated=false){
     throw error;
   }
 }
+async function loadOptionalRows(label,endpoint,options={},authenticated=false){
+  try{
+    return await request(endpoint,options,authenticated);
+  }catch(error){
+    console.warn(`CONNECT ${label} sync unavailable:`,error);
+    return[];
+  }
+}
 async function loadRelationalStore(authenticated=false){
   const[profiles,organizations,calendarItems,announcements,concerns,conferenceBookings]=await Promise.all([
     loadProfilesTable(authenticated),
-    request('/rest/v1/organizations?select=*'),
-    request(authenticated?AUTHENTICATED_CALENDAR_ITEMS_QUERY:PUBLIC_CALENDAR_ITEMS_QUERY,{},authenticated),
-    request('/rest/v1/announcements?select=*',{},authenticated),
+    loadOptionalRows('organizations','/rest/v1/organizations?select=*'),
+    loadOptionalRows('calendar_items',authenticated?AUTHENTICATED_CALENDAR_ITEMS_QUERY:PUBLIC_CALENDAR_ITEMS_QUERY,{},authenticated),
+    loadOptionalRows('announcements','/rest/v1/announcements?select=*',{},authenticated),
     loadConcernsTable(authenticated),
     loadConferenceRoomBookingsTable(authenticated)
   ]);
