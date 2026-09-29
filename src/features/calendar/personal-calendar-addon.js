@@ -409,6 +409,8 @@
         body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:40px!important;}
         body.personal-calendar-perspective #viewSelector{flex-basis:104px!important;min-width:96px!important;max-width:110px!important;font-size:.9rem!important;padding:0 14px!important;}
       }
+      body.personal-calendar-perspective #mobileMenuButton{display:none!important;}
+      body.personal-calendar-perspective #personalCalendarBackButton{display:inline-flex!important;}
     `;
     document.head.appendChild(style);
   }
