@@ -169,7 +169,6 @@
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body-unbalanced{width:100%!important;height:100%!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day.fc-day-other .fc-daygrid-day-number,
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day.fc-day-other .fc-daygrid-day-events{display:none!important;}
-      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body tr:has(.fc-daygrid-day.fc-day-other:first-child):has(.fc-daygrid-day.fc-day-other:last-child){display:none!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-scrollgrid,
       body.personal-calendar-perspective #personalCalendarHost .fc-theme-standard td,
       body.personal-calendar-perspective #personalCalendarHost .fc-theme-standard th,
