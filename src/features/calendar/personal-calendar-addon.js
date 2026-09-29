@@ -152,6 +152,7 @@
       body.admin-dashboard-shell .personal-calendar-section #personalCalendarButton{align-items:center!important;border-radius:18px!important;box-sizing:border-box!important;display:flex!important;font-size:clamp(13px,3.6vw,16px)!important;font-weight:800!important;justify-content:center!important;line-height:1.18!important;margin:0!important;min-height:48px!important;min-width:0!important;overflow:hidden!important;padding:10px 12px!important;text-align:center!important;text-overflow:ellipsis!important;white-space:nowrap!important;width:100%!important;}
       body.admin-dashboard-shell .personal-calendar-section .section-label{align-items:center!important;background:transparent!important;border:0!important;color:#334155!important;display:flex!important;font-size:clamp(11px,2.8vw,13px)!important;font-weight:900!important;letter-spacing:0!important;line-height:1.16!important;margin:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;text-overflow:ellipsis!important;text-transform:uppercase!important;white-space:nowrap!important;}
       @media (max-width:760px){body.admin-dashboard-shell .personal-calendar-section{border-radius:13px!important;gap:10px!important;padding:12px!important;}body.admin-dashboard-shell .personal-calendar-section #personalCalendarButton{border-radius:16px!important;min-height:44px!important;padding:9px 10px!important;}}
+      #personalCalendarBackButton{display:none;}
       #personalCalendarHost{display:none!important;}
       body.personal-calendar-perspective #calendar{display:none!important;}
       body.personal-calendar-perspective #personalCalendarHost{display:block!important;}
@@ -166,6 +167,9 @@
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body table,
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body-balanced,
       body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body-unbalanced{width:100%!important;height:100%!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day.fc-day-other .fc-daygrid-day-number,
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-day.fc-day-other .fc-daygrid-day-events{display:none!important;}
+      body.personal-calendar-perspective #personalCalendarHost .fc-daygrid-body tr:has(.fc-daygrid-day.fc-day-other:first-child):has(.fc-daygrid-day.fc-day-other:last-child){display:none!important;}
       body.personal-calendar-perspective #personalCalendarHost .fc-scrollgrid,
       body.personal-calendar-perspective #personalCalendarHost .fc-theme-standard td,
       body.personal-calendar-perspective #personalCalendarHost .fc-theme-standard th,
@@ -220,6 +224,8 @@
       body.personal-calendar-perspective #mobileMenuButton{align-items:center!important;aspect-ratio:1/1!important;border-radius:999px!important;display:inline-flex!important;flex:0 0 auto!important;height:44px!important;justify-content:center!important;min-height:44px!important;min-width:44px!important;padding:0!important;width:44px!important;}
       body.personal-calendar-perspective #mobileMenuButton span{display:none!important;}
       body.personal-calendar-perspective #mobileMenuButton::before{content:'\\2190'!important;font-size:1.3rem!important;font-weight:800!important;line-height:1!important;}
+      body.personal-calendar-perspective #personalCalendarBackButton{align-items:center!important;background:rgba(255,255,255,.96)!important;border:1px solid rgba(15,23,42,.12)!important;border-radius:999px!important;box-shadow:0 10px 24px rgba(15,23,42,.12)!important;color:#0f172a!important;display:inline-flex!important;flex:0 0 auto!important;font-weight:900!important;gap:6px!important;height:44px!important;justify-content:center!important;line-height:1!important;min-height:44px!important;min-width:92px!important;padding:0 16px!important;white-space:nowrap!important;}
+      body.personal-calendar-perspective #personalCalendarBackButton::before{content:'\\2190';font-size:1.05rem;font-weight:900;line-height:1;}
       body.personal-calendar-perspective .sidebar .sidebar-section{display:none!important;}
       body.personal-calendar-perspective .sidebar .admin-action-panel,
       body.personal-calendar-perspective .sidebar .status-card{display:grid!important;}
@@ -282,6 +288,8 @@
       }
       @media (max-width: 390px){
         body.personal-calendar-perspective .calendar-nav{gap:4px!important;}
+        body.personal-calendar-perspective #personalCalendarBackButton{height:36px!important;min-height:36px!important;min-width:36px!important;padding:0!important;width:36px!important;}
+        body.personal-calendar-perspective #personalCalendarBackButton span{display:none!important;}
         body.personal-calendar-perspective #personalCalendarHeaderSearch{font-size:.76rem!important;min-height:36px!important;min-width:0!important;padding-left:8px!important;padding-right:18px!important;width:auto!important;}
         body.personal-calendar-perspective #personalCalendarHeaderSearch::placeholder{font-size:.76rem!important;}
         body.personal-calendar-perspective #viewSelector{flex-basis:76px!important;font-size:.76rem!important;max-width:76px!important;min-height:36px!important;min-width:70px!important;padding-left:8px!important;padding-right:18px!important;}
@@ -384,6 +392,7 @@
       }
       body.personal-calendar-perspective .calendar-nav{--personal-calendar-control-size:44px!important;align-items:center!important;}
       body.personal-calendar-perspective #viewSelector{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;flex:0 0 122px!important;min-width:112px!important;max-width:132px!important;border-radius:999px!important;font-size:1rem!important;line-height:1!important;padding:0 18px!important;}
+      @media (max-width: 760px){body.personal-calendar-perspective #personalCalendarBackButton{height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;min-width:var(--personal-calendar-control-size)!important;padding:0!important;width:var(--personal-calendar-control-size)!important;}body.personal-calendar-perspective #personalCalendarBackButton span{display:none!important;}}
       body.personal-calendar-perspective .period-controls .icon-button,
       body.personal-calendar-perspective #notificationsButton{align-items:center!important;aspect-ratio:1/1!important;box-sizing:border-box!important;flex:0 0 var(--personal-calendar-control-size)!important;height:var(--personal-calendar-control-size)!important;justify-content:center!important;max-height:var(--personal-calendar-control-size)!important;max-width:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;min-width:var(--personal-calendar-control-size)!important;border-radius:999px!important;padding:0!important;width:var(--personal-calendar-control-size)!important;}
       body.personal-calendar-perspective #personalCalendarHeaderSearch{box-sizing:border-box!important;height:var(--personal-calendar-control-size)!important;max-height:var(--personal-calendar-control-size)!important;min-height:var(--personal-calendar-control-size)!important;border-radius:999px!important;}
@@ -499,6 +508,8 @@
       firstDay: 0,
       height: '100%',
       expandRows: true,
+      fixedWeekCount: false,
+      showNonCurrentDates: false,
       nowIndicator: true,
       selectable: true,
       editable: true,
@@ -516,12 +527,24 @@
         personalCalendar?.unselect?.();
       },
       eventClick: openPersonalEventDetails,
+      datesSet: () => requestAnimationFrame(hideTrailingPersonalMonthRows),
       eventDrop: (info) => void persistPersonalCalendarMove(info),
       eventResize: (info) => void persistPersonalCalendarMove(info),
       eventAllow: (_dropInfo, draggedEvent) => canMovePersonalCalendarEvent(draggedEvent)
     });
     personalCalendar.render();
+    window.CSC_PERSONAL_CALENDAR = personalCalendar;
+    hideTrailingPersonalMonthRows();
     return personalCalendar;
+  }
+
+  function hideTrailingPersonalMonthRows() {
+    const host = document.getElementById('personalCalendarHost');
+    if (!host) return;
+    host.querySelectorAll('.fc-daygrid-body tr').forEach((row) => {
+      const days = [...row.querySelectorAll('.fc-daygrid-day')];
+      row.hidden = Boolean(days.length) && days.every((day) => day.classList.contains('fc-day-other'));
+    });
   }
 
   function saveMainEventsSnapshot() {
@@ -582,6 +605,22 @@
     return search;
   }
 
+  function ensurePersonalBackButton() {
+    let button = document.getElementById('personalCalendarBackButton');
+    if (button) return button;
+    button = document.createElement('button');
+    button.id = 'personalCalendarBackButton';
+    button.className = 'secondary-button personal-calendar-back-button';
+    button.type = 'button';
+    button.innerHTML = '<span>Back</span>';
+    button.setAttribute('aria-label', 'Back to main dashboard calendar');
+    button.setAttribute('title', 'Back to main dashboard calendar');
+    const menu = document.getElementById('mobileMenuButton');
+    if (menu?.parentElement) menu.insertAdjacentElement('afterend', button);
+    else document.querySelector('.brand-area')?.prepend(button) || document.querySelector('.calendar-nav')?.prepend(button);
+    return button;
+  }
+
   function compactHeaderSearchEnabled() {
     return window.matchMedia?.('(max-width: 640px)').matches;
   }
@@ -620,8 +659,7 @@
     if (!view) return;
     const currentValue = view.value;
     const optionLabels = {
-      dayGridMonth: 'Month',
-      timeGridWeek: 'Week'
+      dayGridMonth: 'Month'
     };
     view.innerHTML = '';
     Object.entries(optionLabels).forEach(([value, label]) => {
@@ -630,7 +668,7 @@
       option.textContent = label;
       view.appendChild(option);
     });
-    view.value = currentValue === 'timeGridWeek' ? 'timeGridWeek' : 'dayGridMonth';
+    view.value = 'dayGridMonth';
   }
 
   function ensureClassCategory() {
@@ -660,6 +698,7 @@
   function refreshAddonDom() {
     ensureRecurrenceControls();
     ensureHeaderSearch();
+    ensurePersonalBackButton();
     if (personalMode) ensurePersonalViewOptions();
     ensureClassCategory();
     ensureTab();
@@ -864,6 +903,7 @@
 
   function enterPersonalPerspective() {
     ensureHeaderSearch();
+    ensurePersonalBackButton();
     if (personalMode) return;
     const menu = document.getElementById('mobileMenuButton');
     const view = document.getElementById('viewSelector');
@@ -1543,6 +1583,7 @@
     if (value === 'today') calendar?.today?.();
     installPersonalCalendarCreateHandlers();
     requestAnimationFrame(() => {
+      hideTrailingPersonalMonthRows();
       schedulePersonalCalendarHeightSync();
       if (window.innerWidth <= 640) schedulePersonalCalendarHeightSync(90);
       window.CSC_SAVE_DASHBOARD_RELOAD_STATE?.();
@@ -2124,6 +2165,12 @@
     }, true);
     document.addEventListener('click', (event) => {
       const isPersonalUiActive = personalMode || document.body.classList.contains('personal-calendar-perspective');
+      if (isPersonalUiActive && event.target.closest('#personalCalendarBackButton')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closePersonalCalendar();
+        return;
+      }
       if (isPersonalUiActive && event.target.closest('#dashboardButton')) {
         event.preventDefault();
         event.stopImmediatePropagation();
